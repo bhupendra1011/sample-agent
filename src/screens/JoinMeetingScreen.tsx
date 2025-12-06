@@ -1,0 +1,141 @@
+// src/screens/JoinMeetingScreen.tsx
+import React, { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import useAppStore from "../store/useAppStore";
+import { joinExistingMeetingApi, AGORA_CONFIG } from "../api/agoraApi";
+import { showToast } from "../services/uiService";
+import { useAgora } from "../hooks/useAgora";
+import { MdCallMerge } from "react-icons/md";
+
+import Card from "../components/common/Card";
+import Button from "../components/common/Button";
+import InputField from "../components/common/InputField";
+
+const JoinMeetingScreen: React.FC = () => {
+  const callStart = useAppStore((state) => state.callStart);
+  const callEnd = useAppStore((state) => state.callEnd);
+  const setWhiteboardCredentials = useAppStore(
+    (state) => state.setWhiteboardCredentials
+  );
+  const { joinMeeting: joinAgoraMeeting } = useAgora();
+  const navigate = useNavigate();
+
+  const [yourName, setYourName] = useState<string>("");
+  const [meetingID, setMeetingID] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  const handleJoinMeeting = async () => {
+    if (!yourName.trim() || !meetingID.trim()) {
+      showToast("Please enter your name and the Meeting ID.", "error");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const meetingInfo = await joinExistingMeetingApi({
+        userName: yourName,
+        passphrase: meetingID,
+      });
+
+      callStart({
+        userName: yourName,
+        uid: meetingInfo.mainUser.uid,
+        meetingName: meetingInfo.title,
+        hostPassphrase: meetingInfo.hostPassphrase,
+        viewerPassphrase: meetingInfo.viewerPassphrase,
+      });
+
+      await joinAgoraMeeting(
+        meetingInfo.mainUser.rtc || "",
+        meetingInfo.mainUser.rtm,
+        Number(meetingInfo.mainUser.uid),
+        meetingInfo.channel,
+        meetingInfo.title,
+        meetingInfo?.hostPassphrase,
+        meetingInfo?.viewerPassphrase,
+        yourName
+      );
+
+      // Store whiteboard credentials if available
+      if (
+        meetingInfo.whiteboard?.room_token &&
+        meetingInfo.whiteboard?.room_uuid
+      ) {
+        setWhiteboardCredentials(
+          meetingInfo.whiteboard.room_token,
+          meetingInfo.whiteboard.room_uuid,
+          AGORA_CONFIG.WHITEBOARD_APPIDENTIFIER,
+          AGORA_CONFIG.WHITEBOARD_REGION
+        );
+      }
+
+      navigate(`/call/${meetingInfo.hostPassphrase}`);
+    } catch (error) {
+      console.error("Failed to join meeting:", error);
+      showToast(
+        "Failed to join meeting. Please check the Meeting ID and your name, then try again.",
+        "error"
+      );
+      callEnd();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    // UPDATED: Using direct Tailwind default colors for screen background/text
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white p-4 font-inter transition-colors duration-300">
+      <Card>
+        <div className="flex items-center mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white">
+            Join Meeting
+          </h1>
+        </div>
+
+        <InputField
+          id="yourName"
+          label="Your Name"
+          placeholder="e.g., Alice Smith"
+          value={yourName}
+          onChange={(e) => setYourName(e.target.value)}
+          focusRingColorClass="focus:ring-green-500 dark:focus:ring-green-400"
+        />
+
+        <InputField
+          id="meetingID"
+          label="Meeting ID"
+          placeholder="Enter meeting passphrase or ID"
+          value={meetingID}
+          onChange={(e) => setMeetingID(e.target.value)}
+          focusRingColorClass="focus:ring-green-500 dark:focus:ring-green-400"
+          wrapperClassName="mb-6 sm:mb-8"
+        />
+
+        <Button
+          onClick={handleJoinMeeting}
+          disabled={isLoading}
+          isLoading={isLoading}
+          Icon={MdCallMerge}
+          variant="primary"
+        >
+          Join Meeting
+        </Button>
+
+        <div className="mt-6 sm:mt-8 text-center">
+          {/* UPDATED: Using direct Tailwind default colors for link text */}
+          <span className="text-gray-600 dark:text-gray-400">
+            Need to host?{" "}
+          </span>
+          <Link
+            to="/"
+            className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold transition-colors duration-200 text-base sm:text-lg"
+          >
+            Create a New Meeting
+          </Link>
+        </div>
+      </Card>
+    </div>
+  );
+};
+
+export default JoinMeetingScreen;
