@@ -6,6 +6,15 @@ import AgoraRTC from "agora-rtc-sdk-ng";
 // Define Theme type
 type Theme = "light" | "dark";
 
+// Define Toast types
+export type ToastType = "success" | "error" | "warning" | "info";
+
+export interface Toast {
+  id: string;
+  message: string;
+  type: ToastType;
+}
+
 interface AppState {
   // Existing state...
   videoMuted: boolean;
@@ -73,6 +82,12 @@ interface AppState {
   }) => void;
   removeRemoteParticipant: (payload: { uid: string }) => void;
   setScreenShareStatus: (status: boolean) => void;
+
+  // --- Toast State ---
+  toasts: Toast[];
+  addToast: (message: string, type: ToastType) => void;
+  removeToast: (id: string) => void;
+  // --- END Toast State ---
 }
 
 /**
@@ -203,6 +218,20 @@ const useAppStore = create<AppState>((set, get) => ({
       return { remoteParticipants: newRemoteParticipants };
     }),
   setScreenShareStatus: (status) => set({ isScreenSharing: status }),
+
+  // --- Toast Actions ---
+  toasts: [],
+  addToast: (message, type) => {
+    const id = `toast-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    set((state) => ({
+      toasts: [...state.toasts, { id, message, type }],
+    }));
+  },
+  removeToast: (id) =>
+    set((state) => ({
+      toasts: state.toasts.filter((toast) => toast.id !== id),
+    })),
+  // --- END Toast Actions ---
 }));
 
 // Apply default theme to HTML root on load (important for initial render)
