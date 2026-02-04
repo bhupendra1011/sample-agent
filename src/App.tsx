@@ -9,7 +9,6 @@ import "./index.css";
 
 function App() {
   const callActive = useAppStore((state) => state.callActive);
-  const meetingName = useAppStore((state) => state.meetingName);
   const navigate = useNavigate();
   const theme = useAppStore((state) => state.theme);
 
@@ -19,21 +18,11 @@ function App() {
   }, [theme]);
 
   useEffect(() => {
-    if (callActive) {
-      if (meetingName) {
-        navigate(`/call/${meetingName}`);
-      } else {
-        console.warn(
-          "Call active but meetingName is missing. Navigating to generic call route."
-        );
-        navigate("/call/active");
-      }
-    } else {
-      if (window.location.pathname.startsWith("/call")) {
-        navigate("/");
-      }
+    // When call ends, redirect away from call screen back to home
+    if (!callActive && window.location.pathname.startsWith("/call")) {
+      navigate("/");
     }
-  }, [callActive, meetingName, navigate]);
+  }, [callActive, navigate]);
 
   return (
     // UPDATED: Using direct Tailwind default colors for primary background/text

@@ -55,12 +55,16 @@ const CreateMeetingScreen: React.FC = () => {
         meetingInfo.viewerPassphrase,
         yourName
       );
+
+      // callStart AFTER joinAgoraMeeting completes - setting callActive triggers
+      // navigation via App.tsx, so Agora must be fully connected first
       callStart({
         userName: yourName,
         uid: meetingInfo.mainUser.uid,
         meetingName: meetingInfo.title,
         hostPassphrase: meetingInfo.hostPassphrase,
         viewerPassphrase: meetingInfo.viewerPassphrase,
+        isHost: true, // Creator is always the host
       });
 
       // Store whiteboard credentials if available
@@ -76,7 +80,7 @@ const CreateMeetingScreen: React.FC = () => {
         );
       }
 
-      // navigate(`/call/${meetingInfo.hostPassphrase}`);
+      navigate(`/call/${meetingInfo.channel}`);
     } catch (error) {
       console.error("Failed to create and join meeting:", error);
       showToast(

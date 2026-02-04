@@ -2,21 +2,29 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import AgoraRTC from "agora-rtc-sdk-ng"; // Agora Web RTC SDK
-import AgoraRTM from "agora-rtm-sdk"; // Agora RTM SDK (v1.x for this project)
+import type {
+  IAgoraRTCClient,
+  IAgoraRTCRemoteUser,
+  ILocalVideoTrack,
+  ILocalAudioTrack,
+} from "agora-rtc-sdk-ng";
+import AgoraRTM from "agora-rtm-sdk"; // Agora RTM SDK v2.x
 import useAppStore from "../store/useAppStore"; // Zustand store for global client state
 import { AGORA_CONFIG } from "../api/agoraApi"; // Agora App ID and API Key from your config
 import { showToast } from "../services/uiService"; // Toast notifications
-import type { LocalAgoraTracks, MeetingResponse } from "../types/agora"; // Custom types
+import type { LocalAgoraTracks, HostControlMessage } from "../types/agora"; // Custom types
 
-// --- Initialize Agora RTC and RTM clients as singletons ---
+// --- Initialize Agora RTC client as singleton ---
 const RTC_CLIENT = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" }); // RTC Client for audio/video
-const RTM_CLIENT = AgoraRTM.createInstance(AGORA_CONFIG.APP_ID); // For v1.x, use createInstance with App ID
 
-// --- Variables to hold Agora-related instances and data within the module scope ---
-let rtmChannel: AgoraRTM.Channel | null = null;
-let screenClient: AgoraRTC.IAgoraRTCClient | null = null;
-let screenVideoTrack: AgoraRTC.ILocalVideoTrack | null = null;
-let screenAudioTrack: AgoraRTC.ILocalAudioTrack | null = null;
+// RTM v2.x client - will be initialized per user (requires userId at construction)
+let RTM_CLIENT: InstanceType<typeof AgoraRTM.RTM> | null = null;
+
+// Current RTM channel name for pub/sub
+let currentRtmChannelName: string | null = null;
+let screenClient: IAgoraRTCClient | null = null;
+let screenVideoTrack: ILocalVideoTrack | null = null;
+let screenAudioTrack: ILocalAudioTrack | null = null;
 
 let currentScreenShareToken: string | null = null;
 let currentScreenShareUid: string | null = null;
@@ -52,12 +60,8 @@ export const useAgora = () => {
   const callEnd = useAppStore((state) => state.callEnd);
 
   // --- 2. Local React States (useState) and Refs (useRef) ---
-  const [remoteUsers, setRemoteUsers] = useState<
-    AgoraRTC.IAgoraRTCRemoteUser[]
-  >([]);
-  const remoteUsersRef = useRef<Record<string, AgoraRTC.IAgoraRTCRemoteUser>>(
-    {}
-  );
+  const [remoteUsers, setRemoteUsers] = useState<IAgoraRTCRemoteUser[]>([]);
+  const remoteUsersRef = useRef<Record<string, IAgoraRTCRemoteUser>>({});
   // Track which remote users have been counted to prevent double counting
   const countedUsersRef = useRef<Set<string>>(new Set());
 
@@ -70,7 +74,7 @@ export const useAgora = () => {
 
   const handleUserPublished = useCallback(
     async (
-      user: AgoraRTC.IAgoraRTCRemoteUser,
+      user: IAgoraRTCRemoteUser,
       mediaType: "video" | "audio"
     ) => {
       console.log("User published:", user.uid, mediaType);
@@ -82,16 +86,15 @@ export const useAgora = () => {
 
         const userUidStr = String(user.uid);
 
-        if (mediaType === "video") {
-          // SYNCHRONOUSLY check and mark user as counted FIRST to prevent race conditions
-          const shouldIncrementCount = !countedUsersRef.current.has(userUidStr);
-          if (shouldIncrementCount) {
-            // Mark as counted IMMEDIATELY before any async operations
-            countedUsersRef.current.add(userUidStr);
-            increaseUserCount();
-            console.log("Increased user count for new video user:", userUidStr);
-          }
+        // Count user on FIRST publish event (audio or video) to prevent missed counts
+        const shouldIncrementCount = !countedUsersRef.current.has(userUidStr);
+        if (shouldIncrementCount) {
+          countedUsersRef.current.add(userUidStr);
+          increaseUserCount();
+          console.log("Increased user count for user:", userUidStr, "via", mediaType);
+        }
 
+        if (mediaType === "video") {
           // Update remote users state - only for video
           setRemoteUsers((prev) => {
             // Check if user already exists in ref
@@ -117,12 +120,17 @@ export const useAgora = () => {
           getAppStore.getState().remoteParticipants[userUidStr];
 
         // Update participant info for both audio and video
+        // Only set name if RTM has already provided it, otherwise let RTM set the real name later
         updateRemoteParticipant({
           uid: userUidStr,
-          name: existingParticipant?.name || `User ${user.uid}`,
+          name: existingParticipant?.name,
           micMuted: !user.hasAudio,
           videoMuted: !user.hasVideo,
         });
+
+        // Name will be updated via:
+        // 1. RTM "user-joined" message (contains name)
+        // 2. SNAPSHOT presence event (contains all users with their states)
       } catch (error) {
         console.error("Failed to subscribe to user:", error);
       }
@@ -131,7 +139,7 @@ export const useAgora = () => {
   );
 
   const handleUserUnpublished = useCallback(
-    (user: AgoraRTC.IAgoraRTCRemoteUser, mediaType: "video" | "audio") => {
+    (user: IAgoraRTCRemoteUser, mediaType: "video" | "audio") => {
       console.log("User unpublished:", user.uid, mediaType);
 
       if (mediaType === "video") {
@@ -151,7 +159,7 @@ export const useAgora = () => {
   );
 
   const handleUserLeft = useCallback(
-    (user: AgoraRTC.IAgoraRTCRemoteUser) => {
+    (user: IAgoraRTCRemoteUser) => {
       console.log("User left:", user.uid);
       const userUidStr = String(user.uid);
 
@@ -169,18 +177,17 @@ export const useAgora = () => {
       }
       removeRemoteParticipant({ uid: userUidStr });
 
-      // Send RTM message about user leaving
-      if (rtmChannel) {
-        rtmChannel
-          .sendMessage({
-            text: JSON.stringify({
-              type: "user-left",
-              uid: user.uid,
-            }),
-          } as any)
-          .catch((error) => {
-            console.error("Failed to send user-left message:", error);
-          });
+      // Send RTM message about user leaving (v2.x uses publish)
+      if (RTM_CLIENT && currentRtmChannelName) {
+        RTM_CLIENT.publish(
+          currentRtmChannelName,
+          JSON.stringify({
+            type: "user-left",
+            uid: user.uid,
+          })
+        ).catch((error) => {
+          console.error("Failed to send user-left message:", error);
+        });
       }
     },
     [decreaseUserCount, removeRemoteParticipant]
@@ -200,11 +207,27 @@ export const useAgora = () => {
     [updateRemoteParticipant]
   );
 
-  const handleRTMMessage = useCallback(
-    (message: AgoraRTM.ChannelMessage) => {
+  // RTM v2.x message event handler
+  interface RTMMessageEvent {
+    channelType: string;
+    channelName: string;
+    topicName?: string;
+    messageType: string;
+    customType?: string;
+    message: string | Uint8Array;
+    publisher: string;
+    timestamp: number;
+  }
+
+  const handleRTMMessageV2 = useCallback(
+    (event: RTMMessageEvent) => {
       try {
-        const data = JSON.parse(message.text || "");
-        console.log("RTM message received:", data.type, data);
+        // v2.x: message is in event.message, publisher in event.publisher
+        const messageText = typeof event.message === "string"
+          ? event.message
+          : new TextDecoder().decode(event.message);
+        const data = JSON.parse(messageText);
+        console.log("RTM v2.x message received:", data.type, data, "from:", event.publisher);
 
         switch (data.type) {
           case "user-joined":
@@ -215,6 +238,16 @@ export const useAgora = () => {
             }
 
             const joinedUid = String(data.uid);
+
+            // Skip processing our own user-joined message
+            {
+              const currentLocalUID = getAppStore.getState().localUID;
+              if (currentLocalUID && joinedUid === String(currentLocalUID)) {
+                console.log("Skipping own user-joined RTM message for uid:", joinedUid);
+                break;
+              }
+            }
+
             console.log(
               "Processing user-joined RTM message for uid:",
               joinedUid
@@ -251,6 +284,14 @@ export const useAgora = () => {
                     return prev; // Already exists
                   }
                   remoteUsersRef.current[joinedUid] = existingUser;
+
+                  // Also increment user count if not already counted
+                  if (!countedUsersRef.current.has(joinedUid)) {
+                    countedUsersRef.current.add(joinedUid);
+                    increaseUserCount();
+                    console.log("Increased user count for user added via RTM:", joinedUid);
+                  }
+
                   return [...prev, existingUser];
                 });
               }
@@ -306,6 +347,77 @@ export const useAgora = () => {
             }
             break;
 
+          case "host-mute-request":
+            // Host is requesting to mute this user's media
+            {
+              const hostMuteState = getAppStore.getState();
+              if (data.targetUid === String(hostMuteState.localUID)) {
+                console.log("Processing host mute request:", data);
+                showToast(
+                  `${data.fromName} (Host) muted your ${data.mediaType}`,
+                  "info"
+                );
+
+                // Mute the appropriate track(s) and broadcast state
+                (async () => {
+                  try {
+                    if (data.mediaType === "audio" || data.mediaType === "both") {
+                      const audioTrack = localTracksRef.current.audioTrack;
+                      if (audioTrack && !hostMuteState.audioMuted) {
+                        await audioTrack.setMuted(true);
+                        hostMuteState.toggleAudioMute();
+                      }
+                    }
+
+                    if (data.mediaType === "video" || data.mediaType === "both") {
+                      const videoTrack = localTracksRef.current.videoTrack;
+                      if (videoTrack && !hostMuteState.videoMuted) {
+                        await videoTrack.setMuted(true);
+                        hostMuteState.toggleVideoMute();
+                      }
+                    }
+
+                    // Broadcast updated state to all participants
+                    if (RTM_CLIENT && currentRtmChannelName) {
+                      const updatedState = getAppStore.getState();
+                      await RTM_CLIENT.publish(
+                        currentRtmChannelName,
+                        JSON.stringify({
+                          type: "media-state-updated",
+                          uid: updatedState.localUID,
+                          micMuted: updatedState.audioMuted,
+                          videoMuted: updatedState.videoMuted,
+                        })
+                      );
+                      await RTM_CLIENT.presence.setState(currentRtmChannelName, "MESSAGE", {
+                        micMuted: updatedState.audioMuted.toString(),
+                        videoMuted: updatedState.videoMuted.toString(),
+                      });
+                    }
+                  } catch (error) {
+                    console.error("Failed to process mute request:", error);
+                  }
+                })();
+              }
+            }
+            break;
+
+          case "host-unmute-request":
+            // Host is requesting to unmute - show consent modal
+            {
+              const hostUnmuteState = getAppStore.getState();
+              if (data.targetUid === String(hostUnmuteState.localUID)) {
+                console.log("Processing host unmute request:", data);
+                hostUnmuteState.setPendingUnmuteRequest({
+                  fromUid: data.fromUid,
+                  fromName: data.fromName,
+                  mediaType: data.mediaType,
+                  timestamp: data.timestamp,
+                });
+              }
+            }
+            break;
+
           default:
             console.log("Unknown RTM message type:", data.type);
         }
@@ -313,8 +425,131 @@ export const useAgora = () => {
         console.error("Failed to parse RTM message:", error);
       }
     },
-    [updateRemoteParticipant, getAppStore]
+    [updateRemoteParticipant, getAppStore, increaseUserCount]
   );
+
+  // --- 3.5 Host Control Functions ---
+
+  /**
+   * Sends a mute/unmute request to a specific user via RTM User Channel
+   */
+  const sendHostControlRequest = useCallback(
+    async (
+      targetUid: string,
+      action: "mute" | "unmute",
+      mediaType: "audio" | "video" | "both"
+    ): Promise<boolean> => {
+      if (!RTM_CLIENT) {
+        showToast("RTM not connected", "error");
+        return false;
+      }
+
+      const currentState = getAppStore.getState();
+      if (!currentState.isHost) {
+        showToast("Only hosts can mute/unmute participants", "error");
+        return false;
+      }
+
+      const message: HostControlMessage = {
+        type: action === "mute" ? "host-mute-request" : "host-unmute-request",
+        fromUid: String(currentState.localUID),
+        fromName: currentState.localUsername,
+        targetUid: targetUid,
+        mediaType: mediaType,
+        timestamp: Date.now(),
+      };
+
+      try {
+        // RTM v2.x: Publish to User Channel (private message to specific user)
+        await RTM_CLIENT.publish(targetUid, JSON.stringify(message));
+        console.log(`Host control request sent to ${targetUid}:`, message);
+
+        // Only show toast for unmute requests (mute auto-applies silently)
+        if (action === "unmute") {
+          showToast("Unmute request sent", "info");
+        }
+        return true;
+      } catch (error) {
+        console.error("Failed to send host control request:", error);
+        showToast("Failed to send control request", "error");
+        return false;
+      }
+    },
+    [getAppStore]
+  );
+
+  /**
+   * User accepts the unmute request and enables their media
+   */
+  const acceptUnmuteRequest = useCallback(async () => {
+    const currentState = getAppStore.getState();
+    const request = currentState.pendingUnmuteRequest;
+
+    if (!request) return;
+
+    try {
+      // Enable the appropriate track(s) using ref (correct ILocalTrack type)
+      if (request.mediaType === "audio" || request.mediaType === "both") {
+        const audioTrack = localTracksRef.current.audioTrack;
+        if (audioTrack && currentState.audioMuted) {
+          await audioTrack.setMuted(false);
+          currentState.toggleAudioMute();
+        }
+      }
+
+      if (request.mediaType === "video" || request.mediaType === "both") {
+        const videoTrack = localTracksRef.current.videoTrack;
+        if (videoTrack && currentState.videoMuted) {
+          await videoTrack.setMuted(false);
+          currentState.toggleVideoMute();
+        }
+      }
+
+      // Broadcast updated state
+      if (RTM_CLIENT && currentRtmChannelName) {
+        const newAudioMuted =
+          request.mediaType === "audio" || request.mediaType === "both"
+            ? false
+            : currentState.audioMuted;
+        const newVideoMuted =
+          request.mediaType === "video" || request.mediaType === "both"
+            ? false
+            : currentState.videoMuted;
+
+        await RTM_CLIENT.publish(
+          currentRtmChannelName,
+          JSON.stringify({
+            type: "media-state-updated",
+            uid: currentState.localUID,
+            micMuted: newAudioMuted,
+            videoMuted: newVideoMuted,
+          })
+        );
+
+        // Update presence for late joiners
+        await RTM_CLIENT.presence.setState(currentRtmChannelName, "MESSAGE", {
+          micMuted: newAudioMuted.toString(),
+          videoMuted: newVideoMuted.toString(),
+        });
+      }
+
+      showToast("Media enabled", "success");
+    } catch (error) {
+      console.error("Failed to accept unmute request:", error);
+      showToast("Failed to enable media", "error");
+    } finally {
+      currentState.clearPendingUnmuteRequest();
+    }
+  }, [getAppStore]);
+
+  /**
+   * User declines the unmute request
+   */
+  const declineUnmuteRequest = useCallback(() => {
+    const currentState = getAppStore.getState();
+    currentState.clearPendingUnmuteRequest();
+    showToast("Unmute request declined", "info");
+  }, [getAppStore]);
 
   // --- 4. Core Agora SDK Utility Functions (useCallback) ---
 
@@ -336,46 +571,107 @@ export const useAgora = () => {
       videoMutedState: boolean
     ) => {
       try {
-        // Step 1: Login to RTM with token
-        await RTM_CLIENT.login({ uid, token });
-
-        // Step 2: Create channel instance
-        rtmChannel = RTM_CLIENT.createChannel(channelId);
-
-        // Step 3: Set up channel event listeners
-        rtmChannel.on("ChannelMessage", handleRTMMessage);
-        rtmChannel.on("MemberJoined", (memberId: string) => {
-          console.log("RTM Member joined:", memberId);
-        });
-        rtmChannel.on("MemberLeft", (memberId: string) => {
-          console.log("RTM Member left:", memberId);
+        // RTM v2.x: Create client with appId and userId
+        RTM_CLIENT = new AgoraRTM.RTM(AGORA_CONFIG.APP_ID, uid, {
+          useStringUserId: true,
         });
 
-        // Step 4: Join the RTM channel
-        await rtmChannel.join();
+        // Store channel name for pub/sub
+        currentRtmChannelName = channelId;
 
-        // Step 5: Set initial user attributes
-        await RTM_CLIENT.setLocalUserAttributes({
+        // Step 1: Set up event listeners BEFORE login (v2.x pattern)
+        RTM_CLIENT.addEventListener("message", (event) => {
+          // v2.x message event structure
+          handleRTMMessageV2(event);
+        });
+
+        RTM_CLIENT.addEventListener("presence", async (event) => {
+          console.log("RTM Presence event:", event.eventType, event);
+
+          if (event.eventType === "SNAPSHOT") {
+            // SNAPSHOT fires when joining a channel - contains all current users with their states
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const snapshot = (event as any).snapshot as Array<{
+              userId: string;
+              states: Record<string, string>;
+            }> | undefined;
+
+            console.log("Processing SNAPSHOT with users:", snapshot);
+
+            if (snapshot && Array.isArray(snapshot)) {
+              snapshot.forEach((user) => {
+                // Skip local user
+                if (user.userId === uid) return;
+
+                if (user.states?.name) {
+                  console.log("Found user in SNAPSHOT:", user.userId, user.states.name);
+                  updateRemoteParticipant({
+                    uid: user.userId,
+                    name: user.states.name,
+                    micMuted: user.states.micMuted === "true",
+                    videoMuted: user.states.videoMuted === "true",
+                  });
+                }
+              });
+            }
+          } else if (event.eventType === "REMOTE_JOIN") {
+            console.log("RTM Member joined:", event.publisher);
+            // User name will be received via RTM "user-joined" message
+            // No need to call getState() here as it doesn't work with MESSAGE channel type
+          } else if (event.eventType === "REMOTE_LEAVE") {
+            console.log("RTM Member left:", event.publisher);
+          } else if (event.eventType === "REMOTE_STATE_CHANGED") {
+            // Handle user state/attributes changes
+            if (event.publisher && event.stateChanged) {
+              // stateChanged in RTM v2.x is a plain object like {name: "sdfsdf", micMuted: "false", ...}
+              const stateChanged = event.stateChanged as Record<string, string>;
+              console.log("Processing REMOTE_STATE_CHANGED for:", event.publisher, stateChanged);
+
+              // Directly update participant with the state object
+              if (stateChanged.name || stateChanged.micMuted !== undefined || stateChanged.videoMuted !== undefined) {
+                updateRemoteParticipant({
+                  uid: event.publisher,
+                  name: stateChanged.name,
+                  micMuted: stateChanged.micMuted === "true",
+                  videoMuted: stateChanged.videoMuted === "true",
+                });
+                console.log("Updated remote participant from REMOTE_STATE_CHANGED:", event.publisher, stateChanged.name);
+              }
+            }
+          }
+        });
+
+        RTM_CLIENT.addEventListener("status", (event) => {
+          console.log("RTM Status:", event.state, event.reason);
+        });
+
+        // Step 2: Login to RTM with token (v2.x pattern)
+        await RTM_CLIENT.login({ token });
+
+        // Step 3: Subscribe to channel with presence enabled
+        await RTM_CLIENT.subscribe(channelId, {
+          withMessage: true,
+          withPresence: true,
+          withMetadata: false,
+          withLock: false,
+        });
+
+        // Step 4: Set initial user state using presence (replaces setLocalUserAttributes)
+        await RTM_CLIENT.presence.setState(channelId, "MESSAGE", {
           name: localUsername,
           micMuted: audioMutedState.toString(),
           videoMuted: videoMutedState.toString(),
         });
 
-        // Step 6: Listen for remote user attribute updates
-        // In RTM v2.x, this event might be different - check documentation
-        RTM_CLIENT.on("UserAttributesUpdated", (attributes, uid) => {
-          handleRemoteUserAttributesUpdated(uid, attributes);
-        });
-
-        console.log("RTM initialized successfully for channel:", channelId);
+        console.log("RTM v2.x initialized successfully for channel:", channelId);
       } catch (error) {
         console.error("Failed to initialize RTM:", error);
         showToast("Failed to initialize RTM. Please try again.", "error");
         throw error;
       }
     },
-    [handleRTMMessage, handleRemoteUserAttributesUpdated]
-  ); // Dependencies
+    [handleRemoteUserAttributesUpdated, handleRTMMessageV2]
+  ); // Dependencies for initializeAgoraRTM
 
   // --- 5. Screen Share Functions (MUST BE DEFINED BEFORE _cleanupAgoraResources) ---
 
@@ -432,10 +728,10 @@ export const useAgora = () => {
 
   const _cleanupAgoraResources = useCallback(
     async (
-      currentLocalAudioTrack: AgoraRTC.IAudioTrack | null,
-      currentLocalVideoTrack: AgoraRTC.IVideoTrack | null,
+      currentLocalAudioTrack: ILocalAudioTrack | null,
+      currentLocalVideoTrack: ILocalVideoTrack | null,
       isScreenSharingStatus: boolean,
-      setScreenShareStatusAction: (status: boolean) => void,
+      _setScreenShareStatusAction: (status: boolean) => void,
       callEndAction: () => void,
       stopScreenshareAction: () => Promise<void> // Passed `stopScreenshare` from outer scope
     ) => {
@@ -448,12 +744,19 @@ export const useAgora = () => {
       if (RTC_CLIENT && RTC_CLIENT.connectionState === "CONNECTED") {
         await RTC_CLIENT.leave();
       }
-      if (rtmChannel && rtmChannel.channelId) {
-        await rtmChannel.leave();
-        rtmChannel = null;
-      }
-      if (RTM_CLIENT && RTM_CLIENT.connectionState === "CONNECTED") {
-        await RTM_CLIENT.logout();
+      // RTM v2.x cleanup: unsubscribe and logout
+      if (RTM_CLIENT) {
+        try {
+          if (currentRtmChannelName) {
+            await RTM_CLIENT.unsubscribe(currentRtmChannelName);
+            currentRtmChannelName = null;
+          }
+          RTM_CLIENT.removeAllListeners();
+          await RTM_CLIENT.logout();
+          RTM_CLIENT = null;
+        } catch (rtmError) {
+          console.warn("Error during RTM cleanup:", rtmError);
+        }
       }
       if (isScreenSharingStatus) {
         await stopScreenshareAction();
@@ -514,25 +817,23 @@ export const useAgora = () => {
           }
         }
 
-        // Clean up RTM if already connected
-        if (rtmChannel && rtmChannel.channelId) {
+        // Clean up RTM v2.x if already connected
+        if (RTM_CLIENT) {
           try {
-            await rtmChannel.leave();
-            rtmChannel.removeAllListeners();
-            rtmChannel = null;
-          } catch (rtmLeaveError) {
-            console.warn("Error leaving existing RTM channel:", rtmLeaveError);
-          }
-        }
-
-        // Logout RTM client if logged in
-        try {
-          RTM_CLIENT.removeAllListeners();
-          await RTM_CLIENT.logout();
-        } catch (rtmLogoutError: any) {
-          // Ignore errors if not logged in
-          if (rtmLogoutError?.code !== "RTM_LOGIN_ERROR_NOT_LOGGED_IN") {
-            console.warn("Error logging out RTM client:", rtmLogoutError);
+            // Unsubscribe from channel if subscribed
+            if (currentRtmChannelName) {
+              await RTM_CLIENT.unsubscribe(currentRtmChannelName);
+              currentRtmChannelName = null;
+            }
+            RTM_CLIENT.removeAllListeners();
+            await RTM_CLIENT.logout();
+            RTM_CLIENT = null;
+          } catch (rtmLogoutError: unknown) {
+            // Ignore errors if not logged in
+            const error = rtmLogoutError as { code?: string };
+            if (error?.code !== "RTM_ERROR_NOT_LOGIN") {
+              console.warn("Error cleaning up RTM client:", rtmLogoutError);
+            }
           }
         }
 
@@ -566,19 +867,21 @@ export const useAgora = () => {
         );
         await RTC_CLIENT.publish([audioTrack, videoTrack]);
 
-        // Count local user (don't add local user to remoteParticipants - they're not remote!)
-        increaseUserCount();
+        // Local user count is now set in callStart() - don't double count here
 
-        // Send RTM message to notify other users
-        rtmChannel?.sendMessage({
-          text: JSON.stringify({
-            type: "user-joined",
-            uid: uid,
-            name: userName || `User ${uid}`,
-            micMuted: audioMuted,
-            videoMuted: videoMuted,
-          }),
-        } as AgoraRTM.Message);
+        // Send RTM message to notify other users (v2.x uses publish)
+        if (RTM_CLIENT && currentRtmChannelName) {
+          await RTM_CLIENT.publish(
+            currentRtmChannelName,
+            JSON.stringify({
+              type: "user-joined",
+              uid: uid,
+              name: userName || `User ${uid}`,
+              micMuted: audioMuted,
+              videoMuted: videoMuted,
+            })
+          );
+        }
 
         showToast("Joined meeting successfully!", "success");
       } catch (error) {
@@ -602,7 +905,6 @@ export const useAgora = () => {
       callEnd,
       createLocalTracks,
       getAppStore,
-      increaseUserCount,
       initializeAgoraRTM,
       stopScreenshare,
       updateRemoteParticipant,
@@ -621,6 +923,25 @@ export const useAgora = () => {
     RTC_CLIENT.on("user-published", handleUserPublished);
     RTC_CLIENT.on("user-unpublished", handleUserUnpublished);
     RTC_CLIENT.on("user-left", handleUserLeft);
+
+    // Sync existing remote users from RTC_CLIENT into local state
+    // This handles the case where users published before this hook instance mounted
+    if (RTC_CLIENT.connectionState === "CONNECTED") {
+      const existingRemoteUsers = RTC_CLIENT.remoteUsers;
+      if (existingRemoteUsers.length > 0) {
+        setRemoteUsers((prev) => {
+          const newUsers = [...prev];
+          existingRemoteUsers.forEach((user) => {
+            const uidStr = String(user.uid);
+            if (!remoteUsersRef.current[uidStr]) {
+              remoteUsersRef.current[uidStr] = user;
+              newUsers.push(user);
+            }
+          });
+          return newUsers;
+        });
+      }
+    }
 
     return () => {
       // Cleanup listeners on unmount
@@ -641,23 +962,25 @@ export const useAgora = () => {
   const updateLocalMediaState = async () => {
     try {
       // Only sync RTM attributes - track state is handled by Controls.tsx
-      // This syncs the mute state with other participants via RTM
-      if (rtmChannel && localUID) {
+      // This syncs the mute state with other participants via RTM v2.x
+      if (RTM_CLIENT && currentRtmChannelName && localUID) {
         try {
-          await RTM_CLIENT.setLocalUserAttributes({
+          // v2.x: Use presence.setState instead of setLocalUserAttributes
+          await RTM_CLIENT.presence.setState(currentRtmChannelName, "MESSAGE", {
             micMuted: audioMuted.toString(),
             videoMuted: videoMuted.toString(),
           });
 
-          // Also send RTM message for immediate sync
-          await rtmChannel.sendMessage({
-            text: JSON.stringify({
+          // Also send RTM message for immediate sync (v2.x uses publish)
+          await RTM_CLIENT.publish(
+            currentRtmChannelName,
+            JSON.stringify({
               type: "media-state-updated",
               uid: localUID,
               micMuted: audioMuted,
               videoMuted: videoMuted,
-            }),
-          } as any);
+            })
+          );
         } catch (rtmError) {
           console.warn("Failed to sync media state via RTM:", rtmError);
         }
@@ -690,22 +1013,52 @@ export const useAgora = () => {
       if (user.videoTrack) {
         const element = document.getElementById(`user-${user.uid}`);
         if (element && !user.videoTrack.isPlaying) {
-          // play() may return undefined or a Promise, handle both cases
-          const playResult = user.videoTrack.play(element);
-          if (playResult && typeof playResult.catch === "function") {
-            playResult.catch((error) => {
-              console.error(
-                `Failed to play video for user ${user.uid}:`,
-                error
-              );
-            });
+          try {
+            user.videoTrack.play(element);
+          } catch (error) {
+            console.error(`Failed to play video for user ${user.uid}:`, error);
           }
         }
       }
     });
   }, [remoteUsers]);
 
-  // --- 9. Return values from hook ---
+  // --- 9. Toggle local audio/video using the track ref (correct ILocalTrack type) ---
+
+  const toggleLocalAudio = useCallback(async () => {
+    try {
+      const track = localTracksRef.current.audioTrack;
+      const currentlyMuted = getAppStore.getState().audioMuted;
+      if (track) {
+        await track.setMuted(!currentlyMuted);
+      }
+      getAppStore.getState().toggleAudioMute();
+    } catch (error) {
+      console.error("Failed to toggle audio:", error);
+      showToast("Failed to toggle microphone", "error");
+    }
+  }, [getAppStore]);
+
+  const toggleLocalVideo = useCallback(async () => {
+    try {
+      const track = localTracksRef.current.videoTrack;
+      const currentlyMuted = getAppStore.getState().videoMuted;
+      if (track) {
+        await track.setMuted(!currentlyMuted);
+      }
+      getAppStore.getState().toggleVideoMute();
+    } catch (error) {
+      console.error("Failed to toggle video:", error);
+      showToast("Failed to toggle camera", "error");
+    }
+  }, [getAppStore]);
+
+  // Helper function to publish RTM messages (for whiteboard sync, etc.)
+  const publishRtmMessage = useCallback(async (message: string) => {
+    if (RTM_CLIENT && currentRtmChannelName) {
+      await RTM_CLIENT.publish(currentRtmChannelName, message);
+    }
+  }, []);
 
   return {
     joinMeeting,
@@ -718,6 +1071,13 @@ export const useAgora = () => {
     startScreenshare,
     stopScreenshare,
     isScreenSharing,
-    rtmChannel, // Expose for whiteboard sync
+    publishRtmMessage, // Expose for whiteboard sync (replaces rtmChannel)
+    // Host control functions
+    sendHostControlRequest,
+    acceptUnmuteRequest,
+    declineUnmuteRequest,
+    // Local mute toggles (use track ref with correct type)
+    toggleLocalAudio,
+    toggleLocalVideo,
   };
 };

@@ -1,6 +1,6 @@
 // src/store/useAppStore.ts
 import { create } from "zustand";
-import { Participant } from "../types/agora";
+import type { Participant, PendingUnmuteRequest } from "../types/agora";
 import AgoraRTC from "agora-rtc-sdk-ng";
 
 // Define Theme type
@@ -30,6 +30,10 @@ interface AppState {
   remoteParticipants: {
     [uid: string]: Participant;
   };
+
+  // Host control state
+  isHost: boolean;
+  pendingUnmuteRequest: PendingUnmuteRequest | null;
 
   // --- NEW Theme State ---
   theme: Theme;
@@ -61,6 +65,11 @@ interface AppState {
   ) => void;
   // --- END Whiteboard State ---
 
+  // Host control actions
+  setIsHost: (isHost: boolean) => void;
+  setPendingUnmuteRequest: (request: PendingUnmuteRequest | null) => void;
+  clearPendingUnmuteRequest: () => void;
+
   // Existing actions...
   toggleVideoMute: () => void;
   toggleAudioMute: () => void;
@@ -70,6 +79,7 @@ interface AppState {
     meetingName: string;
     hostPassphrase?: string;
     viewerPassphrase?: string;
+    isHost?: boolean;
   }) => void;
   callEnd: () => void;
   increaseUserCount: () => void;
@@ -119,6 +129,15 @@ const useAppStore = create<AppState>((set, get) => ({
   isScreenSharing: false,
   remoteParticipants: {},
 
+  // Host control initial state
+  isHost: false,
+  pendingUnmuteRequest: null,
+
+  // Host control actions
+  setIsHost: (isHost) => set({ isHost }),
+  setPendingUnmuteRequest: (request) => set({ pendingUnmuteRequest: request }),
+  clearPendingUnmuteRequest: () => set({ pendingUnmuteRequest: null }),
+
   // --- NEW Theme Initial State & Actions ---
   theme: "dark",
   toggleTheme: () =>
@@ -163,6 +182,8 @@ const useAppStore = create<AppState>((set, get) => ({
       meetingName: payload.meetingName,
       hostPassphrase: payload.hostPassphrase || "",
       viewerPassphrase: payload.viewerPassphrase || "",
+      isHost: payload.isHost || false,
+      userCount: 1, // Start with 1 for local user
     }),
   callEnd: () =>
     set({
@@ -180,6 +201,8 @@ const useAppStore = create<AppState>((set, get) => ({
       whiteboardAppIdentifier: "",
       whiteboardRegion: "",
       isWhiteboardActive: false,
+      isHost: false,
+      pendingUnmuteRequest: null,
     }),
   increaseUserCount: () => set((state) => ({ userCount: state.userCount + 1 })),
   decreaseUserCount: () => set((state) => ({ userCount: state.userCount - 1 })),
@@ -187,14 +210,32 @@ const useAppStore = create<AppState>((set, get) => ({
     set((state) => {
       const { uid, name, micMuted, videoMuted } = payload;
       const existingParticipant = state.remoteParticipants[uid] || {};
+
+      // Helper to check if a name is a generic fallback like "User 12345"
+      const isGenericName = (n: string | undefined): boolean =>
+        !n || /^User \d+$/.test(n);
+
+      // Determine the final name:
+      // - If a real name is provided, use it
+      // - If existing has a real name and new is generic/undefined, keep existing
+      // - Otherwise use fallback
+      let finalName: string;
+      if (name !== undefined && !isGenericName(name)) {
+        // New name is a real name, use it
+        finalName = name;
+      } else if (!isGenericName(existingParticipant.name)) {
+        // Existing has a real name, preserve it
+        finalName = existingParticipant.name!;
+      } else {
+        // Fall back to provided name or generic
+        finalName = name ?? existingParticipant.name ?? `User ${uid}`;
+      }
+
       return {
         remoteParticipants: {
           ...state.remoteParticipants,
           [uid]: {
-            name:
-              name !== undefined
-                ? name
-                : existingParticipant.name || `User ${uid}`,
+            name: finalName,
             micMuted:
               micMuted !== undefined
                 ? micMuted

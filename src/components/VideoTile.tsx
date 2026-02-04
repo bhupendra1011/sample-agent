@@ -23,15 +23,12 @@ const VideoTile: React.FC<VideoTileProps> = ({
   const videoContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (videoContainerRef.current && track && !videoMuted) {
-      track.play(videoContainerRef.current);
-      const placeholder =
-        videoContainerRef.current.querySelector(".video-placeholder");
-      if (placeholder) placeholder.classList.add("hidden");
-    } else if (videoContainerRef.current) {
-      const placeholder =
-        videoContainerRef.current.querySelector(".video-placeholder");
-      if (placeholder) placeholder.classList.remove("hidden");
+    if (videoContainerRef.current && track) {
+      if (!videoMuted) {
+        track.play(videoContainerRef.current);
+      } else {
+        track.stop();
+      }
     }
   }, [track, videoMuted]);
 
@@ -60,7 +57,7 @@ const VideoTile: React.FC<VideoTileProps> = ({
       {/* UPDATED: Using direct Tailwind default colors for label background/text/icons */}
       <div className="absolute bottom-2 left-2 bg-gray-800 dark:bg-gray-900 bg-opacity-70 px-3 py-1 rounded-md text-base z-10 flex items-center space-x-2 text-white">
         <span className="font-medium">
-          {isLocal ? "Local" : "User"} - {name}
+          {isLocal ? `${name} (You)` : name}
         </span>
         <span className="flex items-center">
           {micMuted ? (

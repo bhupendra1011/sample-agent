@@ -45,6 +45,34 @@ export interface Participant {
  * to initialize Agora RTC and RTM clients, and to manage screen sharing.
  */
 
+/**
+ * Host control message types for RTM User Channel (private messages)
+ */
+export type HostControlMessageType = "host-mute-request" | "host-unmute-request";
+
+/**
+ * Message payload for host mute/unmute requests
+ * Sent via RTM User Channel (private, to specific user)
+ */
+export interface HostControlMessage {
+  type: HostControlMessageType;
+  fromUid: string;
+  fromName: string;
+  targetUid: string;
+  mediaType: "audio" | "video" | "both";
+  timestamp: number;
+}
+
+/**
+ * Pending unmute request shown in consent modal
+ */
+export interface PendingUnmuteRequest {
+  fromUid: string;
+  fromName: string;
+  mediaType: "audio" | "video" | "both";
+  timestamp: number;
+}
+
 export interface MeetingResponse {
   /**
    * The unique ID of the Agora channel/meeting.

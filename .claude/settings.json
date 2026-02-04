@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "npm run *",
+      "npm install *",
+      "git *"
+    ]
+  }
+}

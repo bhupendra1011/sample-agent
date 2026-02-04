@@ -37,14 +37,6 @@ const JoinMeetingScreen: React.FC = () => {
         passphrase: meetingID,
       });
 
-      callStart({
-        userName: yourName,
-        uid: meetingInfo.mainUser.uid,
-        meetingName: meetingInfo.title,
-        hostPassphrase: meetingInfo.hostPassphrase,
-        viewerPassphrase: meetingInfo.viewerPassphrase,
-      });
-
       await joinAgoraMeeting(
         meetingInfo.mainUser.rtc || "",
         meetingInfo.mainUser.rtm,
@@ -55,6 +47,17 @@ const JoinMeetingScreen: React.FC = () => {
         meetingInfo?.viewerPassphrase,
         yourName
       );
+
+      // callStart AFTER joinAgoraMeeting completes - setting callActive triggers
+      // redirect logic in App.tsx, so Agora must be fully connected first
+      callStart({
+        userName: yourName,
+        uid: meetingInfo.mainUser.uid,
+        meetingName: meetingInfo.title,
+        hostPassphrase: meetingInfo.hostPassphrase,
+        viewerPassphrase: meetingInfo.viewerPassphrase,
+        isHost: meetingInfo.isHost, // From API response
+      });
 
       // Store whiteboard credentials if available
       if (
@@ -69,7 +72,7 @@ const JoinMeetingScreen: React.FC = () => {
         );
       }
 
-      navigate(`/call/${meetingInfo.hostPassphrase}`);
+      navigate(`/call/${meetingInfo.channel}`);
     } catch (error) {
       console.error("Failed to join meeting:", error);
       showToast(

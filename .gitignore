@@ -27,3 +27,12 @@ dist-ssr
 # Environments
 .env
 .venv
+
+# TypeScript build artifacts (don't compile with tsc directly)
+*.tsbuildinfo
+src/**/*.js
+src/**/*.d.ts
+!src/**/*.config.js
+
+.agents/*
+

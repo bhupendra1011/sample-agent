@@ -31,58 +31,23 @@ const Controls: React.FC = () => {
   // ✅ Channel can just reuse meetingName
   const channel = meetingName;
 
-  const toggleAudioMute = useAppStore((state) => state.toggleAudioMute);
-  const toggleVideoMute = useAppStore((state) => state.toggleVideoMute);
+  // toggleAudioMute/toggleVideoMute now handled by useAgora's toggleLocalAudio/toggleLocalVideo
 
   // Whiteboard state
   const isWhiteboardActive = useAppStore((state) => state.isWhiteboardActive);
   const toggleWhiteboard = useAppStore((state) => state.toggleWhiteboard);
   const whiteboardRoomUuid = useAppStore((state) => state.whiteboardRoomUuid);
 
-  const { startScreenshare, stopScreenshare, leaveCall, rtmChannel } =
-    useAgora();
+  const {
+    startScreenshare,
+    stopScreenshare,
+    leaveCall,
+    publishRtmMessage,
+    toggleLocalAudio,
+    toggleLocalVideo,
+  } = useAgora();
 
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-
-  const handleToggleAudio = async () => {
-    try {
-      // Get the current audio track from Zustand store
-      const currentAudioTrack = useAppStore.getState().localAudioTrack;
-
-      if (currentAudioTrack) {
-        // Toggle the actual Agora track state
-        // If currently muted (audioMuted=true), enable it (setEnabled(true))
-        // If currently unmuted (audioMuted=false), disable it (setEnabled(false))
-        await currentAudioTrack.setEnabled(audioMuted);
-      }
-
-      // Update the Zustand store state
-      toggleAudioMute();
-    } catch (error) {
-      console.error("Failed to toggle audio:", error);
-      showToast("Failed to toggle microphone", "error");
-    }
-  };
-
-  const handleToggleVideo = async () => {
-    try {
-      // Get the current video track from Zustand store
-      const currentVideoTrack = useAppStore.getState().localVideoTrack;
-
-      if (currentVideoTrack) {
-        // Toggle the actual Agora track state
-        // If currently muted (videoMuted=true), enable it (setEnabled(true))
-        // If currently unmuted (videoMuted=false), disable it (setEnabled(false))
-        await currentVideoTrack.setEnabled(videoMuted);
-      }
-
-      // Update the Zustand store state
-      toggleVideoMute();
-    } catch (error) {
-      console.error("Failed to toggle video:", error);
-      showToast("Failed to toggle camera", "error");
-    }
-  };
 
   const handleToggleScreenShare = async () => {
     if (isScreenSharing) {
@@ -112,15 +77,10 @@ const Controls: React.FC = () => {
     const isStarting = !isWhiteboardActive;
     toggleWhiteboard();
 
-    // Broadcast whiteboard state change via RTM
-    console.log(
-      "Whiteboard toggle - rtmChannel:",
-      rtmChannel,
-      "localUID:",
-      localUID
-    );
+    // Broadcast whiteboard state change via RTM v2.x
+    console.log("Whiteboard toggle - localUID:", localUID);
 
-    if (rtmChannel && localUID) {
+    if (localUID) {
       const whiteboardState = useAppStore.getState();
       const message = {
         type: isStarting ? "whiteboard-started" : "whiteboard-stopped",
@@ -135,18 +95,14 @@ const Controls: React.FC = () => {
       console.log("Sending whiteboard RTM message:", message);
 
       try {
-        await rtmChannel.sendMessage({
-          text: JSON.stringify(message),
-        } as any);
+        await publishRtmMessage(JSON.stringify(message));
         console.log("Whiteboard RTM message sent successfully");
       } catch (error) {
         console.error("Failed to send whiteboard sync message:", error);
         showToast("Failed to sync whiteboard state", "error");
       }
     } else {
-      console.warn(
-        "Cannot send whiteboard RTM - rtmChannel or localUID missing"
-      );
+      console.warn("Cannot send whiteboard RTM - localUID missing");
     }
   };
 
@@ -170,7 +126,7 @@ const Controls: React.FC = () => {
   return (
     <div className="flex justify-center items-center h-20 bg-gray-200 dark:bg-gray-800 space-x-6 px-4 shadow-lg transition-colors duration-300">
       <button
-        onClick={handleToggleAudio}
+        onClick={toggleLocalAudio}
         className="flex items-center justify-center w-14 h-14 bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-white text-3xl rounded-full transition-colors duration-300 hover:bg-gray-400 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-opacity-75"
         title={audioMuted ? "Unmute Mic" : "Mute Mic"}
       >
@@ -178,7 +134,7 @@ const Controls: React.FC = () => {
       </button>
 
       <button
-        onClick={handleToggleVideo}
+        onClick={toggleLocalVideo}
         className="flex items-center justify-center w-14 h-14 bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-white text-3xl rounded-full transition-colors duration-300 hover:bg-gray-400 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-opacity-75"
         title={videoMuted ? "Turn Video On" : "Turn Video Off"}
       >

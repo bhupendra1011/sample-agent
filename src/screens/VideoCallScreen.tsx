@@ -1,11 +1,13 @@
 // src/screens/VideoCallScreen.tsx
-import React from "react";
+import React, { useCallback } from "react";
 import { useParams } from "react-router-dom";
 import useAppStore from "../store/useAppStore";
 import VideoTile from "../components/VideoTile";
 import Controls from "../components/Controls";
 import ParticipantListItem from "../components/ParticipantListItem";
 import Whiteboard from "../components/Whiteboard";
+import Modal from "../components/common/Modal";
+import Button from "../components/common/Button";
 import { useAgora } from "../hooks/useAgora";
 import type { IAgoraRTCRemoteUser } from "agora-rtc-sdk-ng";
 import { MdWbSunny, MdDarkMode } from "react-icons/md";
@@ -19,16 +21,59 @@ const VideoCallScreen: React.FC = () => {
     meetingName,
     audioMuted,
     videoMuted,
-    userCount,
     remoteParticipants,
     theme,
     toggleTheme,
     isWhiteboardActive,
     whiteboardRoomToken,
     whiteboardRoomUuid,
+    isHost,
+    pendingUnmuteRequest,
   } = useAppStore();
 
-  const { localTracks, remoteUsers } = useAgora();
+  // Derive participant count from remoteParticipants (more reliable than event-based counter)
+  const participantCount =
+    1 +
+    Object.keys(remoteParticipants).filter(
+      (uid) => uid !== String(localUID)
+    ).length;
+
+  const {
+    localTracks,
+    remoteUsers,
+    sendHostControlRequest,
+    acceptUnmuteRequest,
+    declineUnmuteRequest,
+  } = useAgora();
+
+  // Host control handlers
+  const handleMuteAudio = useCallback(
+    (uid: string) => {
+      sendHostControlRequest(uid, "mute", "audio");
+    },
+    [sendHostControlRequest]
+  );
+
+  const handleMuteVideo = useCallback(
+    (uid: string) => {
+      sendHostControlRequest(uid, "mute", "video");
+    },
+    [sendHostControlRequest]
+  );
+
+  const handleUnmuteAudio = useCallback(
+    (uid: string) => {
+      sendHostControlRequest(uid, "unmute", "audio");
+    },
+    [sendHostControlRequest]
+  );
+
+  const handleUnmuteVideo = useCallback(
+    (uid: string) => {
+      sendHostControlRequest(uid, "unmute", "video");
+    },
+    [sendHostControlRequest]
+  );
 
   return (
     // UPDATED: Using direct Tailwind default colors for screen background/text
@@ -62,7 +107,7 @@ const VideoCallScreen: React.FC = () => {
         {!isWhiteboardActive && (
           <div className="w-56 bg-gray-200 dark:bg-gray-800 p-4 border-r border-gray-300 dark:border-gray-700 overflow-y-auto hidden sm:block shadow-inner transition-colors duration-300">
             <strong className="text-xl mb-4 block text-gray-900 dark:text-white">
-              Participants: {userCount}
+              Participants: {participantCount}
             </strong>
             <hr className="my-3 border-gray-300 dark:border-gray-600" />
             <ParticipantListItem
@@ -78,10 +123,16 @@ const VideoCallScreen: React.FC = () => {
               .map(([uid, participant]) => (
                 <ParticipantListItem
                   key={uid}
+                  uid={uid}
                   name={participant.name}
                   micMuted={participant.micMuted}
                   videoMuted={participant.videoMuted}
                   isLocal={false}
+                  isHost={isHost}
+                  onMuteAudio={handleMuteAudio}
+                  onMuteVideo={handleMuteVideo}
+                  onUnmuteAudio={handleUnmuteAudio}
+                  onUnmuteVideo={handleUnmuteVideo}
                 />
               ))}
           </div>
@@ -107,7 +158,7 @@ const VideoCallScreen: React.FC = () => {
                 // Build array of all video tiles
                 const allTiles = [];
                 
-                if (localUID && localTracks.videoTrack) {
+                if (localUID) {
                   allTiles.push(
                     <VideoTile
                       key={localUID}
@@ -116,7 +167,7 @@ const VideoCallScreen: React.FC = () => {
                       isLocal={true}
                       track={localTracks.videoTrack}
                       micMuted={audioMuted}
-                      videoMuted={videoMuted}
+                      videoMuted={!localTracks.videoTrack || videoMuted}
                     />
                   );
                 }
@@ -196,12 +247,12 @@ const VideoCallScreen: React.FC = () => {
           <div className="w-64 bg-gray-200 dark:bg-gray-800 border-l border-gray-300 dark:border-gray-700 overflow-y-auto hidden sm:flex flex-col shadow-inner transition-colors duration-300">
             <div className="p-3 border-b border-gray-300 dark:border-gray-700">
               <strong className="text-sm text-gray-900 dark:text-white">
-                Participants ({userCount})
+                Participants ({participantCount})
               </strong>
             </div>
             <div className="flex-1 overflow-y-auto p-2 space-y-2">
               {/* Local user video */}
-              {localUID && localTracks.videoTrack && (
+              {localUID && (
                 <div className="aspect-video rounded-lg overflow-hidden">
                   <VideoTile
                     key={localUID}
@@ -210,7 +261,7 @@ const VideoCallScreen: React.FC = () => {
                     isLocal={true}
                     track={localTracks.videoTrack}
                     micMuted={audioMuted}
-                    videoMuted={videoMuted}
+                    videoMuted={!localTracks.videoTrack || videoMuted}
                   />
                 </div>
               )}
@@ -241,6 +292,35 @@ const VideoCallScreen: React.FC = () => {
 
       {/* Bottom Controls Bar */}
       <Controls />
+
+      {/* Unmute Request Consent Modal */}
+      <Modal
+        isOpen={!!pendingUnmuteRequest}
+        onClose={declineUnmuteRequest}
+        title="Unmute Request"
+      >
+        <div className="space-y-4">
+          <p className="text-gray-700 dark:text-gray-300">
+            <strong>{pendingUnmuteRequest?.fromName}</strong> (Host) is
+            requesting you to unmute your{" "}
+            {pendingUnmuteRequest?.mediaType === "both"
+              ? "microphone and camera"
+              : pendingUnmuteRequest?.mediaType}
+            .
+          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Your privacy is protected. You can accept or decline this request.
+          </p>
+          <div className="flex space-x-3 pt-2">
+            <Button onClick={acceptUnmuteRequest} variant="primary">
+              Accept
+            </Button>
+            <Button onClick={declineUnmuteRequest} variant="secondary">
+              Decline
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
