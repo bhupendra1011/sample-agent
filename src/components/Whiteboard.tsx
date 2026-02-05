@@ -1,7 +1,7 @@
 // src/components/Whiteboard.tsx
 import React, { useEffect } from "react";
 import { useFastboard, Fastboard } from "@netless/fastboard-react/full";
-import useAppStore from "../store/useAppStore";
+import useAppStore from "@/store/useAppStore";
 
 interface WhiteboardProps {
   roomUuid: string;

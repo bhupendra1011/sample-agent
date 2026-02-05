@@ -1,6 +1,7 @@
-// src/components/Controls.tsx
-import React, { useState } from "react";
-import useAppStore from "../store/useAppStore";
+"use client";
+
+import React, { useState, useCallback } from "react";
+import useAppStore from "@/store/useAppStore";
 import {
   MdMic,
   MdMicOff,
@@ -11,15 +12,18 @@ import {
   MdCallEnd,
   MdShare,
   MdDraw,
+  MdSettings,
 } from "react-icons/md";
-import { useAgora } from "../hooks/useAgora";
-import { showToast } from "../services/uiService";
-import Modal from "./common/Modal";
-import Button from "./common/Button";
-import CopyButton from "./common/CopyButton";
+import { useAgora } from "@/hooks/useAgora";
+import { showToast } from "@/services/uiService";
+import { inviteAgent, stopAgent } from "@/api/agentApi";
+import Modal from "@/components/common/Modal";
+import Button from "@/components/common/Button";
+import CopyButton from "@/components/common/CopyButton";
+import AgentSettingsSidebar from "@/components/AgentSettingsSidebar";
+import type { AgentSettings } from "@/types/agora";
 
 const Controls: React.FC = () => {
-  // ✅ Use primitive selectors for each value:
   const audioMuted = useAppStore((state) => state.audioMuted);
   const videoMuted = useAppStore((state) => state.videoMuted);
   const isScreenSharing = useAppStore((state) => state.isScreenSharing);
@@ -28,15 +32,22 @@ const Controls: React.FC = () => {
   const hostPassphrase = useAppStore((state) => state.hostPassphrase);
   const viewerPassphrase = useAppStore((state) => state.viewerPassphrase);
   const localUID = useAppStore((state) => state.localUID);
-  // ✅ Channel can just reuse meetingName
+  const isHost = useAppStore((state) => state.isHost);
   const channel = meetingName;
 
-  // toggleAudioMute/toggleVideoMute now handled by useAgora's toggleLocalAudio/toggleLocalVideo
-
-  // Whiteboard state
   const isWhiteboardActive = useAppStore((state) => state.isWhiteboardActive);
   const toggleWhiteboard = useAppStore((state) => state.toggleWhiteboard);
   const whiteboardRoomUuid = useAppStore((state) => state.whiteboardRoomUuid);
+
+  // Agent state
+  const agentId = useAppStore((state) => state.agentId);
+  const isAgentActive = useAppStore((state) => state.isAgentActive);
+  const isAgentLoading = useAppStore((state) => state.isAgentLoading);
+  const agentSettings = useAppStore((state) => state.agentSettings);
+  const setAgentActive = useAppStore((state) => state.setAgentActive);
+  const setAgentLoading = useAppStore((state) => state.setAgentLoading);
+  const clearAgent = useAppStore((state) => state.clearAgent);
+  const setAgentSettings = useAppStore((state) => state.setAgentSettings);
 
   const {
     startScreenshare,
@@ -48,6 +59,7 @@ const Controls: React.FC = () => {
   } = useAgora();
 
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isSettingsPanelOpen, setIsSettingsPanelOpen] = useState(false);
 
   const handleToggleScreenShare = async () => {
     if (isScreenSharing) {
@@ -65,6 +77,15 @@ const Controls: React.FC = () => {
   };
 
   const handleCallEnd = async () => {
+    // Stop agent before leaving if active
+    if (isAgentActive && agentId) {
+      try {
+        await stopAgent(agentId);
+      } catch (error) {
+        console.error("Failed to stop agent on call end:", error);
+      }
+      clearAgent();
+    }
     await leaveCall();
   };
 
@@ -76,9 +97,6 @@ const Controls: React.FC = () => {
 
     const isStarting = !isWhiteboardActive;
     toggleWhiteboard();
-
-    // Broadcast whiteboard state change via RTM v2.x
-    console.log("Whiteboard toggle - localUID:", localUID);
 
     if (localUID) {
       const whiteboardState = useAppStore.getState();
@@ -92,17 +110,12 @@ const Controls: React.FC = () => {
         region: whiteboardState.whiteboardRegion,
       };
 
-      console.log("Sending whiteboard RTM message:", message);
-
       try {
         await publishRtmMessage(JSON.stringify(message));
-        console.log("Whiteboard RTM message sent successfully");
       } catch (error) {
         console.error("Failed to send whiteboard sync message:", error);
         showToast("Failed to sync whiteboard state", "error");
       }
-    } else {
-      console.warn("Cannot send whiteboard RTM - localUID missing");
     }
   };
 
@@ -114,68 +127,167 @@ const Controls: React.FC = () => {
     }
   };
 
-  const handleCopyToClipboard = (text: string, label: string) => {
-    navigator.clipboard
-      .writeText(text)
-      .then(() => showToast(`${label} copied!`, "success"))
-      .catch(() => showToast(`Failed to copy ${label}.`, "error"));
-  };
+  const handleInviteAgent = useCallback(async () => {
+    if (!localUID || !channel) {
+      showToast("Cannot invite agent: Meeting information is incomplete.", "error");
+      return;
+    }
 
-  const meetingUrl = `${window.location.origin}/call/${channel}`;
+    if (!agentSettings) {
+      // Open settings panel if not configured
+      setIsSettingsPanelOpen(true);
+      return;
+    }
+
+    setAgentLoading(true);
+    try {
+      const result = await inviteAgent(channel, localUID, agentSettings);
+      setAgentActive(result.agentId);
+      showToast("AI Agent joined the call!", "success");
+    } catch (error) {
+      console.error("Failed to invite agent:", error);
+      showToast(
+        error instanceof Error ? error.message : "Failed to invite AI agent",
+        "error"
+      );
+      setAgentLoading(false);
+    }
+  }, [localUID, channel, agentSettings, setAgentLoading, setAgentActive]);
+
+  const handleStopAgent = useCallback(async () => {
+    if (!agentId) return;
+
+    setAgentLoading(true);
+    try {
+      await stopAgent(agentId);
+      clearAgent();
+      showToast("AI Agent left the call.", "success");
+    } catch (error) {
+      console.error("Failed to stop agent:", error);
+      showToast("Failed to stop AI agent", "error");
+      setAgentLoading(false);
+    }
+  }, [agentId, setAgentLoading, clearAgent]);
+
+  const handleToggleAgent = useCallback(() => {
+    if (isAgentActive) {
+      handleStopAgent();
+    } else {
+      handleInviteAgent();
+    }
+  }, [isAgentActive, handleStopAgent, handleInviteAgent]);
+
+  const handleSaveAgentSettings = useCallback(
+    (settings: AgentSettings) => {
+      setAgentSettings(settings);
+      showToast("Agent settings saved!", "success");
+    },
+    [setAgentSettings]
+  );
+
+  const controlButtonClass =
+    "flex items-center justify-center w-14 h-14 bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-white text-3xl rounded-full transition-colors duration-300 hover:bg-gray-400 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-opacity-75";
 
   return (
-    <div className="flex justify-center items-center h-20 bg-gray-200 dark:bg-gray-800 space-x-6 px-4 shadow-lg transition-colors duration-300">
-      <button
-        onClick={toggleLocalAudio}
-        className="flex items-center justify-center w-14 h-14 bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-white text-3xl rounded-full transition-colors duration-300 hover:bg-gray-400 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-opacity-75"
-        title={audioMuted ? "Unmute Mic" : "Mute Mic"}
-      >
-        {audioMuted ? <MdMicOff /> : <MdMic />}
-      </button>
+    <div className="flex justify-center items-center h-20 bg-gray-200 dark:bg-gray-800 px-4 shadow-lg transition-colors duration-300">
+      {/* Left spacer for balance */}
+      <div className="flex-1" />
 
-      <button
-        onClick={toggleLocalVideo}
-        className="flex items-center justify-center w-14 h-14 bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-white text-3xl rounded-full transition-colors duration-300 hover:bg-gray-400 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-opacity-75"
-        title={videoMuted ? "Turn Video On" : "Turn Video Off"}
-      >
-        {videoMuted ? <MdVideocamOff /> : <MdVideocam />}
-      </button>
+      {/* Center controls */}
+      <div className="flex items-center space-x-6">
+        <button
+          onClick={toggleLocalAudio}
+          className={controlButtonClass}
+          title={audioMuted ? "Unmute Mic" : "Mute Mic"}
+        >
+          {audioMuted ? <MdMicOff /> : <MdMic />}
+        </button>
 
-      <button
-        onClick={handleToggleScreenShare}
-        className="flex items-center justify-center w-14 h-14 bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-white text-3xl rounded-full transition-colors duration-300 hover:bg-gray-400 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-opacity-75"
-        title={isScreenSharing ? "Stop Screen Share" : "Start Screen Share"}
-      >
-        {isScreenSharing ? <MdClose /> : <MdMonitor />}
-      </button>
+        <button
+          onClick={toggleLocalVideo}
+          className={controlButtonClass}
+          title={videoMuted ? "Turn Video On" : "Turn Video Off"}
+        >
+          {videoMuted ? <MdVideocamOff /> : <MdVideocam />}
+        </button>
 
-      <button
-        onClick={handleToggleWhiteboard}
-        className={`flex items-center justify-center w-14 h-14 text-3xl rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-opacity-75 ${
-          isWhiteboardActive
-            ? "bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700"
-            : "bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-400 dark:hover:bg-gray-600"
-        }`}
-        title={isWhiteboardActive ? "Close Whiteboard" : "Open Whiteboard"}
-      >
-        <MdDraw />
-      </button>
+        <button
+          onClick={handleToggleScreenShare}
+          className={controlButtonClass}
+          title={isScreenSharing ? "Stop Screen Share" : "Start Screen Share"}
+        >
+          {isScreenSharing ? <MdClose /> : <MdMonitor />}
+        </button>
 
-      <button
-        onClick={handleShareMeeting}
-        className="flex items-center justify-center w-14 h-14 bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-white text-3xl rounded-full transition-colors duration-300 hover:bg-gray-400 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-opacity-75"
-        title="Share Meeting Info"
-      >
-        <MdShare />
-      </button>
+        <button
+          onClick={handleToggleWhiteboard}
+          className={`flex items-center justify-center w-14 h-14 text-3xl rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-opacity-75 ${
+            isWhiteboardActive
+              ? "bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700"
+              : "bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-400 dark:hover:bg-gray-600"
+          }`}
+          title={isWhiteboardActive ? "Close Whiteboard" : "Open Whiteboard"}
+        >
+          <MdDraw />
+        </button>
 
-      <button
-        onClick={handleCallEnd}
-        className="flex items-center justify-center w-16 h-16 bg-red-600 dark:bg-red-500 text-white text-4xl rounded-full hover:bg-red-700 dark:hover:bg-red-600 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-red-500 dark:focus:ring-red-400 shadow-lg"
-        title="End Call"
-      >
-        <MdCallEnd />
-      </button>
+        <button
+          onClick={handleShareMeeting}
+          className={controlButtonClass}
+          title="Share Meeting Info"
+        >
+          <MdShare />
+        </button>
+
+        <button
+          onClick={handleCallEnd}
+          className="flex items-center justify-center w-16 h-16 bg-red-600 dark:bg-red-500 text-white text-4xl rounded-full hover:bg-red-700 dark:hover:bg-red-600 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-red-500 dark:focus:ring-red-400 shadow-lg"
+          title="End Call"
+        >
+          <MdCallEnd />
+        </button>
+      </div>
+
+      {/* Right side - Agent controls */}
+      <div className="flex-1 flex justify-end">
+        {isHost && (
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={handleToggleAgent}
+              disabled={isAgentLoading}
+              className={`flex items-center justify-center w-14 h-14 text-3xl rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-opacity-75 ${
+                isAgentLoading
+                  ? "bg-yellow-500 dark:bg-yellow-600 text-white animate-pulse"
+                  : isAgentActive
+                  ? "bg-green-500 dark:bg-green-600 text-white hover:bg-green-600 dark:hover:bg-green-700"
+                  : "bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-400 dark:hover:bg-gray-600"
+              }`}
+              title={
+                isAgentLoading
+                  ? "Agent loading..."
+                  : isAgentActive
+                  ? "Stop AI Agent"
+                  : "Invite AI Agent"
+              }
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                className="w-8 h-8"
+              >
+                <path d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1a1 1 0 011 1v3a1 1 0 01-1 1h-1v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1H2a1 1 0 01-1-1v-3a1 1 0 011-1h1a7 7 0 017-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 012-2zm-3 9a1 1 0 00-1 1v2a1 1 0 002 0v-2a1 1 0 00-1-1zm6 0a1 1 0 00-1 1v2a1 1 0 002 0v-2a1 1 0 00-1-1z" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setIsSettingsPanelOpen(true)}
+              className="flex items-center justify-center w-12 h-12 text-2xl rounded-full bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-400 dark:hover:bg-gray-600 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              title="Agent Settings"
+            >
+              <MdSettings />
+            </button>
+          </div>
+        )}
+      </div>
 
       <Modal
         isOpen={isShareModalOpen}
@@ -183,7 +295,6 @@ const Controls: React.FC = () => {
         title="Share Meeting Details"
       >
         <div className="space-y-4">
-          {/* Host Passphrase */}
           {hostPassphrase && (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -198,7 +309,6 @@ const Controls: React.FC = () => {
             </div>
           )}
 
-          {/* Attendee Passphrase */}
           {viewerPassphrase && (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -214,6 +324,12 @@ const Controls: React.FC = () => {
           )}
         </div>
       </Modal>
+
+      <AgentSettingsSidebar
+        isOpen={isSettingsPanelOpen}
+        onClose={() => setIsSettingsPanelOpen(false)}
+        onSave={handleSaveAgentSettings}
+      />
     </div>
   );
 };

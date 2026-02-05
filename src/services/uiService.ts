@@ -1,6 +1,6 @@
 // src/services/uiService.ts
-import useAppStore from "../store/useAppStore";
-import type { ToastType } from "../store/useAppStore";
+import useAppStore from "@/store/useAppStore";
+import type { ToastType } from "@/store/useAppStore";
 
 /**
  * Displays a toast notification with a specified message and type.

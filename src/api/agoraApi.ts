@@ -1,15 +1,13 @@
 // src/api/agoraApi.ts
-import type { MeetingResponse } from "../types/agora"; // Import the MeetingResponse type
+import type { MeetingResponse } from "@/types/agora";
 
-// --- Agora Application Credentials (Replace with your actual values) ---
-// Vite automatically exposes these when prefixed with VITE_
-const APP_ID = import.meta.env.VITE_AGORA_APP_ID;
-const API_KEY = import.meta.env.VITE_AGORA_API_KEY;
-const MANAGED_SERVICE_URL = import.meta.env.VITE_AGORA_MANAGED_SERVICE_URL;
-const PROJECT_ID = import.meta.env.VITE_AGORA_PROJECT_ID;
-const WHITEBOARD_APPIDENTIFIER = import.meta.env
-  .VITE_AGORA_WHITEBOARD_APPIDENTIFIER;
-const WHITEBOARD_REGION = import.meta.env.VITE_AGORA_WHITEBOARD_REGION;
+const APP_ID = process.env.NEXT_PUBLIC_AGORA_APP_ID;
+const API_KEY = process.env.NEXT_PUBLIC_AGORA_API_KEY;
+const MANAGED_SERVICE_URL = process.env.NEXT_PUBLIC_AGORA_MANAGED_SERVICE_URL;
+const PROJECT_ID = process.env.NEXT_PUBLIC_AGORA_PROJECT_ID;
+const WHITEBOARD_APPIDENTIFIER =
+  process.env.NEXT_PUBLIC_AGORA_WHITEBOARD_APPIDENTIFIER;
+const WHITEBOARD_REGION = process.env.NEXT_PUBLIC_AGORA_WHITEBOARD_REGION;
 
 // Export these configurations for use in other parts of the application (e.g., useAgora hook)
 export const AGORA_CONFIG = {

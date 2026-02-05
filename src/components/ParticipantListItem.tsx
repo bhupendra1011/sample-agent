@@ -1,7 +1,7 @@
 // src/components/ParticipantListItem.tsx
 import React from "react";
 import { MdMic, MdMicOff, MdVideocam, MdVideocamOff } from "react-icons/md";
-import type { Participant } from "../types/agora";
+import type { Participant } from "@/types/agora";
 
 interface ParticipantListItemProps extends Participant {
   uid?: string;

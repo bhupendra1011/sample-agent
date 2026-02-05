@@ -1,13 +1,14 @@
 // src/components/VideoTile.tsx
+"use client";
 import React, { useRef, useEffect } from "react";
 import { MdMic, MdMicOff } from "react-icons/md";
-import AgoraRTC from "agora-rtc-sdk-ng";
+import type { ILocalVideoTrack, IRemoteVideoTrack } from "agora-rtc-sdk-ng";
 
 interface VideoTileProps {
   uid: string | number;
   name: string;
   isLocal: boolean;
-  track: AgoraRTC.ILocalVideoTrack | AgoraRTC.IRemoteVideoTrack | null;
+  track: ILocalVideoTrack | IRemoteVideoTrack | null;
   micMuted: boolean;
   videoMuted: boolean;
 }

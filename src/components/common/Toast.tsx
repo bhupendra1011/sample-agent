@@ -7,7 +7,7 @@ import {
   MdInfo,
   MdClose,
 } from "react-icons/md";
-import type { ToastType } from "../../store/useAppStore";
+import type { ToastType } from "@/store/useAppStore";
 
 interface ToastProps {
   id: string;

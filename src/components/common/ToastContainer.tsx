@@ -1,7 +1,7 @@
 // src/components/common/ToastContainer.tsx
 import React, { useCallback } from "react";
 import { createPortal } from "react-dom";
-import useAppStore from "../../store/useAppStore";
+import useAppStore from "@/store/useAppStore";
 import Toast from "./Toast";
 
 const ToastContainer: React.FC = () => {

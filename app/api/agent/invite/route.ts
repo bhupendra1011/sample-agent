@@ -1,0 +1,209 @@
+import { NextRequest, NextResponse } from "next/server";
+import { RtcTokenBuilder, RtcRole } from "agora-token";
+import type { AgentSettings } from "@/types/agora";
+
+const APP_ID = process.env.NEXT_PUBLIC_AGORA_APP_ID!;
+const APP_CERTIFICATE = process.env.AGORA_APP_CERTIFICATE!;
+const CUSTOMER_ID = process.env.AGORA_CUSTOMER_ID!;
+const CUSTOMER_SECRET = process.env.AGORA_CUSTOMER_SECRET!;
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { channelName, uid, agentSettings } = body as {
+      channelName: string;
+      uid: string;
+      agentSettings: AgentSettings;
+    };
+
+    if (!channelName || !uid) {
+      return NextResponse.json(
+        { error: "channelName and uid are required" },
+        { status: 400 }
+      );
+    }
+
+    if (!agentSettings) {
+      return NextResponse.json(
+        { error: "agentSettings is required" },
+        { status: 400 }
+      );
+    }
+
+    if (!APP_CERTIFICATE || !CUSTOMER_ID || !CUSTOMER_SECRET) {
+      return NextResponse.json(
+        { error: "Server missing Agora credentials. Check environment variables." },
+        { status: 500 }
+      );
+    }
+
+    // Generate RTC token for the agent
+    const agentUid = 0; // Let Agora assign UID
+    const tokenExpiration = 3600; // 1 hour
+    const privilegeExpiration = 3600;
+    const agentRtcToken = RtcTokenBuilder.buildTokenWithUid(
+      APP_ID,
+      APP_CERTIFICATE,
+      channelName,
+      agentUid,
+      RtcRole.PUBLISHER,
+      tokenExpiration,
+      privilegeExpiration
+    );
+
+    // Build the join payload for Agora Conversational AI API v2
+    // Based on: https://docs.agora.io/en/conversational-ai/rest-api/agent/join
+    const { llm, tts, asr, turn_detection, advanced_features, parameters } = agentSettings;
+
+    // Build LLM config
+    const llmPayload: Record<string, unknown> = {
+      url: llm.url,
+      api_key: llm.api_key,
+    };
+
+    if (llm.headers) {
+      llmPayload.headers = llm.headers;
+    }
+
+    if (llm.system_messages && llm.system_messages.length > 0) {
+      llmPayload.system_messages = llm.system_messages;
+    }
+
+    if (llm.greeting_message) {
+      llmPayload.greeting_message = llm.greeting_message;
+    }
+
+    if (llm.failure_message) {
+      llmPayload.failure_message = llm.failure_message;
+    }
+
+    if (llm.max_history) {
+      llmPayload.max_history = llm.max_history;
+    }
+
+    if (llm.style) {
+      llmPayload.style = llm.style;
+    }
+
+    if (llm.params) {
+      llmPayload.params = llm.params;
+    }
+
+    // Build TTS config
+    const ttsPayload: Record<string, unknown> = {
+      vendor: tts.vendor,
+      params: tts.params,
+    };
+
+    // Build ASR config (optional)
+    const asrPayload: Record<string, unknown> | undefined = asr
+      ? {
+          ...(asr.vendor && { vendor: asr.vendor }),
+          ...(asr.language && { language: asr.language }),
+          ...(asr.params && Object.keys(asr.params).length > 0 && { params: asr.params }),
+        }
+      : undefined;
+
+    // Build the complete properties payload
+    const propertiesPayload: Record<string, unknown> = {
+      channel: channelName,
+      token: agentRtcToken,
+      agent_rtc_uid: String(agentUid),
+      remote_rtc_uids: [uid],
+      enable_string_uid: true,
+      idle_timeout: agentSettings.idle_timeout || 30,
+      llm: llmPayload,
+      tts: ttsPayload,
+    };
+
+    // Add optional ASR config
+    if (asrPayload && Object.keys(asrPayload).length > 0) {
+      propertiesPayload.asr = asrPayload;
+    }
+
+    // Add turn detection settings
+    if (turn_detection) {
+      propertiesPayload.turn_detection = {
+        ...(turn_detection.silence_duration_ms && {
+          silence_duration_ms: turn_detection.silence_duration_ms,
+        }),
+        ...(turn_detection.mode && { mode: turn_detection.mode }),
+      };
+    }
+
+    // Add advanced features
+    if (advanced_features) {
+      propertiesPayload.advanced_features = {
+        ...(advanced_features.enable_mllm !== undefined && {
+          enable_mllm: advanced_features.enable_mllm,
+        }),
+        ...(advanced_features.enable_rtm !== undefined && {
+          enable_rtm: advanced_features.enable_rtm,
+        }),
+        ...(advanced_features.enable_sal !== undefined && {
+          enable_sal: advanced_features.enable_sal,
+        }),
+        ...(advanced_features.enable_tools !== undefined && {
+          enable_tools: advanced_features.enable_tools,
+        }),
+      };
+    }
+
+    // Add agent parameters
+    if (parameters) {
+      propertiesPayload.parameters = {
+        ...(parameters.enable_farewell !== undefined && {
+          enable_farewell: parameters.enable_farewell,
+        }),
+        ...(parameters.farewell_phrases && {
+          farewell_phrases: parameters.farewell_phrases,
+        }),
+      };
+    }
+
+    const joinPayload = {
+      name: agentSettings.name,
+      properties: propertiesPayload,
+    };
+
+    console.log("Sending agent join payload:", JSON.stringify(joinPayload, null, 2));
+
+    // Call Agora Conversational AI API
+    const authHeader = Buffer.from(`${CUSTOMER_ID}:${CUSTOMER_SECRET}`).toString("base64");
+
+    const agoraResponse = await fetch(
+      `https://api.agora.io/api/conversational-ai-agent/v2/projects/${APP_ID}/join`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Basic ${authHeader}`,
+        },
+        body: JSON.stringify(joinPayload),
+      }
+    );
+
+    const responseData = await agoraResponse.json();
+
+    if (!agoraResponse.ok) {
+      console.error("Agora Conversational AI join failed:", responseData);
+      return NextResponse.json(
+        { error: "Failed to start AI agent", details: responseData },
+        { status: agoraResponse.status }
+      );
+    }
+
+    console.log("Agent started successfully:", responseData);
+
+    return NextResponse.json({
+      agentId: responseData.agent_id,
+      status: responseData.status,
+    });
+  } catch (error) {
+    console.error("Agent invite error:", error);
+    return NextResponse.json(
+      { error: "Internal server error", details: String(error) },
+      { status: 500 }
+    );
+  }
+}

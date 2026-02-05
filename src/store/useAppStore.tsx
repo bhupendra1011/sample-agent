@@ -1,7 +1,7 @@
 // src/store/useAppStore.ts
 import { create } from "zustand";
-import type { Participant, PendingUnmuteRequest } from "../types/agora";
-import AgoraRTC from "agora-rtc-sdk-ng";
+import type { Participant, PendingUnmuteRequest, AgentSettings } from "@/types/agora";
+import type { ILocalAudioTrack, ILocalVideoTrack } from "agora-rtc-sdk-ng";
 
 // Define Theme type
 type Theme = "light" | "dark";
@@ -42,11 +42,11 @@ interface AppState {
   // --- END NEW Theme State ---
 
   // --- NEW: Local Tracks in Zustand ---
-  localAudioTrack: AgoraRTC.IAudioTrack | null;
-  localVideoTrack: AgoraRTC.IVideoTrack | null;
+  localAudioTrack: ILocalAudioTrack | null;
+  localVideoTrack: ILocalVideoTrack | null;
   setLocalTracks: (
-    audioTrack: AgoraRTC.IAudioTrack | null,
-    videoTrack: AgoraRTC.IVideoTrack | null
+    audioTrack: ILocalAudioTrack | null,
+    videoTrack: ILocalVideoTrack | null
   ) => void;
   // --- END NEW ---
 
@@ -64,6 +64,16 @@ interface AppState {
     region: string
   ) => void;
   // --- END Whiteboard State ---
+
+  // Agent state
+  agentId: string | null;
+  isAgentActive: boolean;
+  isAgentLoading: boolean;
+  agentSettings: AgentSettings | null;
+  setAgentActive: (agentId: string) => void;
+  setAgentLoading: (loading: boolean) => void;
+  clearAgent: () => void;
+  setAgentSettings: (settings: AgentSettings) => void;
 
   // Host control actions
   setIsHost: (isHost: boolean) => void;
@@ -128,6 +138,16 @@ const useAppStore = create<AppState>((set, get) => ({
   viewerPassphrase: "",
   isScreenSharing: false,
   remoteParticipants: {},
+
+  // Agent initial state
+  agentId: null,
+  isAgentActive: false,
+  isAgentLoading: false,
+  agentSettings: null,
+  setAgentActive: (agentId) => set({ agentId, isAgentActive: true, isAgentLoading: false }),
+  setAgentLoading: (loading) => set({ isAgentLoading: loading }),
+  clearAgent: () => set({ agentId: null, isAgentActive: false, isAgentLoading: false }),
+  setAgentSettings: (settings) => set({ agentSettings: settings }),
 
   // Host control initial state
   isHost: false,
@@ -203,6 +223,9 @@ const useAppStore = create<AppState>((set, get) => ({
       isWhiteboardActive: false,
       isHost: false,
       pendingUnmuteRequest: null,
+      agentId: null,
+      isAgentActive: false,
+      isAgentLoading: false,
     }),
   increaseUserCount: () => set((state) => ({ userCount: state.userCount + 1 })),
   decreaseUserCount: () => set((state) => ({ userCount: state.userCount - 1 })),
@@ -276,8 +299,10 @@ const useAppStore = create<AppState>((set, get) => ({
 }));
 
 // Apply default theme to HTML root on load (important for initial render)
-// This runs once when the store is created.
-const initialTheme = useAppStore.getState().theme;
-document.documentElement.classList.add(initialTheme);
+// Guard for SSR — document is not available on server.
+if (typeof document !== "undefined") {
+  const initialTheme = useAppStore.getState().theme;
+  document.documentElement.classList.add(initialTheme);
+}
 
 export default useAppStore;

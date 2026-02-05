@@ -1,21 +1,28 @@
 // src/hooks/useAgora.ts
+"use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import AgoraRTC from "agora-rtc-sdk-ng"; // Agora Web RTC SDK
+import AgoraRTC from "agora-rtc-sdk-ng";
 import type {
   IAgoraRTCClient,
   IAgoraRTCRemoteUser,
   ILocalVideoTrack,
   ILocalAudioTrack,
 } from "agora-rtc-sdk-ng";
-import AgoraRTM from "agora-rtm-sdk"; // Agora RTM SDK v2.x
-import useAppStore from "../store/useAppStore"; // Zustand store for global client state
-import { AGORA_CONFIG } from "../api/agoraApi"; // Agora App ID and API Key from your config
-import { showToast } from "../services/uiService"; // Toast notifications
-import type { LocalAgoraTracks, HostControlMessage } from "../types/agora"; // Custom types
+import AgoraRTM from "agora-rtm-sdk";
+import useAppStore from "@/store/useAppStore";
+import { AGORA_CONFIG } from "@/api/agoraApi";
+import { showToast } from "@/services/uiService";
+import type { LocalAgoraTracks, HostControlMessage } from "@/types/agora";
 
-// --- Initialize Agora RTC client as singleton ---
-const RTC_CLIENT = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" }); // RTC Client for audio/video
+// --- Initialize Agora RTC client as singleton (lazy to avoid SSR issues) ---
+let RTC_CLIENT: IAgoraRTCClient | null = null;
+const getRtcClient = (): IAgoraRTCClient => {
+  if (!RTC_CLIENT && typeof window !== "undefined") {
+    RTC_CLIENT = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+  }
+  return RTC_CLIENT!;
+};
 
 // RTM v2.x client - will be initialized per user (requires userId at construction)
 let RTM_CLIENT: InstanceType<typeof AgoraRTM.RTM> | null = null;
@@ -81,7 +88,7 @@ export const useAgora = () => {
 
       try {
         // Subscribe to the user's tracks
-        await RTC_CLIENT.subscribe(user, mediaType);
+        await getRtcClient().subscribe(user, mediaType);
         console.log("Successfully subscribed to user:", user.uid, mediaType);
 
         const userUidStr = String(user.uid);
@@ -230,7 +237,7 @@ export const useAgora = () => {
         console.log("RTM v2.x message received:", data.type, data, "from:", event.publisher);
 
         switch (data.type) {
-          case "user-joined":
+          case "user-joined": {
             // Validate uid exists
             if (!data.uid) {
               console.error("RTM user-joined message missing uid:", data);
@@ -240,12 +247,10 @@ export const useAgora = () => {
             const joinedUid = String(data.uid);
 
             // Skip processing our own user-joined message
-            {
-              const currentLocalUID = getAppStore.getState().localUID;
-              if (currentLocalUID && joinedUid === String(currentLocalUID)) {
-                console.log("Skipping own user-joined RTM message for uid:", joinedUid);
-                break;
-              }
+            const currentLocalUID = getAppStore.getState().localUID;
+            if (currentLocalUID && joinedUid === String(currentLocalUID)) {
+              console.log("Skipping own user-joined RTM message for uid:", joinedUid);
+              break;
             }
 
             console.log(
@@ -264,7 +269,7 @@ export const useAgora = () => {
             // Check if this user is already in the RTC client's remote users
             // This handles the case where RTM message arrives before RTC user-published event
             setTimeout(() => {
-              const remoteUsersList = RTC_CLIENT.remoteUsers;
+              const remoteUsersList = getRtcClient().remoteUsers;
               const existingUser = remoteUsersList.find(
                 (u) => String(u.uid) === joinedUid
               );
@@ -297,6 +302,7 @@ export const useAgora = () => {
               }
             }, 1000); // Give RTC some time to process
             break;
+          }
 
           case "user-left":
             console.log("User left via RTM:", data.uid);
@@ -310,7 +316,7 @@ export const useAgora = () => {
             });
             break;
 
-          case "whiteboard-started":
+          case "whiteboard-started": {
             // Sync whiteboard start across all users
             const currentState = getAppStore.getState();
             if (String(data.uid) !== String(currentState.localUID)) {
@@ -330,8 +336,9 @@ export const useAgora = () => {
               );
             }
             break;
+          }
 
-          case "whiteboard-stopped":
+          case "whiteboard-stopped": {
             // Sync whiteboard stop across all users
             const currentState2 = getAppStore.getState();
             if (
@@ -346,6 +353,7 @@ export const useAgora = () => {
               );
             }
             break;
+          }
 
           case "host-mute-request":
             // Host is requesting to mute this user's media
@@ -572,7 +580,7 @@ export const useAgora = () => {
     ) => {
       try {
         // RTM v2.x: Create client with appId and userId
-        RTM_CLIENT = new AgoraRTM.RTM(AGORA_CONFIG.APP_ID, uid, {
+        RTM_CLIENT = new AgoraRTM.RTM(AGORA_CONFIG.APP_ID!, uid, {
           useStringUserId: true,
         });
 
@@ -741,8 +749,8 @@ export const useAgora = () => {
       if (currentLocalVideoTrack) {
         currentLocalVideoTrack.close();
       }
-      if (RTC_CLIENT && RTC_CLIENT.connectionState === "CONNECTED") {
-        await RTC_CLIENT.leave();
+      if (RTC_CLIENT && getRtcClient().connectionState === "CONNECTED") {
+        await getRtcClient().leave();
       }
       // RTM v2.x cleanup: unsubscribe and logout
       if (RTM_CLIENT) {
@@ -806,12 +814,12 @@ export const useAgora = () => {
         // Clean up any existing connections before joining
         if (
           RTC_CLIENT &&
-          (RTC_CLIENT.connectionState === "CONNECTING" ||
-            RTC_CLIENT.connectionState === "CONNECTED")
+          (getRtcClient().connectionState === "CONNECTING" ||
+            getRtcClient().connectionState === "CONNECTED")
         ) {
           console.log("RTC client already connected, leaving first...");
           try {
-            await RTC_CLIENT.leave();
+            await getRtcClient().leave();
           } catch (leaveError) {
             console.warn("Error leaving existing RTC connection:", leaveError);
           }
@@ -851,8 +859,8 @@ export const useAgora = () => {
           throw new Error("Failed to create local tracks.");
         }
 
-        await RTC_CLIENT.join(
-          AGORA_CONFIG.APP_ID,
+        await getRtcClient().join(
+          AGORA_CONFIG.APP_ID!,
           channelId,
           rtcToken || null,
           uid
@@ -865,7 +873,7 @@ export const useAgora = () => {
           audioMuted,
           videoMuted
         );
-        await RTC_CLIENT.publish([audioTrack, videoTrack]);
+        await getRtcClient().publish([audioTrack, videoTrack]);
 
         // Local user count is now set in callStart() - don't double count here
 
@@ -915,19 +923,19 @@ export const useAgora = () => {
 
   useEffect(() => {
     // Remove ALL existing listeners first to prevent duplicates
-    RTC_CLIENT.removeAllListeners("user-published");
-    RTC_CLIENT.removeAllListeners("user-unpublished");
-    RTC_CLIENT.removeAllListeners("user-left");
+    getRtcClient().removeAllListeners("user-published");
+    getRtcClient().removeAllListeners("user-unpublished");
+    getRtcClient().removeAllListeners("user-left");
 
     // Set up RTC event listeners
-    RTC_CLIENT.on("user-published", handleUserPublished);
-    RTC_CLIENT.on("user-unpublished", handleUserUnpublished);
-    RTC_CLIENT.on("user-left", handleUserLeft);
+    getRtcClient().on("user-published", handleUserPublished);
+    getRtcClient().on("user-unpublished", handleUserUnpublished);
+    getRtcClient().on("user-left", handleUserLeft);
 
     // Sync existing remote users from RTC_CLIENT into local state
     // This handles the case where users published before this hook instance mounted
-    if (RTC_CLIENT.connectionState === "CONNECTED") {
-      const existingRemoteUsers = RTC_CLIENT.remoteUsers;
+    if (getRtcClient().connectionState === "CONNECTED") {
+      const existingRemoteUsers = getRtcClient().remoteUsers;
       if (existingRemoteUsers.length > 0) {
         setRemoteUsers((prev) => {
           const newUsers = [...prev];
@@ -945,19 +953,11 @@ export const useAgora = () => {
 
     return () => {
       // Cleanup listeners on unmount
-      RTC_CLIENT.removeAllListeners("user-published");
-      RTC_CLIENT.removeAllListeners("user-unpublished");
-      RTC_CLIENT.removeAllListeners("user-left");
+      getRtcClient().removeAllListeners("user-published");
+      getRtcClient().removeAllListeners("user-unpublished");
+      getRtcClient().removeAllListeners("user-left");
     };
   }, [handleUserPublished, handleUserUnpublished, handleUserLeft]);
-
-  const isValidTrack = (track: any) =>
-    track &&
-    typeof track.setEnabled === "function" &&
-    typeof track.close === "function" &&
-    !track.isClosed &&
-    (track.constructor?.name === "MicrophoneAudioTrack" ||
-      track.constructor?.name === "CameraVideoTrack");
 
   const updateLocalMediaState = async () => {
     try {

@@ -1,15 +1,17 @@
-// src/screens/CreateMeetingScreen.tsx
+"use client";
+
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import useAppStore from "../store/useAppStore";
-import { createAndJoinMeetingApi, AGORA_CONFIG } from "../api/agoraApi";
-import { showToast } from "../services/uiService";
-import { useAgora } from "../hooks/useAgora";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import useAppStore from "@/store/useAppStore";
+import { createAndJoinMeetingApi, AGORA_CONFIG } from "@/api/agoraApi";
+import { showToast } from "@/services/uiService";
+import { useAgora } from "@/hooks/useAgora";
 import { MdAddCircleOutline } from "react-icons/md";
 
-import Card from "../components/common/Card";
-import Button from "../components/common/Button";
-import InputField from "../components/common/InputField";
+import Card from "@/components/common/Card";
+import Button from "@/components/common/Button";
+import InputField from "@/components/common/InputField";
 
 const CreateMeetingScreen: React.FC = () => {
   const callStart = useAppStore((state) => state.callStart);
@@ -18,7 +20,7 @@ const CreateMeetingScreen: React.FC = () => {
     (state) => state.setWhiteboardCredentials
   );
   const { joinMeeting: joinAgoraMeeting } = useAgora();
-  const navigate = useNavigate();
+  const router = useRouter();
 
   const [yourName, setYourName] = useState<string>("");
   const [meetingTitle, setMeetingTitle] = useState<string>("");
@@ -42,9 +44,6 @@ const CreateMeetingScreen: React.FC = () => {
         role: "host",
       });
 
-      //   setHostPassphraseDisplay(meetingInfo.hostPassphrase || "");
-      //   setAttendeePassphraseDisplay(meetingInfo.viewerPassphrase || "");
-
       await joinAgoraMeeting(
         meetingInfo.mainUser.rtc,
         meetingInfo.mainUser.rtm,
@@ -56,18 +55,15 @@ const CreateMeetingScreen: React.FC = () => {
         yourName
       );
 
-      // callStart AFTER joinAgoraMeeting completes - setting callActive triggers
-      // navigation via App.tsx, so Agora must be fully connected first
       callStart({
         userName: yourName,
         uid: meetingInfo.mainUser.uid,
         meetingName: meetingInfo.title,
         hostPassphrase: meetingInfo.hostPassphrase,
         viewerPassphrase: meetingInfo.viewerPassphrase,
-        isHost: true, // Creator is always the host
+        isHost: true,
       });
 
-      // Store whiteboard credentials if available
       if (
         meetingInfo.whiteboard?.room_token &&
         meetingInfo.whiteboard?.room_uuid
@@ -75,12 +71,12 @@ const CreateMeetingScreen: React.FC = () => {
         setWhiteboardCredentials(
           meetingInfo.whiteboard.room_token,
           meetingInfo.whiteboard.room_uuid,
-          AGORA_CONFIG.WHITEBOARD_APPIDENTIFIER,
-          AGORA_CONFIG.WHITEBOARD_REGION
+          AGORA_CONFIG.WHITEBOARD_APPIDENTIFIER!,
+          AGORA_CONFIG.WHITEBOARD_REGION!
         );
       }
 
-      navigate(`/call/${meetingInfo.channel}`);
+      router.push(`/call/${meetingInfo.channel}`);
     } catch (error) {
       console.error("Failed to create and join meeting:", error);
       showToast(
@@ -94,7 +90,6 @@ const CreateMeetingScreen: React.FC = () => {
   };
 
   return (
-    // UPDATED: Using direct Tailwind default colors for screen background/text
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white p-4 font-inter transition-colors duration-300">
       <Card>
         <div className="flex items-center mb-6 sm:mb-8">
@@ -133,7 +128,6 @@ const CreateMeetingScreen: React.FC = () => {
         </Button>
 
         {hostPassphraseDisplay && (
-          // UPDATED: Using direct Tailwind default colors for passphrase display
           <div className="mt-6 sm:mt-8 text-center p-4 sm:p-6 bg-gray-200 dark:bg-gray-700 rounded-lg shadow-inner border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white text-sm sm:text-base">
             <p className="mb-2 sm:mb-3 text-lg">
               Host Passphrase:{" "}
@@ -154,12 +148,11 @@ const CreateMeetingScreen: React.FC = () => {
         )}
 
         <div className="mt-6 sm:mt-8 text-center">
-          {/* UPDATED: Using direct Tailwind default colors for link text */}
           <span className="text-gray-600 dark:text-gray-400">
             Already have an ID?{" "}
           </span>
           <Link
-            to="/join"
+            href="/join"
             className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold transition-colors duration-200 text-base sm:text-lg"
           >
             Join with a Meeting ID

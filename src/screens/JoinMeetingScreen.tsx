@@ -1,15 +1,17 @@
-// src/screens/JoinMeetingScreen.tsx
+"use client";
+
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import useAppStore from "../store/useAppStore";
-import { joinExistingMeetingApi, AGORA_CONFIG } from "../api/agoraApi";
-import { showToast } from "../services/uiService";
-import { useAgora } from "../hooks/useAgora";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import useAppStore from "@/store/useAppStore";
+import { joinExistingMeetingApi, AGORA_CONFIG } from "@/api/agoraApi";
+import { showToast } from "@/services/uiService";
+import { useAgora } from "@/hooks/useAgora";
 import { MdCallMerge } from "react-icons/md";
 
-import Card from "../components/common/Card";
-import Button from "../components/common/Button";
-import InputField from "../components/common/InputField";
+import Card from "@/components/common/Card";
+import Button from "@/components/common/Button";
+import InputField from "@/components/common/InputField";
 
 const JoinMeetingScreen: React.FC = () => {
   const callStart = useAppStore((state) => state.callStart);
@@ -18,7 +20,7 @@ const JoinMeetingScreen: React.FC = () => {
     (state) => state.setWhiteboardCredentials
   );
   const { joinMeeting: joinAgoraMeeting } = useAgora();
-  const navigate = useNavigate();
+  const router = useRouter();
 
   const [yourName, setYourName] = useState<string>("");
   const [meetingID, setMeetingID] = useState<string>("");
@@ -48,18 +50,15 @@ const JoinMeetingScreen: React.FC = () => {
         yourName
       );
 
-      // callStart AFTER joinAgoraMeeting completes - setting callActive triggers
-      // redirect logic in App.tsx, so Agora must be fully connected first
       callStart({
         userName: yourName,
         uid: meetingInfo.mainUser.uid,
         meetingName: meetingInfo.title,
         hostPassphrase: meetingInfo.hostPassphrase,
         viewerPassphrase: meetingInfo.viewerPassphrase,
-        isHost: meetingInfo.isHost, // From API response
+        isHost: meetingInfo.isHost,
       });
 
-      // Store whiteboard credentials if available
       if (
         meetingInfo.whiteboard?.room_token &&
         meetingInfo.whiteboard?.room_uuid
@@ -67,12 +66,12 @@ const JoinMeetingScreen: React.FC = () => {
         setWhiteboardCredentials(
           meetingInfo.whiteboard.room_token,
           meetingInfo.whiteboard.room_uuid,
-          AGORA_CONFIG.WHITEBOARD_APPIDENTIFIER,
-          AGORA_CONFIG.WHITEBOARD_REGION
+          AGORA_CONFIG.WHITEBOARD_APPIDENTIFIER!,
+          AGORA_CONFIG.WHITEBOARD_REGION!
         );
       }
 
-      navigate(`/call/${meetingInfo.channel}`);
+      router.push(`/call/${meetingInfo.channel}`);
     } catch (error) {
       console.error("Failed to join meeting:", error);
       showToast(
@@ -86,7 +85,6 @@ const JoinMeetingScreen: React.FC = () => {
   };
 
   return (
-    // UPDATED: Using direct Tailwind default colors for screen background/text
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white p-4 font-inter transition-colors duration-300">
       <Card>
         <div className="flex items-center mb-6 sm:mb-8">
@@ -125,12 +123,11 @@ const JoinMeetingScreen: React.FC = () => {
         </Button>
 
         <div className="mt-6 sm:mt-8 text-center">
-          {/* UPDATED: Using direct Tailwind default colors for link text */}
           <span className="text-gray-600 dark:text-gray-400">
             Need to host?{" "}
           </span>
           <Link
-            to="/"
+            href="/"
             className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold transition-colors duration-200 text-base sm:text-lg"
           >
             Create a New Meeting

@@ -1,6 +1,6 @@
 // src/components/common/ThemeSwitcher.tsx
 import React from "react";
-import useAppStore from "../../store/useAppStore";
+import useAppStore from "@/store/useAppStore";
 import { MdWbSunny, MdDarkMode } from "react-icons/md"; // Import Sun and Moon icons
 
 const ThemeSwitcher: React.FC = () => {
