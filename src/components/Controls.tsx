@@ -20,7 +20,7 @@ import { inviteAgent, stopAgent } from "@/api/agentApi";
 import Modal from "@/components/common/Modal";
 import Button from "@/components/common/Button";
 import CopyButton from "@/components/common/CopyButton";
-import AgentSettingsSidebar from "@/components/AgentSettingsSidebar";
+import SettingsSidebar from "@/components/SettingsSidebar";
 import type { AgentSettings } from "@/types/agora";
 
 const Controls: React.FC = () => {
@@ -29,11 +29,11 @@ const Controls: React.FC = () => {
   const isScreenSharing = useAppStore((state) => state.isScreenSharing);
 
   const meetingName = useAppStore((state) => state.meetingName);
+  const channelId = useAppStore((state) => state.channelId);
   const hostPassphrase = useAppStore((state) => state.hostPassphrase);
   const viewerPassphrase = useAppStore((state) => state.viewerPassphrase);
   const localUID = useAppStore((state) => state.localUID);
   const isHost = useAppStore((state) => state.isHost);
-  const channel = meetingName;
 
   const isWhiteboardActive = useAppStore((state) => state.isWhiteboardActive);
   const toggleWhiteboard = useAppStore((state) => state.toggleWhiteboard);
@@ -120,7 +120,7 @@ const Controls: React.FC = () => {
   };
 
   const handleShareMeeting = () => {
-    if (meetingName && channel) {
+    if (meetingName && channelId) {
       setIsShareModalOpen(true);
     } else {
       showToast("No active meeting to share.", "success");
@@ -128,7 +128,7 @@ const Controls: React.FC = () => {
   };
 
   const handleInviteAgent = useCallback(async () => {
-    if (!localUID || !channel) {
+    if (!localUID || !channelId) {
       showToast("Cannot invite agent: Meeting information is incomplete.", "error");
       return;
     }
@@ -141,7 +141,7 @@ const Controls: React.FC = () => {
 
     setAgentLoading(true);
     try {
-      const result = await inviteAgent(channel, localUID, agentSettings);
+      const result = await inviteAgent(channelId, localUID, agentSettings);
       setAgentActive(result.agentId);
       showToast("AI Agent joined the call!", "success");
     } catch (error) {
@@ -152,7 +152,7 @@ const Controls: React.FC = () => {
       );
       setAgentLoading(false);
     }
-  }, [localUID, channel, agentSettings, setAgentLoading, setAgentActive]);
+  }, [localUID, channelId, agentSettings, setAgentLoading, setAgentActive]);
 
   const handleStopAgent = useCallback(async () => {
     if (!agentId) return;
@@ -325,10 +325,10 @@ const Controls: React.FC = () => {
         </div>
       </Modal>
 
-      <AgentSettingsSidebar
+      <SettingsSidebar
         isOpen={isSettingsPanelOpen}
         onClose={() => setIsSettingsPanelOpen(false)}
-        onSave={handleSaveAgentSettings}
+        onSaveAgentSettings={handleSaveAgentSettings}
       />
     </div>
   );

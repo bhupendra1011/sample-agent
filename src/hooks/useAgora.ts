@@ -91,6 +91,13 @@ export const useAgora = () => {
         await getRtcClient().subscribe(user, mediaType);
         console.log("Successfully subscribed to user:", user.uid, mediaType);
 
+        // IMPORTANT: Play audio track immediately after subscribing
+        // Remote audio tracks must be explicitly played to be heard
+        if (mediaType === "audio" && user.audioTrack) {
+          user.audioTrack.play();
+          console.log("Playing audio track for user:", user.uid);
+        }
+
         const userUidStr = String(user.uid);
 
         // Count user on FIRST publish event (audio or video) to prevent missed counts
@@ -561,13 +568,19 @@ export const useAgora = () => {
 
   // --- 4. Core Agora SDK Utility Functions (useCallback) ---
 
-  const createLocalTracks = useCallback(async (): Promise<LocalAgoraTracks> => {
-    const audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+  const createLocalTracks = useCallback(async (selectedMicrophoneId?: string): Promise<LocalAgoraTracks> => {
+    // Get selected microphone ID from store if not provided
+    const microphoneId = selectedMicrophoneId || getAppStore.getState().selectedMicrophoneId;
+
+    // Create audio track with optional device selection
+    const audioTrackConfig = microphoneId ? { microphoneId } : undefined;
+    const audioTrack = await AgoraRTC.createMicrophoneAudioTrack(audioTrackConfig);
     const videoTrack = await AgoraRTC.createCameraVideoTrack();
+
     setLocalTracksZustand(audioTrack, videoTrack); // Store tracks in Zustand
     localTracksRef.current = { audioTrack, videoTrack }; // Also update ref for immediate use within hook
     return { audioTrack, videoTrack };
-  }, [setLocalTracksZustand]); // Dependency: setLocalTracksZustand action
+  }, [setLocalTracksZustand, getAppStore]); // Dependency: setLocalTracksZustand action, getAppStore
 
   const initializeAgoraRTM = useCallback(
     async (

@@ -412,6 +412,28 @@ export interface LocalAgoraTracks {
 }
 
 /**
+ * Represents an audio input device (microphone) for device selection.
+ */
+export interface AudioDevice {
+  /** Unique identifier for the device */
+  deviceId: string;
+  /** Human-readable device name (only available after permission granted) */
+  label: string;
+  /** Device kind - always 'audioinput' for microphones */
+  kind: "audioinput";
+}
+
+/**
+ * Voice settings for microphone configuration.
+ */
+export interface VoiceSettings {
+  /** Currently selected microphone device ID (null for system default) */
+  selectedMicrophoneId: string | null;
+  /** Whether a microphone test is currently in progress */
+  testInProgress: boolean;
+}
+
+/**
  * Defines the structure for a participant in the video call.
  * This interface is primarily used within your Zustand store (`remoteParticipants`)
  * to maintain the UI-relevant state of each user (local and remote).

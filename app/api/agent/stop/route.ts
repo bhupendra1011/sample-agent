@@ -26,14 +26,13 @@ export async function POST(request: NextRequest) {
     const authHeader = Buffer.from(`${CUSTOMER_ID}:${CUSTOMER_SECRET}`).toString("base64");
 
     const agoraResponse = await fetch(
-      `https://api.agora.io/api/conversational-ai-agent/v2/projects/${APP_ID}/leave`,
+      `https://api.agora.io/api/conversational-ai-agent/v2/projects/${APP_ID}/agents/${agentId}/leave`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Basic ${authHeader}`,
         },
-        body: JSON.stringify({ agent_id: agentId }),
       }
     );
 

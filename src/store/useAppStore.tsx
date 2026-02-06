@@ -24,6 +24,7 @@ interface AppState {
   localUsername: string;
   localUID: string | null;
   meetingName: string;
+  channelId: string;
   hostPassphrase: string;
   viewerPassphrase: string;
   isScreenSharing: boolean;
@@ -87,6 +88,7 @@ interface AppState {
     userName: string;
     uid: string;
     meetingName: string;
+    channelId: string;
     hostPassphrase?: string;
     viewerPassphrase?: string;
     isHost?: boolean;
@@ -108,6 +110,11 @@ interface AppState {
   addToast: (message: string, type: ToastType) => void;
   removeToast: (id: string) => void;
   // --- END Toast State ---
+
+  // --- Voice Settings State ---
+  selectedMicrophoneId: string | null;
+  setSelectedMicrophoneId: (id: string | null) => void;
+  // --- END Voice Settings State ---
 }
 
 /**
@@ -134,6 +141,7 @@ const useAppStore = create<AppState>((set, get) => ({
   localUsername: "",
   localUID: null,
   meetingName: "",
+  channelId: "",
   hostPassphrase: "",
   viewerPassphrase: "",
   isScreenSharing: false,
@@ -200,6 +208,7 @@ const useAppStore = create<AppState>((set, get) => ({
       localUsername: payload.userName,
       localUID: payload.uid,
       meetingName: payload.meetingName,
+      channelId: payload.channelId,
       hostPassphrase: payload.hostPassphrase || "",
       viewerPassphrase: payload.viewerPassphrase || "",
       isHost: payload.isHost || false,
@@ -212,6 +221,7 @@ const useAppStore = create<AppState>((set, get) => ({
       localUsername: "",
       localUID: null,
       meetingName: "",
+      channelId: "",
       hostPassphrase: "",
       viewerPassphrase: "",
       isScreenSharing: false,
@@ -296,6 +306,21 @@ const useAppStore = create<AppState>((set, get) => ({
       toasts: state.toasts.filter((toast) => toast.id !== id),
     })),
   // --- END Toast Actions ---
+
+  // --- Voice Settings State & Actions ---
+  selectedMicrophoneId: null,
+  setSelectedMicrophoneId: (id) => {
+    set({ selectedMicrophoneId: id });
+    // Persist to localStorage
+    if (typeof localStorage !== "undefined") {
+      if (id) {
+        localStorage.setItem("selectedMicrophoneId", id);
+      } else {
+        localStorage.removeItem("selectedMicrophoneId");
+      }
+    }
+  },
+  // --- END Voice Settings ---
 }));
 
 // Apply default theme to HTML root on load (important for initial render)

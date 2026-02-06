@@ -41,6 +41,15 @@ export async function POST(request: NextRequest) {
     const agentUid = 0; // Let Agora assign UID
     const tokenExpiration = 3600; // 1 hour
     const privilegeExpiration = 3600;
+
+    console.log("\n========== AGENT INVITE DEBUG ==========");
+    console.log("Channel Name (for token):", channelName);
+    console.log("User UID:", uid);
+    console.log("Agent UID:", agentUid);
+    console.log("APP_ID:", APP_ID);
+    console.log("APP_CERTIFICATE exists:", !!APP_CERTIFICATE);
+    console.log("==========================================\n");
+
     const agentRtcToken = RtcTokenBuilder.buildTokenWithUid(
       APP_ID,
       APP_CERTIFICATE,
@@ -109,7 +118,7 @@ export async function POST(request: NextRequest) {
       channel: channelName,
       token: agentRtcToken,
       agent_rtc_uid: String(agentUid),
-      remote_rtc_uids: [uid],
+      remote_rtc_uids: ["*"], //[String(uid)],
       enable_string_uid: true,
       idle_timeout: agentSettings.idle_timeout || 30,
       llm: llmPayload,
@@ -166,24 +175,47 @@ export async function POST(request: NextRequest) {
       properties: propertiesPayload,
     };
 
-    console.log("Sending agent join payload:", JSON.stringify(joinPayload, null, 2));
-
     // Call Agora Conversational AI API
     const authHeader = Buffer.from(`${CUSTOMER_ID}:${CUSTOMER_SECRET}`).toString("base64");
+    const apiUrl = `https://api.agora.io/api/conversational-ai-agent/v2/projects/${APP_ID}/join`;
 
-    const agoraResponse = await fetch(
-      `https://api.agora.io/api/conversational-ai-agent/v2/projects/${APP_ID}/join`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Basic ${authHeader}`,
-        },
-        body: JSON.stringify(joinPayload),
-      }
-    );
+    // Create a sanitized version for logging (mask sensitive data)
+    const sanitizedPayload = JSON.parse(JSON.stringify(joinPayload));
+    if (sanitizedPayload.properties?.token) {
+      sanitizedPayload.properties.token = sanitizedPayload.properties.token.substring(0, 20) + "...";
+    }
+    if (sanitizedPayload.properties?.llm?.api_key) {
+      sanitizedPayload.properties.llm.api_key = "***MASKED***";
+    }
+    if (sanitizedPayload.properties?.tts?.params?.key) {
+      sanitizedPayload.properties.tts.params.key = "***MASKED***";
+    }
+
+    console.log("\n========== AGORA CONVERSATIONAL AI REQUEST ==========");
+    console.log("URL:", apiUrl);
+    console.log("Method: POST");
+    console.log("Headers:", {
+      "Content-Type": "application/json",
+      "Authorization": "Basic ***MASKED***",
+    });
+    console.log("Payload:", JSON.stringify(sanitizedPayload, null, 2));
+    console.log("=====================================================\n");
+
+    const agoraResponse = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Basic ${authHeader}`,
+      },
+      body: JSON.stringify(joinPayload),
+    });
 
     const responseData = await agoraResponse.json();
+
+    console.log("\n========== AGORA CONVERSATIONAL AI RESPONSE ==========");
+    console.log("Status:", agoraResponse.status, agoraResponse.statusText);
+    console.log("Response:", JSON.stringify(responseData, null, 2));
+    console.log("======================================================\n");
 
     if (!agoraResponse.ok) {
       console.error("Agora Conversational AI join failed:", responseData);
@@ -193,7 +225,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log("Agent started successfully:", responseData);
+    console.log("Agent started successfully with ID:", responseData.agent_id);
 
     return NextResponse.json({
       agentId: responseData.agent_id,

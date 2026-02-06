@@ -35,51 +35,161 @@ interface AgentSettingsSidebarProps {
 // Section collapse state
 type SectionKey = "llm" | "tts" | "asr" | "advanced";
 
+// Environment variable helpers - these must be NEXT_PUBLIC_ prefixed to work client-side
+// Note: Next.js requires explicit references, so we map known keys
+const ENV_MAP: Record<string, string | undefined> = {
+  LLM_VENDOR: process.env.NEXT_PUBLIC_LLM_VENDOR,
+  TTS_VENDOR: process.env.NEXT_PUBLIC_TTS_VENDOR,
+  ASR_VENDOR: process.env.NEXT_PUBLIC_ASR_VENDOR,
+  LLM_URL: process.env.NEXT_PUBLIC_LLM_URL,
+  LLM_API_KEY: process.env.NEXT_PUBLIC_LLM_API_KEY,
+  LLM_MODEL: process.env.NEXT_PUBLIC_LLM_MODEL,
+  MICROSOFT_TTS_KEY: process.env.NEXT_PUBLIC_MICROSOFT_TTS_KEY,
+  MICROSOFT_TTS_REGION: process.env.NEXT_PUBLIC_MICROSOFT_TTS_REGION,
+  MICROSOFT_TTS_VOICE: process.env.NEXT_PUBLIC_MICROSOFT_TTS_VOICE,
+  ELEVENLABS_API_KEY: process.env.NEXT_PUBLIC_ELEVENLABS_API_KEY,
+  ELEVENLABS_VOICE_ID: process.env.NEXT_PUBLIC_ELEVENLABS_VOICE_ID,
+  ELEVENLABS_MODEL_ID: process.env.NEXT_PUBLIC_ELEVENLABS_MODEL_ID,
+  ELEVENLABS_SAMPLE_RATE: process.env.NEXT_PUBLIC_ELEVENLABS_SAMPLE_RATE,
+  OPENAI_TTS_KEY: process.env.NEXT_PUBLIC_OPENAI_TTS_KEY,
+  OPENAI_TTS_MODEL: process.env.NEXT_PUBLIC_OPENAI_TTS_MODEL,
+  OPENAI_TTS_VOICE: process.env.NEXT_PUBLIC_OPENAI_TTS_VOICE,
+  DEEPGRAM_API_KEY: process.env.NEXT_PUBLIC_DEEPGRAM_API_KEY,
+  DEEPGRAM_URL: process.env.NEXT_PUBLIC_DEEPGRAM_URL,
+  DEEPGRAM_MODEL: process.env.NEXT_PUBLIC_DEEPGRAM_MODEL,
+  DEEPGRAM_LANGUAGE: process.env.NEXT_PUBLIC_DEEPGRAM_LANGUAGE,
+  MICROSOFT_ASR_KEY: process.env.NEXT_PUBLIC_MICROSOFT_ASR_KEY,
+  MICROSOFT_ASR_REGION: process.env.NEXT_PUBLIC_MICROSOFT_ASR_REGION,
+  ASR_LANGUAGE: process.env.NEXT_PUBLIC_ASR_LANGUAGE,
+};
+
+const getEnvVar = (key: string, defaultValue: string = ""): string => {
+  return ENV_MAP[key] || defaultValue;
+};
+
+// Get default TTS vendor from env
+const getDefaultTTSVendor = (): TTSVendor => {
+  const vendor = getEnvVar("TTS_VENDOR", "microsoft");
+  if (vendor === "elevenlabs" || vendor === "openai" || vendor === "microsoft") {
+    return vendor;
+  }
+  return "microsoft";
+};
+
+// Get default ASR vendor from env
+const getDefaultASRVendor = (): ASRVendor => {
+  const vendor = getEnvVar("ASR_VENDOR", "ares");
+  if (vendor === "deepgram" || vendor === "microsoft" || vendor === "ares") {
+    return vendor;
+  }
+  return "ares";
+};
+
+// Build default TTS params based on vendor
+const getDefaultTTSParams = (vendor: TTSVendor): Record<string, unknown> => {
+  switch (vendor) {
+    case "elevenlabs":
+      return {
+        key: getEnvVar("ELEVENLABS_API_KEY"),
+        voice_id: getEnvVar("ELEVENLABS_VOICE_ID"),
+        model_id: getEnvVar("ELEVENLABS_MODEL_ID", "eleven_flash_v2_5"),
+        sample_rate: parseInt(getEnvVar("ELEVENLABS_SAMPLE_RATE", "24000"), 10),
+        speed: 1.0,
+      };
+    case "openai":
+      return {
+        key: getEnvVar("OPENAI_TTS_KEY"),
+        model: getEnvVar("OPENAI_TTS_MODEL", "tts-1"),
+        voice: getEnvVar("OPENAI_TTS_VOICE", "alloy"),
+        speed: 1.0,
+      };
+    case "microsoft":
+    default:
+      return {
+        key: getEnvVar("MICROSOFT_TTS_KEY"),
+        region: getEnvVar("MICROSOFT_TTS_REGION", "eastus"),
+        voice_name: getEnvVar("MICROSOFT_TTS_VOICE", "en-US-AndrewMultilingualNeural"),
+        speed: 1.0,
+        volume: 100,
+      };
+  }
+};
+
+// Build default ASR config based on vendor
+const getDefaultASRConfig = (vendor: ASRVendor): ASRConfig => {
+  const language = getEnvVar("ASR_LANGUAGE", "en-US");
+
+  switch (vendor) {
+    case "deepgram":
+      return {
+        vendor: "deepgram",
+        language,
+        params: {
+          api_key: getEnvVar("DEEPGRAM_API_KEY"),
+          url: getEnvVar("DEEPGRAM_URL", "wss://api.deepgram.com/v1/listen"),
+          model: getEnvVar("DEEPGRAM_MODEL", "nova-2"),
+          language: getEnvVar("DEEPGRAM_LANGUAGE", "en"),
+        },
+      };
+    case "microsoft":
+      return {
+        vendor: "microsoft",
+        language,
+        params: {
+          key: getEnvVar("MICROSOFT_ASR_KEY"),
+          region: getEnvVar("MICROSOFT_ASR_REGION", "eastus"),
+        },
+      };
+    case "ares":
+    default:
+      return {
+        vendor: "ares",
+        language,
+      };
+  }
+};
+
 // Default settings
-const getDefaultSettings = (): AgentSettings => ({
-  name: `agent-${Date.now()}`,
-  llm: {
-    url: LLM_PRESETS.openai.url!,
-    api_key: "",
-    system_messages: [
-      {
-        role: "system",
-        content: "You are a helpful AI assistant in a video call. Be concise, friendly, and conversational.",
+const getDefaultSettings = (): AgentSettings => {
+  const ttsVendor = getDefaultTTSVendor();
+  const asrVendor = getDefaultASRVendor();
+
+  return {
+    name: `agent-${Date.now()}`,
+    llm: {
+      url: getEnvVar("LLM_URL", LLM_PRESETS.openai.url!),
+      api_key: getEnvVar("LLM_API_KEY"),
+      system_messages: [
+        {
+          role: "system",
+          content: "You are a helpful AI assistant in a video call. Be concise, friendly, and conversational.",
+        },
+      ],
+      greeting_message: "Hello! I'm your AI assistant. How can I help you today?",
+      failure_message: "I'm sorry, I didn't catch that. Could you please repeat?",
+      max_history: 10,
+      style: "openai",
+      params: {
+        model: getEnvVar("LLM_MODEL", "gpt-4o-mini"),
       },
-    ],
-    greeting_message: "Hello! I'm your AI assistant. How can I help you today?",
-    failure_message: "I'm sorry, I didn't catch that. Could you please repeat?",
-    max_history: 10,
-    style: "openai",
-    params: {
-      model: "gpt-4o-mini",
     },
-  },
-  tts: {
-    vendor: "microsoft",
-    params: {
-      key: "",
-      region: "eastus",
-      voice_name: "en-US-AndrewMultilingualNeural",
-      speed: 1.0,
-      volume: 100,
+    tts: {
+      vendor: ttsVendor,
+      params: getDefaultTTSParams(ttsVendor),
     },
-  },
-  asr: {
-    vendor: "ares",
-    language: "en-US",
-  },
-  idle_timeout: 30,
-  turn_detection: {
-    silence_duration_ms: 500,
-    mode: "server_vad",
-  },
-  advanced_features: {
-    enable_mllm: false,
-    enable_rtm: false,
-    enable_tools: false,
-  },
-});
+    asr: getDefaultASRConfig(asrVendor),
+    idle_timeout: 0,
+    turn_detection: {
+      silence_duration_ms: 500,
+      mode: "server_vad",
+    },
+    advanced_features: {
+      enable_mllm: false,
+      enable_rtm: false,
+      enable_tools: false,
+    },
+  };
+};
 
 // Bot icon SVG component
 const BotIcon: React.FC<{ className?: string; size?: number }> = ({ className = "", size = 24 }) => (
@@ -227,9 +337,11 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
     asr: false,
     advanced: false,
   });
-  const [selectedLLMVendor, setSelectedLLMVendor] = useState<LLMVendor>("openai");
-  const [selectedTTSVendor, setSelectedTTSVendor] = useState<TTSVendor>("microsoft");
-  const [selectedASRVendor, setSelectedASRVendor] = useState<ASRVendor>("ares");
+  const [selectedLLMVendor, setSelectedLLMVendor] = useState<LLMVendor>(
+    (getEnvVar("LLM_VENDOR", "openai") as LLMVendor) || "openai"
+  );
+  const [selectedTTSVendor, setSelectedTTSVendor] = useState<TTSVendor>(getDefaultTTSVendor());
+  const [selectedASRVendor, setSelectedASRVendor] = useState<ASRVendor>(getDefaultASRVendor());
 
   // Sync with existing settings on open
   useEffect(() => {

@@ -54,6 +54,7 @@ const JoinMeetingScreen: React.FC = () => {
         userName: yourName,
         uid: meetingInfo.mainUser.uid,
         meetingName: meetingInfo.title,
+        channelId: meetingInfo.channel,
         hostPassphrase: meetingInfo.hostPassphrase,
         viewerPassphrase: meetingInfo.viewerPassphrase,
         isHost: meetingInfo.isHost,
