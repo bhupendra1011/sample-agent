@@ -29,6 +29,33 @@ export async function inviteAgent(
 }
 
 /**
+ * Updates agent configuration at runtime (LLM, token).
+ * See: https://docs.agora.io/en/conversational-ai/rest-api/agent/update
+ */
+export async function updateAgent(
+  agentId: string,
+  channelName: string,
+  agentSettings: AgentSettings
+): Promise<{ agentId: string; status: string }> {
+  const response = await fetch("/api/agent/update", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      agentId,
+      channelName,
+      agentSettings,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || "Failed to update agent");
+  }
+
+  return response.json();
+}
+
+/**
  * Stops the AI agent and removes it from the call.
  */
 export async function stopAgent(agentId: string): Promise<{ success: boolean }> {

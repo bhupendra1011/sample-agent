@@ -14,15 +14,51 @@ import {
   MdDraw,
   MdSettings,
   MdCreate,
+  MdSync,
 } from "react-icons/md";
 import { useAgora } from "@/hooks/useAgora";
 import { showToast } from "@/services/uiService";
-import { inviteAgent, stopAgent } from "@/api/agentApi";
+import { inviteAgent, stopAgent, updateAgent } from "@/api/agentApi";
 import Modal from "@/components/common/Modal";
 import CopyButton from "@/components/common/CopyButton";
 import SettingsSidebar from "@/components/SettingsSidebar";
 import TranscriptSidePanel from "@/components/TranscriptSidePanel";
 import type { AgentSettings } from "@/types/agora";
+
+// Only LLM and MLLM params support auto-update via API. Adv settings = manual restart only.
+function hasUpdatableChanges(
+  prev: AgentSettings | null,
+  next: AgentSettings
+): boolean {
+  if (!prev) return true;
+  return (
+    JSON.stringify(prev.llm?.system_messages) !==
+      JSON.stringify(next.llm?.system_messages) ||
+    JSON.stringify(prev.llm?.params) !== JSON.stringify(next.llm?.params)
+  );
+}
+
+// Advanced settings require manual restart (TTS, ASR, turn detection, RTM, MLLM, tools, etc.)
+function hasRestartRequiredChanges(
+  prev: AgentSettings | null,
+  next: AgentSettings
+): boolean {
+  if (!prev) return false;
+  return (
+    JSON.stringify(prev.tts) !== JSON.stringify(next.tts) ||
+    JSON.stringify(prev.asr) !== JSON.stringify(next.asr) ||
+    JSON.stringify(prev.turn_detection) !==
+      JSON.stringify(next.turn_detection) ||
+    JSON.stringify(prev.advanced_features) !==
+      JSON.stringify(next.advanced_features) ||
+    JSON.stringify(prev.llm?.url) !== JSON.stringify(next.llm?.url) ||
+    JSON.stringify(prev.llm?.api_key) !== JSON.stringify(next.llm?.api_key) ||
+    prev.llm?.max_history !== next.llm?.max_history ||
+    prev.llm?.style !== next.llm?.style ||
+    prev.llm?.greeting_message !== next.llm?.greeting_message ||
+    prev.llm?.failure_message !== next.llm?.failure_message
+  );
+}
 
 interface ControlsProps {
   sendChatMessage?: (text: string, image?: File) => Promise<void>;
@@ -49,8 +85,10 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
   const isAgentActive = useAppStore((state) => state.isAgentActive);
   const isAgentLoading = useAppStore((state) => state.isAgentLoading);
   const agentSettings = useAppStore((state) => state.agentSettings);
+  const isAgentUpdating = useAppStore((state) => state.isAgentUpdating);
   const setAgentActive = useAppStore((state) => state.setAgentActive);
   const setAgentLoading = useAppStore((state) => state.setAgentLoading);
+  const setAgentUpdating = useAppStore((state) => state.setAgentUpdating);
   const clearAgent = useAppStore((state) => state.clearAgent);
   const setAgentSettings = useAppStore((state) => state.setAgentSettings);
 
@@ -178,7 +216,7 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
     } catch (error) {
       console.error("Failed to stop agent:", error);
       showToast("Failed to stop AI agent", "error");
-      setAgentLoading(false);
+      clearAgent(); // Reset to Start Agent state on error
     }
   }, [agentId, setAgentLoading, clearAgent]);
 
@@ -191,14 +229,45 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
   }, [isAgentActive, handleStopAgent, handleInviteAgent]);
 
   const handleSaveAgentSettings = useCallback(
-    (settings: AgentSettings) => {
+    async (settings: AgentSettings) => {
+      const prevSettings = useAppStore.getState().agentSettings;
       setAgentSettings(settings); // This also updates transcriptionMode
-      showToast("Agent settings saved!", "success");
-      if (isAgentActive) {
-        showToast("Restart the agent for RTM changes to take effect", "info");
+
+      if (isAgentActive && agentId && channelId) {
+        const canUpdate = hasUpdatableChanges(prevSettings, settings);
+        const needsRestart = hasRestartRequiredChanges(prevSettings, settings);
+
+        if (canUpdate) {
+          setAgentUpdating(true);
+          try {
+            await updateAgent(agentId, channelId, settings);
+            showToast("Agent configuration updated successfully!", "success");
+          } catch (error) {
+            console.error("Failed to update agent:", error);
+            showToast(
+              error instanceof Error ? error.message : "Failed to update agent",
+              "error"
+            );
+          } finally {
+            setAgentUpdating(false);
+          }
+        }
+
+        if (needsRestart) {
+          showToast(
+            "Restart the agent for TTS/ASR/advanced changes to take effect",
+            "info"
+          );
+        }
+
+        if (!canUpdate && !needsRestart) {
+          showToast("Agent settings saved!", "success");
+        }
+      } else {
+        showToast("Agent settings saved!", "success");
       }
     },
-    [setAgentSettings, isAgentActive]
+    [setAgentSettings, setAgentUpdating, isAgentActive, agentId, channelId]
   );
 
   const controlButtonClass =
@@ -206,17 +275,6 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
 
   return (
     <React.Fragment>
-      {/* Floating Transcript Button - Bottom Right */}
-      {isAgentActive && (
-        <button
-          onClick={() => setIsTranscriptPanelOpen(true)}
-          className="fixed bottom-24 right-6 z-30 flex items-center justify-center w-14 h-14 text-2xl rounded-full bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700 shadow-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 hover:scale-110"
-          title="Open Transcript"
-        >
-          <MdCreate />
-        </button>
-      )}
-
       <div className="flex justify-center items-center h-20 bg-gray-200 dark:bg-gray-800 px-4 shadow-lg transition-colors duration-300">
       {/* Left spacer for balance */}
       <div className="flex-1" />
@@ -282,37 +340,67 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
           <div className="flex items-center space-x-2">
             <button
               onClick={handleToggleAgent}
-              disabled={isAgentLoading}
-              className={`flex items-center justify-center w-14 h-14 text-3xl rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-opacity-75 ${
-                isAgentLoading
+              disabled={isAgentLoading || isAgentUpdating}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-opacity-75 ${
+                isAgentUpdating
+                  ? "bg-amber-500 dark:bg-amber-600 text-white animate-pulse"
+                  : isAgentLoading
                   ? "bg-yellow-500 dark:bg-yellow-600 text-white animate-pulse"
                   : isAgentActive
                   ? "bg-green-500 dark:bg-green-600 text-white hover:bg-green-600 dark:hover:bg-green-700"
                   : "bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-400 dark:hover:bg-gray-600"
               }`}
               title={
-                isAgentLoading
-                  ? "Agent loading..."
+                isAgentUpdating
+                  ? "Updating agent configuration..."
+                  : isAgentLoading
+                  ? isAgentActive
+                    ? "Agent disconnecting..."
+                    : "Agent connecting..."
                   : isAgentActive
                   ? "Stop AI Agent"
                   : "Invite AI Agent"
               }
             >
-              <svg
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                className="w-8 h-8"
-              >
-                <path d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1a1 1 0 011 1v3a1 1 0 01-1 1h-1v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1H2a1 1 0 01-1-1v-3a1 1 0 011-1h1a7 7 0 017-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 012-2zm-3 9a1 1 0 00-1 1v2a1 1 0 002 0v-2a1 1 0 00-1-1zm6 0a1 1 0 00-1 1v2a1 1 0 002 0v-2a1 1 0 00-1-1z" />
-              </svg>
+              {isAgentUpdating ? (
+                <MdSync className="w-5 h-5 shrink-0 animate-spin" />
+              ) : (
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  className="w-5 h-5 shrink-0"
+                >
+                  <path d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1a1 1 0 011 1v3a1 1 0 01-1 1h-1v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1H2a1 1 0 01-1-1v-3a1 1 0 011-1h1a7 7 0 017-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 012-2zm-3 9a1 1 0 00-1 1v2a1 1 0 002 0v-2a1 1 0 00-1-1zm6 0a1 1 0 00-1 1v2a1 1 0 002 0v-2a1 1 0 00-1-1z" />
+                </svg>
+              )}
+              <span className="text-sm font-medium whitespace-nowrap">
+                {isAgentUpdating
+                  ? "Updating"
+                  : isAgentLoading
+                  ? isAgentActive
+                    ? "Disconnecting"
+                    : "Connecting"
+                  : isAgentActive
+                  ? "Stop Agent"
+                  : "Start Agent"}
+              </span>
             </button>
             <button
               onClick={() => setIsSettingsPanelOpen(true)}
-              className="flex items-center justify-center w-12 h-12 text-2xl rounded-full bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-400 dark:hover:bg-gray-600 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              className="flex items-center justify-center w-10 h-10 rounded-lg bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-400 dark:hover:bg-gray-600 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
               title="Agent Settings"
             >
-              <MdSettings />
+              <MdSettings className="w-5 h-5" />
             </button>
+            {isAgentActive && (
+              <button
+                onClick={() => setIsTranscriptPanelOpen(true)}
+                className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                title="Open Transcript"
+              >
+                <MdCreate className="w-5 h-5" />
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -358,6 +446,8 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
         isOpen={isSettingsPanelOpen}
         onClose={() => setIsSettingsPanelOpen(false)}
         onSaveAgentSettings={handleSaveAgentSettings}
+        isAgentUpdating={isAgentUpdating}
+        isAgentActive={isAgentActive}
       />
 
       <TranscriptSidePanel

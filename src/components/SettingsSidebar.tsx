@@ -14,6 +14,8 @@ interface SettingsSidebarProps {
   isOpen: boolean;
   onClose: () => void;
   onSaveAgentSettings: (settings: AgentSettings) => void;
+  isAgentUpdating?: boolean;
+  isAgentActive?: boolean;
 }
 
 // Tab button component
@@ -40,6 +42,8 @@ const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
   isOpen,
   onClose,
   onSaveAgentSettings,
+  isAgentUpdating = false,
+  isAgentActive = false,
 }) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>("ai-agent");
   const localAudioTrack = useAppStore((state) => state.localAudioTrack);
@@ -72,8 +76,12 @@ const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Settings</h2>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Configure your meeting preferences</p>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Settings
+            </h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Configure your meeting preferences
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -100,9 +108,23 @@ const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto relative">
+          {isAgentUpdating && activeTab === "ai-agent" && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Updating Agent Configuration...
+                </span>
+              </div>
+            </div>
+          )}
           {activeTab === "ai-agent" ? (
-            <AgentSettingsContent onSave={onSaveAgentSettings} onClose={onClose} />
+            <AgentSettingsContent
+              onSave={onSaveAgentSettings}
+              onClose={onClose}
+              isAgentActive={isAgentActive}
+            />
           ) : (
             <div className="px-6 py-4">
               <VoiceSettings localMicrophoneTrack={microphoneTrackInterface} />
@@ -118,13 +140,20 @@ const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
 interface AgentSettingsContentProps {
   onSave: (settings: AgentSettings) => void;
   onClose: () => void;
+  isAgentActive?: boolean;
 }
 
-const AgentSettingsContent: React.FC<AgentSettingsContentProps> = ({ onSave, onClose }) => {
-  // We'll render AgentSettingsSidebar but need to extract just the content
-  // For now, we'll use the full sidebar but hide the outer wrapper via a prop
+const AgentSettingsContent: React.FC<AgentSettingsContentProps> = ({
+  onSave,
+  onClose,
+  isAgentActive = false,
+}) => {
   return (
-    <AgentSettingsSidebarContent onSave={onSave} onClose={onClose} />
+    <AgentSettingsSidebarContent
+      onSave={onSave}
+      onClose={onClose}
+      isAgentActive={isAgentActive}
+    />
   );
 };
 
@@ -188,7 +217,11 @@ const getEnvVar = (key: string, defaultValue: string = ""): string => {
 
 const getDefaultTTSVendor = (): TTSVendor => {
   const vendor = getEnvVar("TTS_VENDOR", "microsoft");
-  if (vendor === "elevenlabs" || vendor === "openai" || vendor === "microsoft") {
+  if (
+    vendor === "elevenlabs" ||
+    vendor === "openai" ||
+    vendor === "microsoft"
+  ) {
     return vendor;
   }
   return "microsoft";
@@ -224,7 +257,10 @@ const getDefaultTTSParams = (vendor: TTSVendor): Record<string, unknown> => {
       return {
         key: getEnvVar("MICROSOFT_TTS_KEY"),
         region: getEnvVar("MICROSOFT_TTS_REGION", "eastus"),
-        voice_name: getEnvVar("MICROSOFT_TTS_VOICE", "en-US-AndrewMultilingualNeural"),
+        voice_name: getEnvVar(
+          "MICROSOFT_TTS_VOICE",
+          "en-US-AndrewMultilingualNeural",
+        ),
         speed: 1.0,
         volume: 100,
       };
@@ -276,11 +312,14 @@ const getDefaultSettings = (): AgentSettingsType => {
       system_messages: [
         {
           role: "system",
-          content: "You are a helpful AI assistant in a video call. Be concise, friendly, and conversational.",
+          content:
+            "You are a helpful AI assistant in a video call. Be concise, friendly, and conversational.",
         },
       ],
-      greeting_message: "Hello! I'm your AI assistant. How can I help you today?",
-      failure_message: "I'm sorry, I didn't catch that. Could you please repeat?",
+      greeting_message:
+        "Hello! I'm your AI assistant. How can I help you today?",
+      failure_message:
+        "I'm sorry, I didn't catch that. Could you please repeat?",
       max_history: 10,
       style: "openai",
       params: {
@@ -317,12 +356,16 @@ const FormField: React.FC<{
     <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
       <span>
         {label}
-        {required && <span className="text-red-500 dark:text-red-400 ml-1">*</span>}
+        {required && (
+          <span className="text-red-500 dark:text-red-400 ml-1">*</span>
+        )}
       </span>
       {tooltip && <InfoTooltip content={tooltip} />}
     </label>
     {children}
-    {hint && <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">{hint}</p>}
+    {hint && (
+      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">{hint}</p>
+    )}
   </div>
 );
 
@@ -379,7 +422,9 @@ const Section: React.FC<{
     >
       <div className="flex items-center gap-2">
         <span className="text-blue-500 dark:text-blue-400">{icon}</span>
-        <span className="font-medium text-gray-900 dark:text-white">{title}</span>
+        <span className="font-medium text-gray-900 dark:text-white">
+          {title}
+        </span>
         {badge && (
           <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-full">
             {badge}
@@ -392,7 +437,9 @@ const Section: React.FC<{
         <MdExpandMore className="text-gray-500 dark:text-gray-400" size={20} />
       )}
     </button>
-    {isOpen && <div className="px-4 py-4 bg-gray-50 dark:bg-gray-900/50">{children}</div>}
+    {isOpen && (
+      <div className="px-4 py-4 bg-gray-50 dark:bg-gray-900/50">{children}</div>
+    )}
   </div>
 );
 
@@ -410,7 +457,9 @@ const Toggle: React.FC<{
     <button
       onClick={() => onChange(!checked)}
       className={`relative w-11 h-6 rounded-full transition-colors ${
-        checked ? "bg-blue-500 dark:bg-blue-500" : "bg-gray-300 dark:bg-gray-600"
+        checked
+          ? "bg-blue-500 dark:bg-blue-500"
+          : "bg-gray-300 dark:bg-gray-600"
       }`}
     >
       <span
@@ -423,8 +472,17 @@ const Toggle: React.FC<{
 );
 
 // Bot icon
-const BotIcon: React.FC<{ className?: string; size?: number }> = ({ className = "", size = 24 }) => (
-  <svg viewBox="0 0 24 24" fill="currentColor" width={size} height={size} className={className}>
+const BotIcon: React.FC<{ className?: string; size?: number }> = ({
+  className = "",
+  size = 24,
+}) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    width={size}
+    height={size}
+    className={className}
+  >
     <path d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1a1 1 0 011 1v3a1 1 0 01-1 1h-1v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1H2a1 1 0 01-1-1v-3a1 1 0 011-1h1a7 7 0 017-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 012-2zm-3 9a1 1 0 00-1 1v2a1 1 0 002 0v-2a1 1 0 00-1-1zm6 0a1 1 0 00-1 1v2a1 1 0 002 0v-2a1 1 0 00-1-1z" />
   </svg>
 );
@@ -433,22 +491,29 @@ const BotIcon: React.FC<{ className?: string; size?: number }> = ({ className = 
 const AgentSettingsSidebarContent: React.FC<{
   onSave: (settings: AgentSettingsType) => void;
   onClose: () => void;
-}> = ({ onSave, onClose }) => {
+  isAgentActive?: boolean;
+}> = ({ onSave, onClose, isAgentActive = false }) => {
   const existingSettings = useAppStore((state) => state.agentSettings);
   const [settings, setSettings] = React.useState<AgentSettingsType>(
-    existingSettings || getDefaultSettings()
+    existingSettings || getDefaultSettings(),
   );
-  const [expandedSections, setExpandedSections] = React.useState<Record<SectionKey, boolean>>({
+  const [expandedSections, setExpandedSections] = React.useState<
+    Record<SectionKey, boolean>
+  >({
     llm: true,
     tts: true,
     asr: false,
     advanced: false,
   });
   const [selectedLLMVendor, setSelectedLLMVendor] = React.useState<LLMVendor>(
-    (getEnvVar("LLM_VENDOR", "openai") as LLMVendor) || "openai"
+    (getEnvVar("LLM_VENDOR", "openai") as LLMVendor) || "openai",
   );
-  const [selectedTTSVendor, setSelectedTTSVendor] = React.useState<TTSVendor>(getDefaultTTSVendor());
-  const [selectedASRVendor, setSelectedASRVendor] = React.useState<ASRVendor>(getDefaultASRVendor());
+  const [selectedTTSVendor, setSelectedTTSVendor] = React.useState<TTSVendor>(
+    getDefaultTTSVendor(),
+  );
+  const [selectedASRVendor, setSelectedASRVendor] = React.useState<ASRVendor>(
+    getDefaultASRVendor(),
+  );
 
   React.useEffect(() => {
     if (existingSettings) {
@@ -541,7 +606,10 @@ const AgentSettingsSidebarContent: React.FC<{
       });
     }
 
-    updateASR({ vendor, params: Object.keys(defaultParams).length ? defaultParams : undefined });
+    updateASR({
+      vendor,
+      params: Object.keys(defaultParams).length ? defaultParams : undefined,
+    });
   };
 
   const handleSave = () => {
@@ -559,7 +627,10 @@ const AgentSettingsSidebarContent: React.FC<{
       ...prev,
       tts: {
         ...prev.tts,
-        params: { ...(prev.tts.params as Record<string, unknown>), [key]: value },
+        params: {
+          ...(prev.tts.params as Record<string, unknown>),
+          [key]: value,
+        },
       },
     }));
   };
@@ -574,7 +645,10 @@ const AgentSettingsSidebarContent: React.FC<{
       ...prev,
       asr: {
         ...prev.asr,
-        params: { ...((prev.asr?.params || {}) as Record<string, unknown>), [key]: value },
+        params: {
+          ...((prev.asr?.params || {}) as Record<string, unknown>),
+          [key]: value,
+        },
       },
     }));
   };
@@ -582,6 +656,19 @@ const AgentSettingsSidebarContent: React.FC<{
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto px-6 py-4 bg-gray-50 dark:bg-gray-900/50">
+        {/* Info banner - which changes apply live vs require restart */}
+        {isAgentActive && (
+          <div className="mb-4 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+            <p className="text-xs font-medium text-blue-800 dark:text-blue-200 mb-1.5">
+              When agent is running:
+            </p>
+            <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-0.5">
+              <li>• <strong>Auto-update (no restart):</strong> LLM and MLLM params (system prompt, model, params)</li>
+              <li>• <strong>Manual restart required:</strong> All advanced settings (TTS, ASR, turn detection, RTM, MLLM toggle, tools)</li>
+            </ul>
+          </div>
+        )}
+
         {/* Agent Name */}
         <FormField
           label="Agent Name"
@@ -604,10 +691,16 @@ const AgentSettingsSidebarContent: React.FC<{
           onToggle={() => toggleSection("llm")}
           badge="Required"
         >
-          <FormField label="Provider" required tooltip="LLM provider selection.">
+          <FormField
+            label="Provider"
+            required
+            tooltip="LLM provider selection."
+          >
             <Select
               value={selectedLLMVendor}
-              onChange={(e) => handleLLMVendorChange(e.target.value as LLMVendor)}
+              onChange={(e) =>
+                handleLLMVendorChange(e.target.value as LLMVendor)
+              }
             >
               {Object.entries(LLM_PRESETS).map(([key, preset]) => (
                 <option key={key} value={key}>
@@ -625,7 +718,11 @@ const AgentSettingsSidebarContent: React.FC<{
             />
           </FormField>
 
-          <FormField label="API Key" required tooltip="Verification key for the LLM.">
+          <FormField
+            label="API Key"
+            required
+            tooltip="Verification key for the LLM."
+          >
             <Input
               type="password"
               value={settings.llm.api_key}
@@ -634,12 +731,18 @@ const AgentSettingsSidebarContent: React.FC<{
             />
           </FormField>
 
-          <FormField label="Model" required tooltip="Model name for the selected LLM vendor.">
+          <FormField
+            label="Model"
+            required
+            tooltip="Model name for the selected LLM vendor."
+          >
             {LLM_PRESETS[selectedLLMVendor].models ? (
               <Select
                 value={settings.llm.params?.model || ""}
                 onChange={(e) =>
-                  updateLLM({ params: { ...settings.llm.params, model: e.target.value } })
+                  updateLLM({
+                    params: { ...settings.llm.params, model: e.target.value },
+                  })
                 }
               >
                 {LLM_PRESETS[selectedLLMVendor].models!.map((model) => (
@@ -652,7 +755,9 @@ const AgentSettingsSidebarContent: React.FC<{
               <Input
                 value={settings.llm.params?.model || ""}
                 onChange={(e) =>
-                  updateLLM({ params: { ...settings.llm.params, model: e.target.value } })
+                  updateLLM({
+                    params: { ...settings.llm.params, model: e.target.value },
+                  })
                 }
                 placeholder="Model name"
               />
@@ -669,7 +774,9 @@ const AgentSettingsSidebarContent: React.FC<{
               value={settings.llm.system_messages?.[0]?.content || ""}
               onChange={(e) =>
                 updateLLM({
-                  system_messages: [{ role: "system", content: e.target.value }],
+                  system_messages: [
+                    { role: "system", content: e.target.value },
+                  ],
                 })
               }
               placeholder="You are a helpful AI assistant..."
@@ -701,13 +808,19 @@ const AgentSettingsSidebarContent: React.FC<{
           </FormField>
 
           <div className="grid grid-cols-2 gap-4">
-            <FormField label="Max History" hint="1-1024" tooltip="Conversation history size (1-1024).">
+            <FormField
+              label="Max History"
+              hint="1-1024"
+              tooltip="Conversation history size (1-1024)."
+            >
               <Input
                 type="number"
                 min={1}
                 max={1024}
                 value={settings.llm.max_history || 10}
-                onChange={(e) => updateLLM({ max_history: parseInt(e.target.value) || 10 })}
+                onChange={(e) =>
+                  updateLLM({ max_history: parseInt(e.target.value) || 10 })
+                }
               />
             </FormField>
             <FormField label="Temperature" hint="0-2">
@@ -742,7 +855,9 @@ const AgentSettingsSidebarContent: React.FC<{
           <FormField label="Vendor" required>
             <Select
               value={selectedTTSVendor}
-              onChange={(e) => handleTTSVendorChange(e.target.value as TTSVendor)}
+              onChange={(e) =>
+                handleTTSVendorChange(e.target.value as TTSVendor)
+              }
             >
               {Object.entries(TTS_PRESETS).map(([key, preset]) => (
                 <option key={key} value={key}>
@@ -800,7 +915,9 @@ const AgentSettingsSidebarContent: React.FC<{
                     max={2}
                     step={0.1}
                     value={getTTSParam("speed") || "1.0"}
-                    onChange={(e) => setTTSParam("speed", parseFloat(e.target.value))}
+                    onChange={(e) =>
+                      setTTSParam("speed", parseFloat(e.target.value))
+                    }
                   />
                 </FormField>
                 <FormField label="Volume" hint="0-100">
@@ -809,7 +926,9 @@ const AgentSettingsSidebarContent: React.FC<{
                     min={0}
                     max={100}
                     value={getTTSParam("volume") || "100"}
-                    onChange={(e) => setTTSParam("volume", parseInt(e.target.value))}
+                    onChange={(e) =>
+                      setTTSParam("volume", parseInt(e.target.value))
+                    }
                   />
                 </FormField>
               </div>
@@ -831,7 +950,11 @@ const AgentSettingsSidebarContent: React.FC<{
                   ))}
                 </Select>
               </FormField>
-              <FormField label="Voice ID" required hint="From ElevenLabs voice library">
+              <FormField
+                label="Voice ID"
+                required
+                hint="From ElevenLabs voice library"
+              >
                 <Input
                   value={getTTSParam("voice_id")}
                   onChange={(e) => setTTSParam("voice_id", e.target.value)}
@@ -846,7 +969,9 @@ const AgentSettingsSidebarContent: React.FC<{
                     max={1.2}
                     step={0.1}
                     value={getTTSParam("speed") || "1.0"}
-                    onChange={(e) => setTTSParam("speed", parseFloat(e.target.value))}
+                    onChange={(e) =>
+                      setTTSParam("speed", parseFloat(e.target.value))
+                    }
                   />
                 </FormField>
                 <FormField label="Stability" hint="0-1">
@@ -856,7 +981,9 @@ const AgentSettingsSidebarContent: React.FC<{
                     max={1}
                     step={0.1}
                     value={getTTSParam("stability") || "0.5"}
-                    onChange={(e) => setTTSParam("stability", parseFloat(e.target.value))}
+                    onChange={(e) =>
+                      setTTSParam("stability", parseFloat(e.target.value))
+                    }
                   />
                 </FormField>
               </div>
@@ -901,10 +1028,15 @@ const AgentSettingsSidebarContent: React.FC<{
           isOpen={expandedSections.asr}
           onToggle={() => toggleSection("asr")}
         >
-          <FormField label="Vendor" hint="ARES is Agora's built-in ASR (no API key needed)">
+          <FormField
+            label="Vendor"
+            hint="ARES is Agora's built-in ASR (no API key needed)"
+          >
             <Select
               value={selectedASRVendor}
-              onChange={(e) => handleASRVendorChange(e.target.value as ASRVendor)}
+              onChange={(e) =>
+                handleASRVendorChange(e.target.value as ASRVendor)
+              }
             >
               {Object.entries(ASR_PRESETS).map(([key, preset]) => (
                 <option key={key} value={key}>
@@ -992,7 +1124,10 @@ const AgentSettingsSidebarContent: React.FC<{
               max={300}
               value={settings.idle_timeout || 30}
               onChange={(e) =>
-                setSettings({ ...settings, idle_timeout: parseInt(e.target.value) || 30 })
+                setSettings({
+                  ...settings,
+                  idle_timeout: parseInt(e.target.value) || 30,
+                })
               }
             />
           </FormField>
@@ -1020,7 +1155,10 @@ const AgentSettingsSidebarContent: React.FC<{
             />
           </FormField>
 
-          <FormField label="VAD Mode" tooltip="server_vad or semantic turn detection.">
+          <FormField
+            label="VAD Mode"
+            tooltip="server_vad or semantic turn detection."
+          >
             <Select
               value={settings.turn_detection?.mode || "server_vad"}
               onChange={(e) =>
@@ -1039,14 +1177,19 @@ const AgentSettingsSidebarContent: React.FC<{
           </FormField>
 
           <div className="border-t border-gray-200 dark:border-gray-700 my-4 pt-4">
-            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Features</h4>
+            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+              Features
+            </h4>
             <Toggle
               label="Enable MLLM (Vision)"
               checked={settings.advanced_features?.enable_mllm || false}
               onChange={(checked) =>
                 setSettings({
                   ...settings,
-                  advanced_features: { ...settings.advanced_features, enable_mllm: checked },
+                  advanced_features: {
+                    ...settings.advanced_features,
+                    enable_mllm: checked,
+                  },
                 })
               }
               hint="Multimodal LLM for vision."
@@ -1057,7 +1200,10 @@ const AgentSettingsSidebarContent: React.FC<{
               onChange={(checked) =>
                 setSettings({
                   ...settings,
-                  advanced_features: { ...settings.advanced_features, enable_rtm: checked },
+                  advanced_features: {
+                    ...settings.advanced_features,
+                    enable_rtm: checked,
+                  },
                 })
               }
               hint="Enables Signaling; use RTM for transcripts, state, chat."
@@ -1068,7 +1214,10 @@ const AgentSettingsSidebarContent: React.FC<{
               onChange={(checked) =>
                 setSettings({
                   ...settings,
-                  advanced_features: { ...settings.advanced_features, enable_tools: checked },
+                  advanced_features: {
+                    ...settings.advanced_features,
+                    enable_tools: checked,
+                  },
                 })
               }
               hint="Function calling support."
@@ -1084,7 +1233,7 @@ const AgentSettingsSidebarContent: React.FC<{
             onClick={handleSave}
             className="flex-1 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
           >
-            Save & Apply
+            Save
           </button>
           <button
             onClick={onClose}
@@ -1094,7 +1243,8 @@ const AgentSettingsSidebarContent: React.FC<{
           </button>
         </div>
         <p className="text-xs text-gray-500 text-center mt-3">
-          Fields marked with <span className="text-red-500 dark:text-red-400">*</span> are required
+          Fields marked with{" "}
+          <span className="text-red-500 dark:text-red-400">*</span> are required
         </p>
       </div>
     </div>

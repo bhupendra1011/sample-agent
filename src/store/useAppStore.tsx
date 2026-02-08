@@ -76,6 +76,7 @@ interface AppState {
   agentId: string | null;
   isAgentActive: boolean;
   isAgentLoading: boolean;
+  isAgentUpdating: boolean;
   agentSettings: AgentSettings | null;
   agentState: EAgentState;
   agentRtcUid: string | null;
@@ -85,6 +86,7 @@ interface AppState {
   transcriptRenderMode: ETranscriptRenderMode;
   setAgentActive: (agentId: string, agentRtcUid?: string) => void;
   setAgentLoading: (loading: boolean) => void;
+  setAgentUpdating: (updating: boolean) => void;
   clearAgent: () => void;
   setAgentSettings: (settings: AgentSettings) => void;
   setAgentState: (state: EAgentState) => void;
@@ -168,6 +170,7 @@ const useAppStore = create<AppState>((set, get) => ({
   agentId: null,
   isAgentActive: false,
   isAgentLoading: false,
+  isAgentUpdating: false,
   agentSettings: null,
   agentState: EAgentState.IDLE,
   agentRtcUid: null,
@@ -183,11 +186,13 @@ const useAppStore = create<AppState>((set, get) => ({
       isAgentLoading: false,
     }),
   setAgentLoading: (loading) => set({ isAgentLoading: loading }),
+  setAgentUpdating: (updating) => set({ isAgentUpdating: updating }),
   clearAgent: () =>
     set({
       agentId: null,
       isAgentActive: false,
       isAgentLoading: false,
+      isAgentUpdating: false,
       agentState: EAgentState.IDLE,
       agentRtcUid: null,
       transcriptItems: [],
@@ -285,6 +290,7 @@ const useAppStore = create<AppState>((set, get) => ({
       agentId: null,
       isAgentActive: false,
       isAgentLoading: false,
+      isAgentUpdating: false,
       agentState: EAgentState.IDLE,
       agentRtcUid: null,
       transcriptItems: [],
