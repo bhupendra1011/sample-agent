@@ -157,6 +157,32 @@ export interface AgentParametersConfig {
   data_channel?: "rtc" | "rtm";
 }
 
+// --- Avatar Vendors ---
+export type AvatarVendor = "akool" | "heygen";
+
+export interface AvatarAkoolParams {
+  api_key: string;
+  agora_uid: string;
+  agora_token?: string;
+  avatar_id: string;
+}
+
+export interface AvatarHeyGenParams {
+  api_key: string;
+  quality: "low" | "medium" | "high";
+  agora_uid: string;
+  agora_token?: string;
+  avatar_id?: string;
+  disable_idle_timeout?: boolean;
+  activity_idle_timeout?: number;
+}
+
+export interface AvatarConfig {
+  enable: boolean;
+  vendor: AvatarVendor;
+  params: AvatarAkoolParams | AvatarHeyGenParams;
+}
+
 // --- Agent State Enum (from Agora Conversational AI API) ---
 export enum EAgentState {
   IDLE = "idle",
@@ -253,6 +279,9 @@ export interface AgentSettings {
 
   // Agent parameters
   parameters?: AgentParametersConfig;
+
+  // Avatar configuration (optional)
+  avatar?: AvatarConfig;
 }
 
 // --- Preset Configurations for Quick Setup ---

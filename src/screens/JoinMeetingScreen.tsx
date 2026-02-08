@@ -17,7 +17,7 @@ const JoinMeetingScreen: React.FC = () => {
   const callStart = useAppStore((state) => state.callStart);
   const callEnd = useAppStore((state) => state.callEnd);
   const setWhiteboardCredentials = useAppStore(
-    (state) => state.setWhiteboardCredentials
+    (state) => state.setWhiteboardCredentials,
   );
   const { joinMeeting: joinAgoraMeeting } = useAgora();
   const router = useRouter();
@@ -47,7 +47,7 @@ const JoinMeetingScreen: React.FC = () => {
         meetingInfo.title,
         meetingInfo?.hostPassphrase,
         meetingInfo?.viewerPassphrase,
-        yourName
+        yourName,
       );
 
       callStart({
@@ -68,7 +68,7 @@ const JoinMeetingScreen: React.FC = () => {
           meetingInfo.whiteboard.room_token,
           meetingInfo.whiteboard.room_uuid,
           AGORA_CONFIG.WHITEBOARD_APPIDENTIFIER!,
-          AGORA_CONFIG.WHITEBOARD_REGION!
+          AGORA_CONFIG.WHITEBOARD_REGION!,
         );
       }
 
@@ -77,7 +77,7 @@ const JoinMeetingScreen: React.FC = () => {
       console.error("Failed to join meeting:", error);
       showToast(
         "Failed to join meeting. Please check the Meeting ID and your name, then try again.",
-        "error"
+        "error",
       );
       callEnd();
     } finally {

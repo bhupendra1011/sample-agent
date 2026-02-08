@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
 
     // Build the join payload for Agora Conversational AI API v2
     // Based on: https://docs.agora.io/en/conversational-ai/rest-api/agent/join
-    const { llm, tts, asr, turn_detection, advanced_features, parameters } = agentSettings;
+    const { llm, tts, asr, turn_detection, advanced_features, parameters, avatar } = agentSettings;
 
     // Generate token with RTC+RTM privileges when RTM is enabled
     // Per: https://docs.agora.io/en/help/integration-issues/rtc_rtm_token
@@ -127,12 +127,16 @@ export async function POST(request: NextRequest) {
         }
       : undefined;
 
+    // When avatar is enabled, Agora does not allow "subscribe all" (*).
+    // Must specify the local user's UID explicitly.
+    const remoteRtcUids = avatar?.enable ? [String(uid)] : ["*"];
+
     // Build the complete properties payload
     const propertiesPayload: Record<string, unknown> = {
       channel: channelName,
       token: agentRtcToken,
       agent_rtc_uid: String(agentUid),
-      remote_rtc_uids: ["*"], //[String(uid)],
+      remote_rtc_uids: remoteRtcUids,
       enable_string_uid: true,
       idle_timeout: agentSettings.idle_timeout || 30,
       llm: llmPayload,
@@ -189,6 +193,58 @@ export async function POST(request: NextRequest) {
       };
     }
 
+    // Add avatar configuration if enabled
+    if (avatar?.enable) {
+      // Use a distinct avatar UID (999999) to avoid conflicts with agent (0) or user
+      const avatarUid = 999999;
+      const avatarRtcToken = RtcTokenBuilder.buildTokenWithUid(
+        APP_ID,
+        APP_CERTIFICATE,
+        channelName,
+        avatarUid,
+        RtcRole.PUBLISHER,
+        tokenExpiration,
+        privilegeExpiration
+      );
+
+      // Build avatar params based on vendor
+      const avatarParams: Record<string, unknown> = {
+        agora_uid: String(avatarUid),
+        agora_token: avatarRtcToken,
+      };
+
+      // Add vendor-specific params
+      if (avatar.vendor === "akool") {
+        const akoolParams = avatar.params as {
+          api_key?: string;
+          avatar_id?: string;
+        };
+        avatarParams.api_key =
+          akoolParams.api_key || process.env.AKOOL_API_KEY || "";
+        avatarParams.avatar_id = akoolParams.avatar_id || "";
+      } else if (avatar.vendor === "heygen") {
+        const heygenParams = avatar.params as {
+          api_key?: string;
+          quality?: string;
+          avatar_id?: string;
+          disable_idle_timeout?: boolean;
+          activity_idle_timeout?: number;
+        };
+        avatarParams.api_key =
+          heygenParams.api_key || process.env.HEYGEN_API_KEY || process.env.NEXT_PUBLIC_HEYGEN_API_KEY || "";
+        avatarParams.quality = heygenParams.quality || process.env.NEXT_PUBLIC_HEYGEN_QUALITY || "medium";
+        avatarParams.avatar_id = heygenParams.avatar_id ?? process.env.NEXT_PUBLIC_HEYGEN_AVATAR_ID ?? "";
+        avatarParams.disable_idle_timeout = heygenParams.disable_idle_timeout ?? false;
+        avatarParams.activity_idle_timeout = heygenParams.activity_idle_timeout ?? 60;
+      }
+
+      propertiesPayload.avatar = {
+        enable: true,
+        vendor: avatar.vendor,
+        params: avatarParams,
+      };
+    }
+
     const joinPayload = {
       name: agentSettings.name,
       properties: propertiesPayload,
@@ -208,6 +264,12 @@ export async function POST(request: NextRequest) {
     }
     if (sanitizedPayload.properties?.tts?.params?.key) {
       sanitizedPayload.properties.tts.params.key = "***MASKED***";
+    }
+    if (sanitizedPayload.properties?.avatar?.params?.api_key) {
+      sanitizedPayload.properties.avatar.params.api_key = "***MASKED***";
+    }
+    if (sanitizedPayload.properties?.avatar?.params?.agora_token) {
+      sanitizedPayload.properties.avatar.params.agora_token = sanitizedPayload.properties.avatar.params.agora_token.substring(0, 20) + "...";
     }
 
     console.log("\n========== AGORA CONVERSATIONAL AI REQUEST ==========");

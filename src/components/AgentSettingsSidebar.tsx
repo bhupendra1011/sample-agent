@@ -8,6 +8,7 @@ import {
   MdRecordVoiceOver,
   MdGraphicEq,
   MdTune,
+  MdFace,
 } from "react-icons/md";
 import useAppStore from "@/store/useAppStore";
 import InfoTooltip from "@/components/common/InfoTooltip";
@@ -16,9 +17,13 @@ import type {
   LLMVendor,
   TTSVendor,
   ASRVendor,
+  AvatarVendor,
   LLMConfig,
   TTSConfig,
   ASRConfig,
+  AvatarConfig,
+  AvatarAkoolParams,
+  AvatarHeyGenParams,
 } from "@/types/agora";
 import {
   LLM_PRESETS,
@@ -34,7 +39,7 @@ interface AgentSettingsSidebarProps {
 }
 
 // Section collapse state
-type SectionKey = "llm" | "tts" | "asr" | "advanced";
+type SectionKey = "llm" | "tts" | "asr" | "avatar" | "advanced";
 
 // Environment variable helpers - these must be NEXT_PUBLIC_ prefixed to work client-side
 // Note: Next.js requires explicit references, so we map known keys
@@ -62,6 +67,11 @@ const ENV_MAP: Record<string, string | undefined> = {
   MICROSOFT_ASR_KEY: process.env.NEXT_PUBLIC_MICROSOFT_ASR_KEY,
   MICROSOFT_ASR_REGION: process.env.NEXT_PUBLIC_MICROSOFT_ASR_REGION,
   ASR_LANGUAGE: process.env.NEXT_PUBLIC_ASR_LANGUAGE,
+  AKOOL_API_KEY: process.env.NEXT_PUBLIC_AKOOL_API_KEY,
+  AKOOL_AVATAR_ID: process.env.NEXT_PUBLIC_AKOOL_AVATAR_ID,
+  HEYGEN_API_KEY: process.env.NEXT_PUBLIC_HEYGEN_API_KEY,
+  HEYGEN_AVATAR_ID: process.env.NEXT_PUBLIC_HEYGEN_AVATAR_ID,
+  HEYGEN_QUALITY: process.env.NEXT_PUBLIC_HEYGEN_QUALITY,
 };
 
 const getEnvVar = (key: string, defaultValue: string = ""): string => {
@@ -157,6 +167,42 @@ const getDefaultASRConfig = (vendor: ASRVendor): ASRConfig => {
   }
 };
 
+// Avatar presets (simple labels for UI)
+const AVATAR_PRESETS: Record<AvatarVendor, { label: string; value: string }> = {
+  akool: {
+    label: "Akool (Beta)",
+    value: "akool",
+  },
+  heygen: {
+    label: "HeyGen (Beta)",
+    value: "heygen",
+  },
+};
+
+// Build default avatar params based on vendor
+const getDefaultAvatarParams = (
+  vendor: AvatarVendor,
+): AvatarAkoolParams | AvatarHeyGenParams => {
+  switch (vendor) {
+    case "akool":
+      return {
+        api_key: getEnvVar("AKOOL_API_KEY"),
+        agora_uid: "", // Will be set by server
+        avatar_id: getEnvVar("AKOOL_AVATAR_ID"),
+      };
+    case "heygen":
+      return {
+        api_key: getEnvVar("HEYGEN_API_KEY"),
+        quality: (getEnvVar("HEYGEN_QUALITY", "medium") ||
+          "medium") as "low" | "medium" | "high",
+        agora_uid: "", // Will be set by server
+        avatar_id: getEnvVar("HEYGEN_AVATAR_ID"),
+        disable_idle_timeout: false,
+        activity_idle_timeout: 60,
+      };
+  }
+};
+
 // Default settings
 const getDefaultSettings = (): AgentSettings => {
   const ttsVendor = getDefaultTTSVendor();
@@ -198,6 +244,11 @@ const getDefaultSettings = (): AgentSettings => {
       enable_mllm: false,
       enable_rtm: false,
       enable_tools: false,
+    },
+    avatar: {
+      enable: false,
+      vendor: "heygen",
+      params: getDefaultAvatarParams("heygen"),
     },
   };
 };
@@ -365,6 +416,7 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
     llm: true,
     tts: true,
     asr: false,
+    avatar: true,
     advanced: false,
   });
   const [selectedLLMVendor, setSelectedLLMVendor] = useState<LLMVendor>(
@@ -376,11 +428,27 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
   const [selectedASRVendor, setSelectedASRVendor] = useState<ASRVendor>(
     getDefaultASRVendor(),
   );
+  const [selectedAvatarVendor, setSelectedAvatarVendor] = useState<AvatarVendor>(
+    "heygen",
+  );
 
   // Sync with existing settings on open
   useEffect(() => {
     if (isOpen && existingSettings) {
       setSettings(existingSettings);
+      if (existingSettings.avatar?.vendor) {
+        setSelectedAvatarVendor(existingSettings.avatar.vendor);
+      } else {
+        // Initialize avatar if not present
+        setSettings((prev) => ({
+          ...prev,
+          avatar: {
+            enable: false,
+            vendor: "akool",
+            params: getDefaultAvatarParams("akool"),
+          },
+        }));
+      }
     }
   }, [isOpen, existingSettings]);
 
@@ -406,6 +474,19 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
     setSettings((prev) => ({
       ...prev,
       asr: { ...prev.asr, ...updates },
+    }));
+  };
+
+  const updateAvatar = (updates: Partial<AvatarConfig>) => {
+    setSettings((prev) => ({
+      ...prev,
+      avatar: {
+        enable: false,
+        vendor: "heygen",
+        params: getDefaultAvatarParams("heygen"),
+        ...prev.avatar,
+        ...updates,
+      } as AvatarConfig,
     }));
   };
 
@@ -516,6 +597,52 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
         },
       },
     }));
+  };
+
+  const handleAvatarVendorChange = (vendor: AvatarVendor) => {
+    setSelectedAvatarVendor(vendor);
+    const defaultParams = getDefaultAvatarParams(vendor);
+    updateAvatar({
+      vendor,
+      params: defaultParams,
+    });
+  };
+
+  // Ensure avatar is initialized
+  useEffect(() => {
+    if (!settings.avatar) {
+      setSettings((prev) => ({
+        ...prev,
+        avatar: {
+          enable: false,
+          vendor: selectedAvatarVendor,
+          params: getDefaultAvatarParams(selectedAvatarVendor),
+        },
+      }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Get avatar params safely
+  const getAvatarParam = (key: string): string => {
+    if (!settings.avatar?.params) return "";
+    const params = settings.avatar.params as unknown as Record<string, unknown>;
+    return (params[key] as string) || "";
+  };
+
+  const setAvatarParam = (key: string, value: unknown) => {
+    setSettings((prev) => {
+      if (!prev.avatar) return prev;
+      const currentParams = prev.avatar.params as unknown as Record<string, unknown>;
+      const newParams = { ...currentParams, [key]: value };
+      return {
+        ...prev,
+        avatar: {
+          ...prev.avatar,
+          params: newParams as unknown as AvatarAkoolParams | AvatarHeyGenParams,
+        },
+      };
+    });
   };
 
   if (!isOpen) return null;
@@ -998,6 +1125,179 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
                     ))}
                   </Select>
                 </FormField>
+              </>
+            )}
+          </Section>
+
+          {/* Avatar Section */}
+          <Section
+            title="AI Avatar (Optional)"
+            icon={<MdFace size={20} />}
+            isOpen={expandedSections.avatar}
+            onToggle={() => toggleSection("avatar")}
+            badge="Optional"
+          >
+            <Toggle
+              label="Enable Avatar"
+              checked={settings.avatar?.enable || false}
+              onChange={(checked) => {
+                updateAvatar({
+                  enable: checked,
+                  vendor: settings.avatar?.vendor || selectedAvatarVendor,
+                  params: settings.avatar?.params || getDefaultAvatarParams(selectedAvatarVendor),
+                });
+              }}
+              hint="Enable AI avatar for visual representation of the agent"
+            />
+
+            {settings.avatar?.enable && (
+              <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <p className="text-xs text-blue-800 dark:text-blue-200">
+                  <strong>Note:</strong> When avatar is enabled, the agent subscribes only to your UID (not all participants). This is required by Agora when using AI avatars.
+                </p>
+              </div>
+            )}
+
+            <FormField
+              label="Vendor"
+              required
+              tooltip="Avatar provider selection."
+            >
+              <Select
+                value={selectedAvatarVendor}
+                onChange={(e) => {
+                  const vendor = e.target.value as AvatarVendor;
+                  setSelectedAvatarVendor(vendor);
+                  handleAvatarVendorChange(vendor);
+                  // Auto-enable avatar when vendor is selected
+                  if (!settings.avatar?.enable) {
+                    updateAvatar({
+                      enable: true,
+                      vendor,
+                      params: getDefaultAvatarParams(vendor),
+                    });
+                  }
+                }}
+              >
+                {Object.entries(AVATAR_PRESETS).map(([key, preset]) => (
+                  <option key={key} value={key}>
+                    {preset.label}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+
+            {/* TTS Sample Rate Warning */}
+            <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+              <p className="text-xs text-yellow-800 dark:text-yellow-200">
+                <strong>Important:</strong>{" "}
+                {selectedAvatarVendor === "akool"
+                  ? "Akool requires TTS with 16kHz sample rate (e.g., Microsoft Azure TTS)"
+                  : "HeyGen requires TTS with 24kHz sample rate (e.g., ElevenLabs or OpenAI TTS)"}
+              </p>
+            </div>
+
+            <FormField label="API Key" required>
+              <Input
+                type="password"
+                value={getAvatarParam("api_key")}
+                onChange={(e) => setAvatarParam("api_key", e.target.value)}
+                placeholder={
+                  selectedAvatarVendor === "akool"
+                    ? "Akool API key"
+                    : "HeyGen API key"
+                }
+              />
+            </FormField>
+
+            {/* Akool specific fields */}
+            {selectedAvatarVendor === "akool" && (
+              <FormField
+                label="Avatar ID"
+                required
+                hint="Find available avatar IDs in your Akool dashboard"
+                tooltip="Unique identifier for the Akool avatar."
+              >
+                <Input
+                  value={getAvatarParam("avatar_id")}
+                  onChange={(e) =>
+                    setAvatarParam("avatar_id", e.target.value)
+                  }
+                  placeholder="Akool avatar ID"
+                />
+              </FormField>
+            )}
+
+            {/* HeyGen specific fields */}
+            {selectedAvatarVendor === "heygen" && (
+              <>
+                <FormField
+                  label="Quality"
+                  required
+                  tooltip="Video quality: low (360p), medium (480p), high (720p)"
+                >
+                  <Select
+                    value={getAvatarParam("quality") || "medium"}
+                    onChange={(e) =>
+                      setAvatarParam("quality", e.target.value)
+                    }
+                  >
+                    <option value="low">Low (360p)</option>
+                    <option value="medium">Medium (480p)</option>
+                    <option value="high">High (720p)</option>
+                  </Select>
+                </FormField>
+
+                <FormField
+                  label="Avatar ID"
+                  hint="Optional - unique identifier for HeyGen avatar"
+                  tooltip="Optional HeyGen avatar identifier."
+                >
+                  <Input
+                    value={getAvatarParam("avatar_id")}
+                    onChange={(e) =>
+                      setAvatarParam("avatar_id", e.target.value)
+                    }
+                    placeholder="HeyGen avatar ID (optional)"
+                  />
+                </FormField>
+
+                <FormField
+                  label="Activity Idle Timeout (seconds)"
+                  hint="Default: 60 seconds"
+                  tooltip="Seconds of inactivity before avatar session times out."
+                >
+                  <Input
+                    type="number"
+                    min={0}
+                    max={300}
+                    value={
+                      getAvatarParam("activity_idle_timeout") || "60"
+                    }
+                    onChange={(e) =>
+                      setAvatarParam(
+                        "activity_idle_timeout",
+                        parseInt(e.target.value) || 60,
+                      )
+                    }
+                  />
+                </FormField>
+
+                <Toggle
+                  label="Disable Idle Timeout"
+                  checked={
+                    (() => {
+                      if (!settings.avatar?.params) return false;
+                      const params = settings.avatar.params as unknown as Record<string, unknown>;
+                      const val = params["disable_idle_timeout"];
+                      return val === true || val === "true";
+                    })()
+                  }
+                  onChange={(checked) =>
+                    setAvatarParam("disable_idle_timeout", checked)
+                  }
+                  hint="Disable automatic timeout when inactive"
+                />
               </>
             )}
           </Section>

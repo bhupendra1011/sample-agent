@@ -15,6 +15,7 @@ import {
   MdSettings,
   MdCreate,
   MdSync,
+  MdMessage,
 } from "react-icons/md";
 import { useAgora } from "@/hooks/useAgora";
 import { showToast } from "@/services/uiService";
@@ -28,7 +29,7 @@ import type { AgentSettings } from "@/types/agora";
 // Only LLM and MLLM params support auto-update via API. Adv settings = manual restart only.
 function hasUpdatableChanges(
   prev: AgentSettings | null,
-  next: AgentSettings
+  next: AgentSettings,
 ): boolean {
   if (!prev) return true;
   return (
@@ -41,7 +42,7 @@ function hasUpdatableChanges(
 // Advanced settings require manual restart (TTS, ASR, turn detection, RTM, MLLM, tools, etc.)
 function hasRestartRequiredChanges(
   prev: AgentSettings | null,
-  next: AgentSettings
+  next: AgentSettings,
 ): boolean {
   if (!prev) return false;
   return (
@@ -117,7 +118,7 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
       } else {
         showToast(
           "Cannot start screen share: Meeting information is incomplete.",
-          "error"
+          "error",
         );
       }
     }
@@ -176,7 +177,10 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
 
   const handleInviteAgent = useCallback(async () => {
     if (!localUID || !channelId) {
-      showToast("Cannot invite agent: Meeting information is incomplete.", "error");
+      showToast(
+        "Cannot invite agent: Meeting information is incomplete.",
+        "error",
+      );
       return;
     }
 
@@ -199,7 +203,7 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
       console.error("Failed to invite agent:", error);
       showToast(
         error instanceof Error ? error.message : "Failed to invite AI agent",
-        "error"
+        "error",
       );
       setAgentLoading(false);
     }
@@ -246,7 +250,7 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
             console.error("Failed to update agent:", error);
             showToast(
               error instanceof Error ? error.message : "Failed to update agent",
-              "error"
+              "error",
             );
           } finally {
             setAgentUpdating(false);
@@ -256,7 +260,7 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
         if (needsRestart) {
           showToast(
             "Restart the agent for TTS/ASR/advanced changes to take effect",
-            "info"
+            "info",
           );
         }
 
@@ -267,7 +271,7 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
         showToast("Agent settings saved!", "success");
       }
     },
-    [setAgentSettings, setAgentUpdating, isAgentActive, agentId, channelId]
+    [setAgentSettings, setAgentUpdating, isAgentActive, agentId, channelId],
   );
 
   const controlButtonClass =
@@ -276,134 +280,134 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
   return (
     <React.Fragment>
       <div className="flex justify-center items-center h-20 bg-gray-200 dark:bg-gray-800 px-4 shadow-lg transition-colors duration-300">
-      {/* Left spacer for balance */}
-      <div className="flex-1" />
+        {/* Left spacer for balance */}
+        <div className="flex-1" />
 
-      {/* Center controls */}
-      <div className="flex items-center space-x-6">
-        <button
-          onClick={toggleLocalAudio}
-          className={controlButtonClass}
-          title={audioMuted ? "Unmute Mic" : "Mute Mic"}
-        >
-          {audioMuted ? <MdMicOff /> : <MdMic />}
-        </button>
+        {/* Center controls */}
+        <div className="flex items-center space-x-6">
+          <button
+            onClick={toggleLocalAudio}
+            className={controlButtonClass}
+            title={audioMuted ? "Unmute Mic" : "Mute Mic"}
+          >
+            {audioMuted ? <MdMicOff /> : <MdMic />}
+          </button>
 
-        <button
-          onClick={toggleLocalVideo}
-          className={controlButtonClass}
-          title={videoMuted ? "Turn Video On" : "Turn Video Off"}
-        >
-          {videoMuted ? <MdVideocamOff /> : <MdVideocam />}
-        </button>
+          <button
+            onClick={toggleLocalVideo}
+            className={controlButtonClass}
+            title={videoMuted ? "Turn Video On" : "Turn Video Off"}
+          >
+            {videoMuted ? <MdVideocamOff /> : <MdVideocam />}
+          </button>
 
-        <button
-          onClick={handleToggleScreenShare}
-          className={controlButtonClass}
-          title={isScreenSharing ? "Stop Screen Share" : "Start Screen Share"}
-        >
-          {isScreenSharing ? <MdClose /> : <MdMonitor />}
-        </button>
+          <button
+            onClick={handleToggleScreenShare}
+            className={controlButtonClass}
+            title={isScreenSharing ? "Stop Screen Share" : "Start Screen Share"}
+          >
+            {isScreenSharing ? <MdClose /> : <MdMonitor />}
+          </button>
 
-        <button
-          onClick={handleToggleWhiteboard}
-          className={`flex items-center justify-center w-14 h-14 text-3xl rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-opacity-75 ${
-            isWhiteboardActive
-              ? "bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700"
-              : "bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-400 dark:hover:bg-gray-600"
-          }`}
-          title={isWhiteboardActive ? "Close Whiteboard" : "Open Whiteboard"}
-        >
-          <MdDraw />
-        </button>
+          <button
+            onClick={handleToggleWhiteboard}
+            className={`flex items-center justify-center w-14 h-14 text-3xl rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-opacity-75 ${
+              isWhiteboardActive
+                ? "bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700"
+                : "bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-400 dark:hover:bg-gray-600"
+            }`}
+            title={isWhiteboardActive ? "Close Whiteboard" : "Open Whiteboard"}
+          >
+            <MdDraw />
+          </button>
 
-        <button
-          onClick={handleShareMeeting}
-          className={controlButtonClass}
-          title="Share Meeting Info"
-        >
-          <MdShare />
-        </button>
+          <button
+            onClick={handleShareMeeting}
+            className={controlButtonClass}
+            title="Share Meeting Info"
+          >
+            <MdShare />
+          </button>
 
-        <button
-          onClick={handleCallEnd}
-          className="flex items-center justify-center w-16 h-16 bg-red-600 dark:bg-red-500 text-white text-4xl rounded-full hover:bg-red-700 dark:hover:bg-red-600 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-red-500 dark:focus:ring-red-400 shadow-lg"
-          title="End Call"
-        >
-          <MdCallEnd />
-        </button>
-      </div>
+          <button
+            onClick={handleCallEnd}
+            className="flex items-center justify-center w-16 h-16 bg-red-600 dark:bg-red-500 text-white text-4xl rounded-full hover:bg-red-700 dark:hover:bg-red-600 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-red-500 dark:focus:ring-red-400 shadow-lg"
+            title="End Call"
+          >
+            <MdCallEnd />
+          </button>
+        </div>
 
-      {/* Right side - Agent controls */}
-      <div className="flex-1 flex justify-end items-center gap-2">
-        {isHost && (
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={handleToggleAgent}
-              disabled={isAgentLoading || isAgentUpdating}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-opacity-75 ${
-                isAgentUpdating
-                  ? "bg-amber-500 dark:bg-amber-600 text-white animate-pulse"
-                  : isAgentLoading
-                  ? "bg-yellow-500 dark:bg-yellow-600 text-white animate-pulse"
-                  : isAgentActive
-                  ? "bg-green-500 dark:bg-green-600 text-white hover:bg-green-600 dark:hover:bg-green-700"
-                  : "bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-400 dark:hover:bg-gray-600"
-              }`}
-              title={
-                isAgentUpdating
-                  ? "Updating agent configuration..."
-                  : isAgentLoading
-                  ? isAgentActive
-                    ? "Agent disconnecting..."
-                    : "Agent connecting..."
-                  : isAgentActive
-                  ? "Stop AI Agent"
-                  : "Invite AI Agent"
-              }
-            >
-              {isAgentUpdating ? (
-                <MdSync className="w-5 h-5 shrink-0 animate-spin" />
-              ) : (
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  className="w-5 h-5 shrink-0"
-                >
-                  <path d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1a1 1 0 011 1v3a1 1 0 01-1 1h-1v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1H2a1 1 0 01-1-1v-3a1 1 0 011-1h1a7 7 0 017-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 012-2zm-3 9a1 1 0 00-1 1v2a1 1 0 002 0v-2a1 1 0 00-1-1zm6 0a1 1 0 00-1 1v2a1 1 0 002 0v-2a1 1 0 00-1-1z" />
-                </svg>
-              )}
-              <span className="text-sm font-medium whitespace-nowrap">
-                {isAgentUpdating
-                  ? "Updating"
-                  : isAgentLoading
-                  ? isAgentActive
-                    ? "Disconnecting"
-                    : "Connecting"
-                  : isAgentActive
-                  ? "Stop Agent"
-                  : "Start Agent"}
-              </span>
-            </button>
-            <button
-              onClick={() => setIsSettingsPanelOpen(true)}
-              className="flex items-center justify-center w-10 h-10 rounded-lg bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-400 dark:hover:bg-gray-600 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-              title="Agent Settings"
-            >
-              <MdSettings className="w-5 h-5" />
-            </button>
-            {isAgentActive && (
+        {/* Right side - Agent controls */}
+        <div className="flex-1 flex justify-end items-center gap-2">
+          {isHost && (
+            <div className="flex items-center space-x-2">
               <button
-                onClick={() => setIsTranscriptPanelOpen(true)}
-                className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                title="Open Transcript"
+                onClick={handleToggleAgent}
+                disabled={isAgentLoading || isAgentUpdating}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-opacity-75 ${
+                  isAgentUpdating
+                    ? "bg-amber-500 dark:bg-amber-600 text-white animate-pulse"
+                    : isAgentLoading
+                      ? "bg-yellow-500 dark:bg-yellow-600 text-white animate-pulse"
+                      : isAgentActive
+                        ? "bg-green-500 dark:bg-green-600 text-white hover:bg-green-600 dark:hover:bg-green-700"
+                        : "bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-400 dark:hover:bg-gray-600"
+                }`}
+                title={
+                  isAgentUpdating
+                    ? "Updating agent configuration..."
+                    : isAgentLoading
+                      ? isAgentActive
+                        ? "Agent disconnecting..."
+                        : "Agent connecting..."
+                      : isAgentActive
+                        ? "Stop AI Agent"
+                        : "Invite AI Agent"
+                }
               >
-                <MdCreate className="w-5 h-5" />
+                {isAgentUpdating ? (
+                  <MdSync className="w-5 h-5 shrink-0 animate-spin" />
+                ) : (
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    className="w-5 h-5 shrink-0"
+                  >
+                    <path d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1a1 1 0 011 1v3a1 1 0 01-1 1h-1v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1H2a1 1 0 01-1-1v-3a1 1 0 011-1h1a7 7 0 017-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 012-2zm-3 9a1 1 0 00-1 1v2a1 1 0 002 0v-2a1 1 0 00-1-1zm6 0a1 1 0 00-1 1v2a1 1 0 002 0v-2a1 1 0 00-1-1z" />
+                  </svg>
+                )}
+                <span className="text-sm font-medium whitespace-nowrap">
+                  {isAgentUpdating
+                    ? "Updating"
+                    : isAgentLoading
+                      ? isAgentActive
+                        ? "Disconnecting"
+                        : "Connecting"
+                      : isAgentActive
+                        ? "Stop Agent"
+                        : "Start Agent"}
+                </span>
               </button>
-            )}
-          </div>
-        )}
-      </div>
+              <button
+                onClick={() => setIsSettingsPanelOpen(true)}
+                className="flex items-center justify-center w-10 h-10 rounded-lg text-gray-800 dark:text-white  hover:bg-gray-400 dark:hover:bg-gray-600 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                title="Agent Settings"
+              >
+                <MdSettings className="w-5 h-5" />
+              </button>
+              {isAgentActive && (
+                <button
+                  onClick={() => setIsTranscriptPanelOpen(true)}
+                  className="flex items-center justify-center w-10 h-10 rounded-lg  text-gray-800 dark:text-white transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 hover:bg-gray-400 dark:hover:bg-gray-600"
+                  title="Open Transcript"
+                >
+                  <MdMessage className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       <Modal
@@ -454,7 +458,9 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
         isOpen={isTranscriptPanelOpen}
         onClose={() => setIsTranscriptPanelOpen(false)}
         onSendMessage={
-          transcriptionMode === "rtm" && agentRtcUid ? sendChatMessage : undefined
+          transcriptionMode === "rtm" && agentRtcUid
+            ? sendChatMessage
+            : undefined
         }
       />
     </React.Fragment>
