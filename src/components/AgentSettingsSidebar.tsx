@@ -10,6 +10,7 @@ import {
   MdTune,
 } from "react-icons/md";
 import useAppStore from "@/store/useAppStore";
+import InfoTooltip from "@/components/common/InfoTooltip";
 import type {
   AgentSettings,
   LLMVendor,
@@ -210,11 +211,15 @@ const FormField: React.FC<{
   required?: boolean;
   children: React.ReactNode;
   hint?: string;
-}> = ({ label, required, children, hint }) => (
+  tooltip?: string;
+}> = ({ label, required, children, hint, tooltip }) => (
   <div className="mb-4">
-    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-      {label}
-      {required && <span className="text-red-500 dark:text-red-400 ml-1">*</span>}
+    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+      <span>
+        {label}
+        {required && <span className="text-red-500 dark:text-red-400 ml-1">*</span>}
+      </span>
+      {tooltip && <InfoTooltip content={tooltip} />}
     </label>
     {children}
     {hint && <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">{hint}</p>}
@@ -509,7 +514,12 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-6 py-4 bg-gray-50 dark:bg-gray-900/50">
           {/* Agent Name */}
-          <FormField label="Agent Name" required hint="Unique identifier for this agent instance">
+          <FormField
+            label="Agent Name"
+            required
+            hint="Unique identifier for this agent instance"
+            tooltip="Unique identifier for this agent instance."
+          >
             <Input
               value={settings.name}
               onChange={(e) => setSettings({ ...settings, name: e.target.value })}
@@ -525,7 +535,7 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
             onToggle={() => toggleSection("llm")}
             badge="Required"
           >
-            <FormField label="Provider" required>
+            <FormField label="Provider" required tooltip="LLM provider selection.">
               <Select
                 value={selectedLLMVendor}
                 onChange={(e) => handleLLMVendorChange(e.target.value as LLMVendor)}
@@ -538,7 +548,7 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
               </Select>
             </FormField>
 
-            <FormField label="API URL" required>
+            <FormField label="API URL" required tooltip="LLM callback endpoint.">
               <Input
                 value={settings.llm.url}
                 onChange={(e) => updateLLM({ url: e.target.value })}
@@ -546,7 +556,7 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
               />
             </FormField>
 
-            <FormField label="API Key" required>
+            <FormField label="API Key" required tooltip="Verification key for the LLM.">
               <Input
                 type="password"
                 value={settings.llm.api_key}
@@ -555,7 +565,7 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
               />
             </FormField>
 
-            <FormField label="Model" required>
+            <FormField label="Model" required tooltip="Model name for the selected LLM vendor.">
               {LLM_PRESETS[selectedLLMVendor].models ? (
                 <Select
                   value={settings.llm.params?.model || ""}
@@ -580,7 +590,11 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
               )}
             </FormField>
 
-            <FormField label="System Prompt" hint="Defines the agent's personality and behavior">
+            <FormField
+              label="System Prompt"
+              hint="Defines the agent's personality and behavior"
+              tooltip="Predefined context for the LLM."
+            >
               <Textarea
                 rows={4}
                 value={settings.llm.system_messages?.[0]?.content || ""}
@@ -593,7 +607,11 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
               />
             </FormField>
 
-            <FormField label="Greeting Message" hint="What the agent says when joining">
+            <FormField
+              label="Greeting Message"
+              hint="What the agent says when joining"
+              tooltip="Message spoken when the agent joins."
+            >
               <Input
                 value={settings.llm.greeting_message || ""}
                 onChange={(e) => updateLLM({ greeting_message: e.target.value })}
@@ -601,7 +619,11 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
               />
             </FormField>
 
-            <FormField label="Failure Message" hint="Fallback when there's an error">
+            <FormField
+              label="Failure Message"
+              hint="Fallback when there's an error"
+              tooltip="Fallback when the LLM call fails."
+            >
               <Input
                 value={settings.llm.failure_message || ""}
                 onChange={(e) => updateLLM({ failure_message: e.target.value })}
@@ -610,7 +632,7 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
             </FormField>
 
             <div className="grid grid-cols-2 gap-4">
-              <FormField label="Max History" hint="1-1024">
+              <FormField label="Max History" hint="1-1024" tooltip="Conversation history size (1-1024).">
                 <Input
                   type="number"
                   min={1}
@@ -890,7 +912,11 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
             isOpen={expandedSections.advanced}
             onToggle={() => toggleSection("advanced")}
           >
-            <FormField label="Idle Timeout (seconds)" hint="Auto-exit when users leave">
+            <FormField
+              label="Idle Timeout (seconds)"
+              hint="Auto-exit when users leave"
+              tooltip="Seconds before agent exits when users leave."
+            >
               <Input
                 type="number"
                 min={10}
@@ -902,7 +928,11 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
               />
             </FormField>
 
-            <FormField label="Silence Duration (ms)" hint="Wait before processing response">
+            <FormField
+              label="Silence Duration (ms)"
+              hint="Wait before processing response"
+              tooltip="Milliseconds of silence before processing."
+            >
               <Input
                 type="number"
                 min={100}
@@ -921,7 +951,7 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
               />
             </FormField>
 
-            <FormField label="VAD Mode">
+            <FormField label="VAD Mode" tooltip="server_vad or semantic turn detection.">
               <Select
                 value={settings.turn_detection?.mode || "server_vad"}
                 onChange={(e) =>
@@ -950,7 +980,7 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
                     advanced_features: { ...settings.advanced_features, enable_mllm: checked },
                   })
                 }
-                hint="Multimodal LLM for image understanding"
+                hint="Multimodal LLM for vision."
               />
               <Toggle
                 label="Enable RTM"
@@ -961,7 +991,7 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
                     advanced_features: { ...settings.advanced_features, enable_rtm: checked },
                   })
                 }
-                hint="Real-time messaging integration"
+                hint="Enables Signaling; use RTM for transcripts, state, chat."
               />
               <Toggle
                 label="Enable Tools"
@@ -972,7 +1002,7 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
                     advanced_features: { ...settings.advanced_features, enable_tools: checked },
                   })
                 }
-                hint="Function calling capabilities"
+                hint="Function calling support."
               />
             </div>
           </Section>

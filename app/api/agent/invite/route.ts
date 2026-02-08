@@ -37,8 +37,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate RTC token for the agent
+    // Generate token for the agent
+    // When RTM is enabled, use buildTokenWithRtm to grant both RTC and Signaling privileges
     const agentUid = 0; // Let Agora assign UID
+    const agentAccount = String(agentUid); // "0" - required for buildTokenWithRtm
     const tokenExpiration = 3600; // 1 hour
     const privilegeExpiration = 3600;
 
@@ -50,19 +52,31 @@ export async function POST(request: NextRequest) {
     console.log("APP_CERTIFICATE exists:", !!APP_CERTIFICATE);
     console.log("==========================================\n");
 
-    const agentRtcToken = RtcTokenBuilder.buildTokenWithUid(
-      APP_ID,
-      APP_CERTIFICATE,
-      channelName,
-      agentUid,
-      RtcRole.PUBLISHER,
-      tokenExpiration,
-      privilegeExpiration
-    );
-
     // Build the join payload for Agora Conversational AI API v2
     // Based on: https://docs.agora.io/en/conversational-ai/rest-api/agent/join
     const { llm, tts, asr, turn_detection, advanced_features, parameters } = agentSettings;
+
+    // Generate token with RTC+RTM privileges when RTM is enabled
+    // Per: https://docs.agora.io/en/help/integration-issues/rtc_rtm_token
+    const agentRtcToken = advanced_features?.enable_rtm
+      ? RtcTokenBuilder.buildTokenWithRtm(
+          APP_ID,
+          APP_CERTIFICATE,
+          channelName,
+          agentAccount,
+          RtcRole.PUBLISHER,
+          tokenExpiration,
+          privilegeExpiration
+        )
+      : RtcTokenBuilder.buildTokenWithUid(
+          APP_ID,
+          APP_CERTIFICATE,
+          channelName,
+          agentUid,
+          RtcRole.PUBLISHER,
+          tokenExpiration,
+          privilegeExpiration
+        );
 
     // Build LLM config
     const llmPayload: Record<string, unknown> = {
@@ -159,13 +173,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Add agent parameters
-    if (parameters) {
+    // When RTM is enabled, set data_channel to "rtm" for transcript routing
+    if (parameters || advanced_features?.enable_rtm) {
       propertiesPayload.parameters = {
-        ...(parameters.enable_farewell !== undefined && {
+        ...(parameters?.enable_farewell !== undefined && {
           enable_farewell: parameters.enable_farewell,
         }),
-        ...(parameters.farewell_phrases && {
+        ...(parameters?.farewell_phrases && {
           farewell_phrases: parameters.farewell_phrases,
+        }),
+        // Set data_channel to RTM when RTM is enabled (required for RTM transcript mode)
+        ...(advanced_features?.enable_rtm && {
+          data_channel: "rtm",
         }),
       };
     }
@@ -230,6 +249,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       agentId: responseData.agent_id,
       status: responseData.status,
+      agentRtcUid: String(agentUid),
     });
   } catch (error) {
     console.error("Agent invite error:", error);

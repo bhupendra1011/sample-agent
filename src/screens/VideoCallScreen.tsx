@@ -4,12 +4,14 @@ import React, { useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import useAppStore from "@/store/useAppStore";
 import VideoTile from "@/components/VideoTile";
+import AgentTile from "@/components/AgentTile";
 import Controls from "@/components/Controls";
 import ParticipantListItem from "@/components/ParticipantListItem";
 import Whiteboard from "@/components/Whiteboard";
 import Modal from "@/components/common/Modal";
 import Button from "@/components/common/Button";
 import { useAgora } from "@/hooks/useAgora";
+import { useConversationalAI } from "@/hooks/useConversationalAI";
 import type { IAgoraRTCRemoteUser } from "agora-rtc-sdk-ng";
 import { MdWbSunny, MdDarkMode } from "react-icons/md";
 
@@ -35,6 +37,11 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ channelId }) => {
     isHost,
     pendingUnmuteRequest,
     callActive,
+    isAgentActive,
+    agentState,
+    agentRtcUid,
+    agentSettings,
+    transcriptionMode,
   } = useAppStore();
 
   useEffect(() => {
@@ -55,7 +62,19 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ channelId }) => {
     sendHostControlRequest,
     acceptUnmuteRequest,
     declineUnmuteRequest,
+    rtcClient,
+    rtmClient,
   } = useAgora();
+
+  // Initialize conversational AI hook for transcript handling
+  const { sendChatMessage } = useConversationalAI({
+    rtcClient,
+    rtmClient,
+    channelId,
+    isAgentActive,
+    transcriptionMode,
+    agentRtcUid,
+  });
 
   const handleMuteAudio = useCallback(
     (uid: string) => {
@@ -88,24 +107,39 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ channelId }) => {
   return (
     <div className="flex flex-col h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-300">
       {/* Top Bar */}
-      <div className="flex  items-center bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white p-4 text-lg shadow-md transition-colors duration-300">
+      <div className="flex items-center bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white p-4 text-lg shadow-md transition-colors duration-300">
         <span className="font-bold text-xl">
           Meeting: {meetingName || channelId}
         </span>
 
-        <button
-          onClick={toggleTheme}
-          className="p-2 rounded-full bg-gray-300 dark:bg-gray-700 hover:bg-gray-400 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all text-gray-800 dark:text-white ml-auto"
-          title={
-            theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"
-          }
-        >
-          {theme === "dark" ? (
-            <MdWbSunny size={24} className="text-yellow-400" />
-          ) : (
-            <MdDarkMode size={24} className="text-gray-700" />
+        <div className="flex items-center gap-3 ml-auto">
+          {/* Transmission Badge - shown when agent is active */}
+          {isAgentActive && (
+            <span
+              className={`text-xs px-2 py-1 rounded-full font-medium ${
+                transcriptionMode === "rtm"
+                  ? "bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400"
+                  : "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
+              }`}
+            >
+              Transmission: {transcriptionMode.toUpperCase()}
+            </span>
           )}
-        </button>
+
+          <button
+            onClick={toggleTheme}
+            className="p-2 rounded-full bg-gray-300 dark:bg-gray-700 hover:bg-gray-400 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all text-gray-800 dark:text-white"
+            title={
+              theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"
+            }
+          >
+            {theme === "dark" ? (
+              <MdWbSunny size={24} className="text-yellow-400" />
+            ) : (
+              <MdDarkMode size={24} className="text-gray-700" />
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Main Content Area */}
@@ -188,6 +222,18 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ channelId }) => {
                     />
                   );
                 });
+
+                // Add Agent Tile if agent is active
+                if (isAgentActive && agentRtcUid) {
+                  allTiles.push(
+                    <AgentTile
+                      key={`agent-${agentRtcUid}`}
+                      agentUid={agentRtcUid}
+                      agentState={agentState}
+                      agentName={agentSettings?.name || "AI Agent"}
+                    />
+                  );
+                }
 
                 const count = allTiles.length;
                 let gridClass = "";
@@ -281,7 +327,7 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ channelId }) => {
         )}
       </div>
 
-      <Controls />
+      <Controls sendChatMessage={sendChatMessage} />
 
       <Modal
         isOpen={!!pendingUnmuteRequest}

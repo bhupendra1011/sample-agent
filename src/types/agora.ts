@@ -153,6 +153,79 @@ export interface AgentParametersConfig {
   enable_farewell?: boolean;
   /** Custom farewell phrases */
   farewell_phrases?: string[];
+  /** Data channel mode: "rtc" for RTC stream, "rtm" for RTM signaling */
+  data_channel?: "rtc" | "rtm";
+}
+
+// --- Agent State Enum (from Agora Conversational AI API) ---
+export enum EAgentState {
+  IDLE = "idle",
+  LISTENING = "listening",
+  THINKING = "thinking",
+  SPEAKING = "speaking",
+  SILENT = "silent",
+}
+
+// --- Transcript Types ---
+export enum ETurnStatus {
+  IN_PROGRESS = 0,
+  END = 1,
+  INTERRUPTED = 2,
+}
+
+// --- Transcript Render Mode ---
+export enum ETranscriptRenderMode {
+  TEXT = "text", // Show full text block at once
+  WORD = "word", // Animate word-by-word using timing data
+  AUTO = "auto", // Auto-detect based on available data
+}
+
+export interface ITranscriptHelperItem<T = unknown> {
+  uid: string;
+  stream_id: number;
+  turn_id: number;
+  _time: number;
+  text: string;
+  status: ETurnStatus;
+  metadata: T | null;
+}
+
+export interface IUserTranscription {
+  object: "user.transcription";
+  text: string;
+  start_ms: number;
+  duration_ms: number;
+  language: string;
+  turn_id: number;
+  stream_id: number;
+  user_id: string;
+  words: Array<{
+    word: string;
+    start_ms: number;
+    duration_ms: number;
+    stable: boolean;
+  }> | null;
+  final: boolean;
+}
+
+export interface IAgentTranscription {
+  object: "assistant.transcription";
+  text: string;
+  start_ms: number;
+  duration_ms: number;
+  language: string;
+  turn_id: number;
+  stream_id: number;
+  user_id: string;
+  words: Array<{
+    word: string;
+    start_ms: number;
+    duration_ms: number;
+    stable: boolean;
+  }> | null;
+  quiet: boolean;
+  turn_seq_id: number;
+  turn_status: ETurnStatus;
 }
 
 // --- Complete Agent Settings (used for UI) ---

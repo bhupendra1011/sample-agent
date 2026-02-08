@@ -19,6 +19,8 @@ import type { LocalAgoraTracks, HostControlMessage } from "@/types/agora";
 let RTC_CLIENT: IAgoraRTCClient | null = null;
 const getRtcClient = (): IAgoraRTCClient => {
   if (!RTC_CLIENT && typeof window !== "undefined") {
+    // Note: ENABLE_AUDIO_PTS_METADATA would improve word-by-word transcript sync
+    // but is not yet in Web SDK MUTABLE_PARAMS - transcripts still work via RTM/RTC
     RTC_CLIENT = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
   }
   return RTC_CLIENT!;
@@ -240,8 +242,28 @@ export const useAgora = () => {
         const messageText = typeof event.message === "string"
           ? event.message
           : new TextDecoder().decode(event.message);
-        const data = JSON.parse(messageText);
-        console.log("RTM v2.x message received:", data.type, data, "from:", event.publisher);
+        
+        // Log raw message for debugging transcript issues
+        console.log("[useAgora] RTM raw message:", messageText.substring(0, 200), "from:", event.publisher);
+        
+        // Try to parse - but chunked messages might not be valid JSON
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let data: any;
+        try {
+          data = JSON.parse(messageText);
+        } catch {
+          // Could be a chunked transcript message (format: id|idx|sum|base64)
+          console.log("[useAgora] RTM non-JSON message (possibly chunked):", messageText.substring(0, 100));
+          return; // Let ConversationalAIAPI handle it
+        }
+        
+        console.log("[useAgora] RTM v2.x message received - type:", data.type, "object:", data.object, "from:", event.publisher);
+        
+        // Transcript messages have 'object' field, not 'type' - let ConversationalAIAPI handle those
+        if (data.object && !data.type) {
+          console.log("[useAgora] Transcript message detected, skipping (handled by ConversationalAIAPI):", data.object);
+          return;
+        }
 
         switch (data.type) {
           case "user-joined": {
@@ -1092,5 +1114,8 @@ export const useAgora = () => {
     // Local mute toggles (use track ref with correct type)
     toggleLocalAudio,
     toggleLocalVideo,
+    // Expose clients for conversational AI integration
+    rtcClient: getRtcClient(),
+    rtmClient: RTM_CLIENT,
   };
 };

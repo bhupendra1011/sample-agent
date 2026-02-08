@@ -13,17 +13,22 @@ import {
   MdShare,
   MdDraw,
   MdSettings,
+  MdCreate,
 } from "react-icons/md";
 import { useAgora } from "@/hooks/useAgora";
 import { showToast } from "@/services/uiService";
 import { inviteAgent, stopAgent } from "@/api/agentApi";
 import Modal from "@/components/common/Modal";
-import Button from "@/components/common/Button";
 import CopyButton from "@/components/common/CopyButton";
 import SettingsSidebar from "@/components/SettingsSidebar";
+import TranscriptSidePanel from "@/components/TranscriptSidePanel";
 import type { AgentSettings } from "@/types/agora";
 
-const Controls: React.FC = () => {
+interface ControlsProps {
+  sendChatMessage?: (text: string, image?: File) => Promise<void>;
+}
+
+const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
   const audioMuted = useAppStore((state) => state.audioMuted);
   const videoMuted = useAppStore((state) => state.videoMuted);
   const isScreenSharing = useAppStore((state) => state.isScreenSharing);
@@ -58,8 +63,12 @@ const Controls: React.FC = () => {
     toggleLocalVideo,
   } = useAgora();
 
+  const transcriptionMode = useAppStore((state) => state.transcriptionMode);
+  const agentRtcUid = useAppStore((state) => state.agentRtcUid);
+
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isSettingsPanelOpen, setIsSettingsPanelOpen] = useState(false);
+  const [isTranscriptPanelOpen, setIsTranscriptPanelOpen] = useState(false);
 
   const handleToggleScreenShare = async () => {
     if (isScreenSharing) {
@@ -142,7 +151,11 @@ const Controls: React.FC = () => {
     setAgentLoading(true);
     try {
       const result = await inviteAgent(channelId, localUID, agentSettings);
-      setAgentActive(result.agentId);
+      // Agent UID is typically "0" (as set in backend)
+      setAgentActive(result.agentId, result.agentRtcUid || "0");
+      // Ensure transcription mode is set based on current settings
+      const mode = agentSettings?.advanced_features?.enable_rtm ? "rtm" : "rtc";
+      useAppStore.getState().setTranscriptionMode(mode);
       showToast("AI Agent joined the call!", "success");
     } catch (error) {
       console.error("Failed to invite agent:", error);
@@ -179,17 +192,32 @@ const Controls: React.FC = () => {
 
   const handleSaveAgentSettings = useCallback(
     (settings: AgentSettings) => {
-      setAgentSettings(settings);
+      setAgentSettings(settings); // This also updates transcriptionMode
       showToast("Agent settings saved!", "success");
+      if (isAgentActive) {
+        showToast("Restart the agent for RTM changes to take effect", "info");
+      }
     },
-    [setAgentSettings]
+    [setAgentSettings, isAgentActive]
   );
 
   const controlButtonClass =
     "flex items-center justify-center w-14 h-14 bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-white text-3xl rounded-full transition-colors duration-300 hover:bg-gray-400 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-opacity-75";
 
   return (
-    <div className="flex justify-center items-center h-20 bg-gray-200 dark:bg-gray-800 px-4 shadow-lg transition-colors duration-300">
+    <React.Fragment>
+      {/* Floating Transcript Button - Bottom Right */}
+      {isAgentActive && (
+        <button
+          onClick={() => setIsTranscriptPanelOpen(true)}
+          className="fixed bottom-24 right-6 z-30 flex items-center justify-center w-14 h-14 text-2xl rounded-full bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700 shadow-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 hover:scale-110"
+          title="Open Transcript"
+        >
+          <MdCreate />
+        </button>
+      )}
+
+      <div className="flex justify-center items-center h-20 bg-gray-200 dark:bg-gray-800 px-4 shadow-lg transition-colors duration-300">
       {/* Left spacer for balance */}
       <div className="flex-1" />
 
@@ -249,7 +277,7 @@ const Controls: React.FC = () => {
       </div>
 
       {/* Right side - Agent controls */}
-      <div className="flex-1 flex justify-end">
+      <div className="flex-1 flex justify-end items-center gap-2">
         {isHost && (
           <div className="flex items-center space-x-2">
             <button
@@ -287,6 +315,7 @@ const Controls: React.FC = () => {
             </button>
           </div>
         )}
+      </div>
       </div>
 
       <Modal
@@ -330,7 +359,15 @@ const Controls: React.FC = () => {
         onClose={() => setIsSettingsPanelOpen(false)}
         onSaveAgentSettings={handleSaveAgentSettings}
       />
-    </div>
+
+      <TranscriptSidePanel
+        isOpen={isTranscriptPanelOpen}
+        onClose={() => setIsTranscriptPanelOpen(false)}
+        onSendMessage={
+          transcriptionMode === "rtm" && agentRtcUid ? sendChatMessage : undefined
+        }
+      />
+    </React.Fragment>
   );
 };
 

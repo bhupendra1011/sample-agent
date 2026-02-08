@@ -1,6 +1,12 @@
 // src/store/useAppStore.ts
 import { create } from "zustand";
-import type { Participant, PendingUnmuteRequest, AgentSettings } from "@/types/agora";
+import type {
+  Participant,
+  PendingUnmuteRequest,
+  AgentSettings,
+  ITranscriptHelperItem,
+} from "@/types/agora";
+import { EAgentState, ETranscriptRenderMode } from "@/types/agora";
 import type { ILocalAudioTrack, ILocalVideoTrack } from "agora-rtc-sdk-ng";
 
 // Define Theme type
@@ -71,10 +77,21 @@ interface AppState {
   isAgentActive: boolean;
   isAgentLoading: boolean;
   agentSettings: AgentSettings | null;
-  setAgentActive: (agentId: string) => void;
+  agentState: EAgentState;
+  agentRtcUid: string | null;
+  transcriptItems: ITranscriptHelperItem[];
+  currentInProgressMessage: ITranscriptHelperItem | null;
+  transcriptionMode: "rtc" | "rtm";
+  transcriptRenderMode: ETranscriptRenderMode;
+  setAgentActive: (agentId: string, agentRtcUid?: string) => void;
   setAgentLoading: (loading: boolean) => void;
   clearAgent: () => void;
   setAgentSettings: (settings: AgentSettings) => void;
+  setAgentState: (state: EAgentState) => void;
+  setTranscriptItems: (items: ITranscriptHelperItem[]) => void;
+  setCurrentInProgressMessage: (message: ITranscriptHelperItem | null) => void;
+  setTranscriptionMode: (mode: "rtc" | "rtm") => void;
+  setTranscriptRenderMode: (mode: ETranscriptRenderMode) => void;
 
   // Host control actions
   setIsHost: (isHost: boolean) => void;
@@ -152,10 +169,42 @@ const useAppStore = create<AppState>((set, get) => ({
   isAgentActive: false,
   isAgentLoading: false,
   agentSettings: null,
-  setAgentActive: (agentId) => set({ agentId, isAgentActive: true, isAgentLoading: false }),
+  agentState: EAgentState.IDLE,
+  agentRtcUid: null,
+  transcriptItems: [],
+  currentInProgressMessage: null,
+  transcriptionMode: "rtc",
+  transcriptRenderMode: ETranscriptRenderMode.AUTO,
+  setAgentActive: (agentId, agentRtcUid) =>
+    set({
+      agentId,
+      agentRtcUid: agentRtcUid || null,
+      isAgentActive: true,
+      isAgentLoading: false,
+    }),
   setAgentLoading: (loading) => set({ isAgentLoading: loading }),
-  clearAgent: () => set({ agentId: null, isAgentActive: false, isAgentLoading: false }),
-  setAgentSettings: (settings) => set({ agentSettings: settings }),
+  clearAgent: () =>
+    set({
+      agentId: null,
+      isAgentActive: false,
+      isAgentLoading: false,
+      agentState: EAgentState.IDLE,
+      agentRtcUid: null,
+      transcriptItems: [],
+      currentInProgressMessage: null,
+      transcriptionMode: "rtc",
+    }),
+  setAgentSettings: (settings) => {
+    // Derive transcription mode and update both atomically
+    const mode = settings?.advanced_features?.enable_rtm ? "rtm" : "rtc";
+    set({ agentSettings: settings, transcriptionMode: mode });
+  },
+  setAgentState: (state) => set({ agentState: state }),
+  setTranscriptItems: (items) => set({ transcriptItems: items }),
+  setCurrentInProgressMessage: (message) =>
+    set({ currentInProgressMessage: message }),
+  setTranscriptionMode: (mode) => set({ transcriptionMode: mode }),
+  setTranscriptRenderMode: (mode) => set({ transcriptRenderMode: mode }),
 
   // Host control initial state
   isHost: false,
@@ -236,6 +285,10 @@ const useAppStore = create<AppState>((set, get) => ({
       agentId: null,
       isAgentActive: false,
       isAgentLoading: false,
+      agentState: EAgentState.IDLE,
+      agentRtcUid: null,
+      transcriptItems: [],
+      transcriptionMode: "rtc",
     }),
   increaseUserCount: () => set((state) => ({ userCount: state.userCount + 1 })),
   decreaseUserCount: () => set((state) => ({ userCount: state.userCount - 1 })),
