@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useState } from "react";
-import { MdClose, MdSmartToy, MdMic } from "react-icons/md";
+import { MdClose, MdSmartToy, MdMic, MdExtension, MdAdd, MdEdit, MdDelete, MdRefresh, MdBuild } from "react-icons/md";
 import VoiceSettings from "./VoiceSettings";
 import useAppStore from "@/store/useAppStore";
-import type { AgentSettings } from "@/types/agora";
+import type { AgentSettings, MCPServerConfig, MCPToolInfo } from "@/types/agora";
+import Modal from "@/components/common/Modal";
 import type { IMicrophoneAudioTrack } from "agora-rtc-sdk-ng";
 
-type SettingsTab = "ai-agent" | "voice";
+type SettingsTab = "ai-agent" | "voice" | "mcp-server";
 
 interface SettingsSidebarProps {
   isOpen: boolean;
@@ -104,6 +105,12 @@ const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
             icon={<MdMic size={18} />}
             label="Voice"
           />
+          <TabButton
+            active={activeTab === "mcp-server"}
+            onClick={() => setActiveTab("mcp-server")}
+            icon={<MdExtension size={18} />}
+            label="MCP Server"
+          />
         </div>
 
         {/* Content */}
@@ -123,6 +130,11 @@ const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
               onSave={onSaveAgentSettings}
               onClose={onClose}
               isAgentActive={isAgentActive}
+            />
+          ) : activeTab === "mcp-server" ? (
+            <MCPServerTabContent
+              onSave={onSaveAgentSettings}
+              onClose={onClose}
             />
           ) : (
             <div className="px-6 py-4">
@@ -361,6 +373,7 @@ const getDefaultSettings = (): AgentSettingsType => {
       params: {
         model: getEnvVar("LLM_MODEL", "gpt-4o-mini"),
       },
+      mcp_servers: [],
     },
     tts: {
       vendor: ttsVendor,
@@ -511,6 +524,497 @@ const Toggle: React.FC<{
     </button>
   </div>
 );
+
+// --- MCP Server tab and modal ---
+const MCP_PROTOCOL_OPTIONS: { value: MCPServerConfig["transport"]; label: string }[] = [
+  { value: "sse", label: "SSE" },
+  { value: "http", label: "HTTP" },
+  { value: "streamable_http", label: "Streamable HTTP" },
+];
+
+interface MCPServerFormModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (server: MCPServerConfig) => void;
+  initialServer?: MCPServerConfig | null;
+}
+
+const MCPServerFormModal: React.FC<MCPServerFormModalProps> = ({
+  isOpen,
+  onClose,
+  onSave,
+  initialServer = null,
+}) => {
+  const isEdit = !!initialServer;
+  const [name, setName] = React.useState(initialServer?.name ?? "");
+  const [endpoint, setEndpoint] = React.useState(initialServer?.endpoint ?? "");
+  const [timeoutMs, setTimeoutMs] = React.useState(initialServer?.timeout_ms ?? 10000);
+  const [transport, setTransport] = React.useState<MCPServerConfig["transport"]>(
+    initialServer?.transport ?? "streamable_http"
+  );
+  const [headers, setHeaders] = React.useState<Array<{ key: string; value: string }>>(
+    initialServer?.headers
+      ? Object.entries(initialServer.headers).map(([key, value]) => ({ key, value }))
+      : []
+  );
+  const [queries, setQueries] = React.useState<Array<{ key: string; value: string }>>(
+    initialServer?.queries
+      ? Object.entries(initialServer.queries).map(([key, value]) => ({ key, value }))
+      : []
+  );
+  const [nameError, setNameError] = React.useState("");
+  const [endpointError, setEndpointError] = React.useState("");
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setName(initialServer?.name ?? "");
+      setEndpoint(initialServer?.endpoint ?? "");
+      setTimeoutMs(initialServer?.timeout_ms ?? 10000);
+      setTransport(initialServer?.transport ?? "streamable_http");
+      setHeaders(
+        initialServer?.headers
+          ? Object.entries(initialServer.headers).map(([key, value]) => ({ key, value }))
+          : []
+      );
+      setQueries(
+        initialServer?.queries
+          ? Object.entries(initialServer.queries).map(([key, value]) => ({ key, value }))
+          : []
+      );
+      setNameError("");
+      setEndpointError("");
+    }
+  }, [isOpen, initialServer]);
+
+  const validate = (): boolean => {
+    let ok = true;
+    if (!name.trim()) {
+      setNameError("Name is required.");
+      ok = false;
+    } else if (name.length > 48) {
+      setNameError("Max 48 characters.");
+      ok = false;
+    } else if (!/^[a-zA-Z0-9]+$/.test(name)) {
+      setNameError("Only letters and numbers.");
+      ok = false;
+    } else {
+      setNameError("");
+    }
+    if (!endpoint.trim()) {
+      setEndpointError("Server URL is required.");
+      ok = false;
+    } else {
+      try {
+        new URL(endpoint);
+        setEndpointError("");
+      } catch {
+        setEndpointError("Enter a valid URL.");
+        ok = false;
+      }
+    }
+    return ok;
+  };
+
+  const handleSubmit = () => {
+    if (!validate()) return;
+    const headersObj: Record<string, string> = {};
+    headers.forEach(({ key, value }) => {
+      if (key.trim()) headersObj[key.trim()] = value;
+    });
+    const queriesObj: Record<string, string> = {};
+    queries.forEach(({ key, value }) => {
+      if (key.trim()) queriesObj[key.trim()] = value;
+    });
+    onSave({
+      name: name.trim(),
+      endpoint: endpoint.trim(),
+      timeout_ms: timeoutMs,
+      transport,
+      ...(Object.keys(headersObj).length > 0 && { headers: headersObj }),
+      ...(Object.keys(queriesObj).length > 0 && { queries: queriesObj }),
+      ...(initialServer?.allowed_tools != null && { allowed_tools: initialServer.allowed_tools }),
+    });
+  };
+
+  const addHeader = () => setHeaders((prev) => [...prev, { key: "", value: "" }]);
+  const removeHeader = (i: number) => setHeaders((prev) => prev.filter((_, idx) => idx !== i));
+  const updateHeader = (i: number, field: "key" | "value", val: string) =>
+    setHeaders((prev) => prev.map((h, idx) => (idx === i ? { ...h, [field]: val } : h)));
+  const addQuery = () => setQueries((prev) => [...prev, { key: "", value: "" }]);
+  const removeQuery = (i: number) => setQueries((prev) => prev.filter((_, idx) => idx !== i));
+  const updateQuery = (i: number, field: "key" | "value", val: string) =>
+    setQueries((prev) => prev.map((q, idx) => (idx === i ? { ...q, [field]: val } : q)));
+
+  if (!isOpen) return null;
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={isEdit ? "Edit MCP Server" : "New Custom MCP Server"}
+    >
+      <div className="space-y-4">
+        <FormField label="Name" required>
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="MCP Server name"
+            maxLength={48}
+            error={!!nameError}
+          />
+          {nameError && <p className="text-xs text-red-500 dark:text-red-400 mt-1">{nameError}</p>}
+        </FormField>
+        <FormField label="Server URL" required>
+          <Input
+            value={endpoint}
+            onChange={(e) => setEndpoint(e.target.value)}
+            placeholder="https://example.com/sse"
+            error={!!endpointError}
+          />
+          {endpointError && <p className="text-xs text-red-500 dark:text-red-400 mt-1">{endpointError}</p>}
+        </FormField>
+        <FormField label="Timeout (ms)" hint="Request timeout in milliseconds.">
+          <Input
+            type="number"
+            min={1000}
+            value={timeoutMs}
+            onChange={(e) => setTimeoutMs(parseInt(e.target.value, 10) || 10000)}
+          />
+        </FormField>
+        <FormField label="Server Protocol" required>
+          <div className="flex gap-4 flex-wrap">
+            {MCP_PROTOCOL_OPTIONS.map((opt) => (
+              <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="mcp-transport"
+                  checked={transport === opt.value}
+                  onChange={() => setTransport(opt.value)}
+                  className="text-blue-500 focus:ring-blue-500 dark:focus:ring-blue-400"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">{opt.label}</span>
+              </label>
+            ))}
+          </div>
+        </FormField>
+        <div>
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">HTTP Headers</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Add custom headers for additional configuration or authentication.</p>
+          {headers.map((h, i) => (
+            <div key={i} className="flex gap-2 mb-2">
+              <Input
+                placeholder="Header name"
+                value={h.key}
+                onChange={(e) => updateHeader(i, "key", e.target.value)}
+                className="flex-1"
+              />
+              <Input
+                placeholder="Value"
+                value={h.value}
+                onChange={(e) => updateHeader(i, "value", e.target.value)}
+                className="flex-1"
+              />
+              <button
+                type="button"
+                onClick={() => removeHeader(i)}
+                className="p-2 text-gray-500 hover:text-red-500 dark:hover:text-red-400"
+              >
+                <MdClose size={18} />
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={addHeader}
+            className="text-sm text-blue-500 dark:text-blue-400 hover:underline"
+          >
+            + Add Header
+          </button>
+        </div>
+        <div>
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Query Parameters</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Query string parameters to append to the URL.</p>
+          {queries.map((q, i) => (
+            <div key={i} className="flex gap-2 mb-2">
+              <Input
+                placeholder="Key"
+                value={q.key}
+                onChange={(e) => updateQuery(i, "key", e.target.value)}
+                className="flex-1"
+              />
+              <Input
+                placeholder="Value"
+                value={q.value}
+                onChange={(e) => updateQuery(i, "value", e.target.value)}
+                className="flex-1"
+              />
+              <button
+                type="button"
+                onClick={() => removeQuery(i)}
+                className="p-2 text-gray-500 hover:text-red-500 dark:hover:text-red-400"
+              >
+                <MdClose size={18} />
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={addQuery}
+            className="text-sm text-blue-500 dark:text-blue-400 hover:underline"
+          >
+            + Add Parameter
+          </button>
+        </div>
+        <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <button
+            onClick={handleSubmit}
+            className="flex-1 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+          >
+            {isEdit ? "Save" : "Add"}
+          </button>
+          <button
+            onClick={onClose}
+            className="px-4 py-2.5 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-white font-medium rounded-lg transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+interface MCPServerTabContentProps {
+  onSave: (settings: AgentSettings) => void;
+  onClose: () => void;
+}
+
+const MCPServerTabContent: React.FC<MCPServerTabContentProps> = ({ onSave, onClose }) => {
+  const agentSettings = useAppStore((state) => state.agentSettings);
+  const [servers, setServers] = React.useState<MCPServerConfig[]>([]);
+  const [modalOpen, setModalOpen] = React.useState(false);
+  const [editingIndex, setEditingIndex] = React.useState<number | null>(null);
+  const [toolsByServer, setToolsByServer] = React.useState<Record<string, MCPToolInfo[]>>({});
+  const [refreshingServer, setRefreshingServer] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    const list = agentSettings?.llm?.mcp_servers ?? [];
+    setServers(list);
+  }, [agentSettings?.llm?.mcp_servers]);
+
+  const handleAddOrUpdate = React.useCallback((server: MCPServerConfig) => {
+    if (editingIndex !== null) {
+      setServers((prev) => prev.map((s, i) => (i === editingIndex ? server : s)));
+      setEditingIndex(null);
+    } else {
+      setServers((prev) => [...prev, server]);
+    }
+  }, [editingIndex]);
+
+  const handleSave = React.useCallback(() => {
+    const base = agentSettings ?? getDefaultSettings();
+    const next: AgentSettings = {
+      ...base,
+      name: base.name ?? `agent-${Date.now()}`,
+      llm: {
+        ...base.llm,
+        url: base.llm?.url ?? "",
+        api_key: base.llm?.api_key ?? "",
+        mcp_servers: servers,
+      },
+      tts: base.tts ?? ({} as AgentSettings["tts"]),
+      advanced_features: {
+        ...base.advanced_features,
+        enable_tools: servers.length > 0 ? true : (base.advanced_features?.enable_tools ?? false),
+      },
+    };
+    onSave(next);
+    onClose();
+  }, [agentSettings, servers, onSave, onClose]);
+
+  const refreshTools = React.useCallback(async (server: MCPServerConfig) => {
+    setRefreshingServer(server.name);
+    try {
+      const res = await fetch("/api/mcp/tools", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          endpoint: server.endpoint,
+          headers: server.headers,
+          transport: server.transport,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const tools: MCPToolInfo[] = Array.isArray(data.tools) ? data.tools : [];
+        setToolsByServer((prev) => ({ ...prev, [server.name]: tools }));
+      }
+    } catch {
+      setToolsByServer((prev) => ({ ...prev, [server.name]: [] }));
+    } finally {
+      setRefreshingServer(null);
+    }
+  }, []);
+
+  const toggleTool = React.useCallback((serverName: string, toolName: string, enabled: boolean) => {
+    setServers((prev) =>
+      prev.map((s) => {
+        if (s.name !== serverName) return s;
+        const current = s.allowed_tools ?? [];
+        if (enabled) return { ...s, allowed_tools: [...current, toolName] };
+        return { ...s, allowed_tools: current.filter((t) => t !== toolName) };
+      })
+    );
+  }, []);
+
+  const openAdd = () => {
+    setEditingIndex(null);
+    setModalOpen(true);
+  };
+  const openEdit = (index: number) => {
+    setEditingIndex(index);
+    setModalOpen(true);
+  };
+  const closeModal = () => {
+    setModalOpen(false);
+    setEditingIndex(null);
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">MCP Servers</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              Enable your agent with capabilities of custom MCP servers.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={openAdd}
+            className="p-2 rounded-full bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white transition-colors"
+            title="Add MCP Server"
+          >
+            <MdAdd size={20} />
+          </button>
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+        {servers.length === 0 ? (
+          <p className="text-sm text-gray-500 dark:text-gray-400">No MCP servers added. Click + to add one.</p>
+        ) : (
+          servers.map((server, index) => {
+            const discoveredTools = toolsByServer[server.name] ?? [];
+            const allowedSet = new Set(server.allowed_tools ?? []);
+            return (
+              <div
+                key={server.name + index}
+                className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-900/50"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <MdExtension className="text-blue-500 dark:text-blue-400" size={20} />
+                    <span className="font-medium text-gray-900 dark:text-white">{server.name}</span>
+                    <span className="text-xs text-green-600 dark:text-green-400">Configured</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => refreshTools(server)}
+                      disabled={refreshingServer === server.name}
+                      className="px-2 py-1.5 text-sm bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg text-gray-700 dark:text-gray-300 transition-colors disabled:opacity-50"
+                    >
+                      {refreshingServer === server.name ? (
+                        <span className="flex items-center gap-1">Loading...</span>
+                      ) : (
+                        <span className="flex items-center gap-1">
+                          <MdRefresh size={14} /> Refresh Tools
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openEdit(index)}
+                      className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                      title="Edit"
+                    >
+                      <MdEdit size={18} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setServers((prev) => prev.filter((_, i) => i !== index))}
+                      className="p-2 text-gray-500 hover:text-red-500 dark:hover:text-red-400"
+                      title="Remove"
+                    >
+                      <MdDelete size={18} />
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {discoveredTools.length === 0 ? (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Click &quot;Refresh Tools&quot; to fetch available tools, or add tool names manually below.
+                    </p>
+                  ) : (
+                    discoveredTools.map((tool) => (
+                      <label
+                        key={tool.name}
+                        className="flex items-center gap-2 py-2 px-3 rounded-lg bg-gray-100 dark:bg-gray-800 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={allowedSet.has(tool.name)}
+                          onChange={(e) => toggleTool(server.name, tool.name, e.target.checked)}
+                          className="rounded border-gray-300 dark:border-gray-600 text-blue-500 focus:ring-blue-500 dark:focus:ring-blue-400"
+                        />
+                        <MdBuild size={16} className="text-gray-500 dark:text-gray-400 shrink-0" />
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">{tool.name}</span>
+                        {tool.description && (
+                          <span className="text-xs text-gray-500 dark:text-gray-400 truncate flex-1">{tool.description}</span>
+                        )}
+                      </label>
+                    ))
+                  )}
+                  {discoveredTools.length > 0 && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                      Check the tools you want the agent to use.
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+      <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+        <div className="flex gap-3">
+          <button
+            onClick={handleSave}
+            className="flex-1 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+          >
+            Save
+          </button>
+          <button
+            onClick={onClose}
+            className="px-4 py-2.5 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-white font-medium rounded-lg transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+      <MCPServerFormModal
+        isOpen={modalOpen}
+        onClose={closeModal}
+        onSave={(s) => {
+          handleAddOrUpdate(s);
+          closeModal();
+        }}
+        initialServer={editingIndex !== null ? servers[editingIndex] ?? null : null}
+      />
+    </div>
+  );
+};
 
 // Bot icon
 const BotIcon: React.FC<{ className?: string; size?: number }> = ({

@@ -112,6 +112,27 @@ export async function POST(request: NextRequest) {
       llmPayload.params = llm.params;
     }
 
+    // Build MCP servers for LLM (tool invocation)
+    if (llm.mcp_servers && llm.mcp_servers.length > 0) {
+      llmPayload.mcp_servers = llm.mcp_servers.map((s) => {
+        const endpoint =
+          s.queries && Object.keys(s.queries).length > 0
+            ? `${s.endpoint.replace(/\?$/, "")}?${new URLSearchParams(s.queries).toString()}`
+            : s.endpoint;
+        const entry: Record<string, unknown> = {
+          name: s.name,
+          endpoint,
+          ...(s.timeout_ms != null && { timeout_ms: s.timeout_ms }),
+          ...(s.headers && Object.keys(s.headers).length > 0 && { headers: s.headers }),
+          ...(s.allowed_tools != null && { allowed_tools: s.allowed_tools }),
+        };
+        if (s.transport === "streamable_http") {
+          entry.transport = "streamable_http";
+        }
+        return entry;
+      });
+    }
+
     // Build TTS config
     const ttsPayload: Record<string, unknown> = {
       vendor: tts.vendor,
@@ -158,21 +179,21 @@ export async function POST(request: NextRequest) {
       };
     }
 
-    // Add advanced features
-    if (advanced_features) {
+    // Add advanced features; auto-enable tools when any MCP server is configured
+    const hasMcpServers = llm.mcp_servers && llm.mcp_servers.length > 0;
+    const enableTools = hasMcpServers || advanced_features?.enable_tools;
+    if (advanced_features || hasMcpServers) {
       propertiesPayload.advanced_features = {
-        ...(advanced_features.enable_mllm !== undefined && {
+        ...(advanced_features?.enable_mllm !== undefined && {
           enable_mllm: advanced_features.enable_mllm,
         }),
-        ...(advanced_features.enable_rtm !== undefined && {
+        ...(advanced_features?.enable_rtm !== undefined && {
           enable_rtm: advanced_features.enable_rtm,
         }),
-        ...(advanced_features.enable_sal !== undefined && {
+        ...(advanced_features?.enable_sal !== undefined && {
           enable_sal: advanced_features.enable_sal,
         }),
-        ...(advanced_features.enable_tools !== undefined && {
-          enable_tools: advanced_features.enable_tools,
-        }),
+        enable_tools: enableTools,
       };
     }
 

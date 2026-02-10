@@ -19,6 +19,33 @@ export type LLMVendor =
   | "minimax"
   | "custom";
 
+// --- MCP (Model Context Protocol) Server ---
+/** Transport protocol for MCP; Agora docs document streamable_http */
+export type MCPTransport = "sse" | "http" | "streamable_http";
+
+export interface MCPServerConfig {
+  /** Unique identifier for the MCP server (max 48 chars, letters/numbers) */
+  name: string;
+  /** Endpoint URL of the MCP server */
+  endpoint: string;
+  /** Transport type; map to streamable_http for API when needed */
+  transport?: MCPTransport;
+  /** HTTP headers (e.g. Authorization) */
+  headers?: Record<string, string>;
+  /** Query params; merged into endpoint when building API payload */
+  queries?: Record<string, string>;
+  /** Request timeout in milliseconds */
+  timeout_ms?: number;
+  /** Tool names the agent is allowed to invoke; omit = all, [] = none */
+  allowed_tools?: string[];
+}
+
+/** UI-only: tool info from discovery (e.g. Refresh Tools) */
+export interface MCPToolInfo {
+  name: string;
+  description?: string;
+}
+
 export interface LLMConfig {
   /** LLM API endpoint URL (required) */
   url: string;
@@ -43,6 +70,8 @@ export interface LLMConfig {
     temperature?: number;
     [key: string]: unknown;
   };
+  /** MCP server configurations for tool invocation */
+  mcp_servers?: MCPServerConfig[];
 }
 
 // --- TTS Vendors ---

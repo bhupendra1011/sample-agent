@@ -229,6 +229,7 @@ const getDefaultSettings = (): AgentSettings => {
       params: {
         model: getEnvVar("LLM_MODEL", "gpt-4o-mini"),
       },
+      mcp_servers: [],
     },
     tts: {
       vendor: ttsVendor,
