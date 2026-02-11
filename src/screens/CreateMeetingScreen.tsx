@@ -18,7 +18,7 @@ const CreateMeetingScreen: React.FC = () => {
   const callStart = useAppStore((state) => state.callStart);
   const callEnd = useAppStore((state) => state.callEnd);
   const setWhiteboardCredentials = useAppStore(
-    (state) => state.setWhiteboardCredentials
+    (state) => state.setWhiteboardCredentials,
   );
   const { joinMeeting: joinAgoraMeeting } = useAgora();
   const router = useRouter();
@@ -53,7 +53,7 @@ const CreateMeetingScreen: React.FC = () => {
         meetingInfo.title,
         meetingInfo.hostPassphrase,
         meetingInfo.viewerPassphrase,
-        yourName
+        yourName,
       );
 
       callStart({
@@ -74,7 +74,7 @@ const CreateMeetingScreen: React.FC = () => {
           meetingInfo.whiteboard.room_token,
           meetingInfo.whiteboard.room_uuid,
           AGORA_CONFIG.WHITEBOARD_APPIDENTIFIER!,
-          AGORA_CONFIG.WHITEBOARD_REGION!
+          AGORA_CONFIG.WHITEBOARD_REGION!,
         );
       }
 
@@ -83,7 +83,7 @@ const CreateMeetingScreen: React.FC = () => {
       console.error("Failed to create and join meeting:", error);
       showToast(
         "Failed to create or join meeting. Please check your network or credentials and try again.",
-        "error"
+        "error",
       );
       callEnd();
     } finally {
@@ -156,7 +156,7 @@ const CreateMeetingScreen: React.FC = () => {
           </span>
           <Link
             href="/join"
-            className="text-agora hover:opacity-90 font-semibold transition-colors duration-200 text-base sm:text-lg"
+            className="text-agora-accent-blue text-shadow-agora-accent-blue hover:opacity-90 font-semibold transition-colors duration-200 text-base sm:text-lg"
           >
             Join with a Meeting ID
           </Link>

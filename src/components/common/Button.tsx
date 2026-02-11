@@ -28,7 +28,7 @@ const Button: React.FC<ButtonProps> = ({
   // UPDATED: Using direct Tailwind default colors for variants
   const variantClasses = {
     primary:
-      "bg-agora hover:opacity-90 border-agora border-solid",
+      "bg-agora-accent-blue hover:opacity-70 border-agora-accent-blue border-solid",
     secondary:
       "bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600 border-green-600 dark:border-green-500 hover:border-green-700 dark:hover:border-green-600",
     danger:
@@ -41,6 +41,7 @@ const Button: React.FC<ButtonProps> = ({
       onClick={onClick}
       disabled={disabled || isLoading}
       className={`
+        cursor-pointer
         w-full text-white font-bold py-3 sm:py-4 px-6 rounded-lg
         text-lg sm:text-xl transition-all duration-200 ease-in-out shadow-lg
         disabled:opacity-50 disabled:cursor-not-allowed

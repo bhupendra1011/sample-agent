@@ -13,6 +13,7 @@ export default {
                 black: '#000000',
                 white: '#FFFFFF',
                 agora: '#00c2ff',
+                'agora-accent-blue': '#00c2ff',
             },
             // Custom grid utility (keep this)
             gridTemplateColumns: {
