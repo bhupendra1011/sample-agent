@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { MdMic, MdRefresh, MdCheckCircle, MdWarning, MdPlayArrow, MdStop } from "react-icons/md";
 import useAppStore from "@/store/useAppStore";
+import { setVoiceSettings } from "@/services/settingsDb";
 import type { AudioDevice } from "@/types/agora";
 import type { IMicrophoneAudioTrack } from "agora-rtc-sdk-ng";
 
@@ -105,23 +106,12 @@ const VoiceSettings: React.FC<VoiceSettingsProps> = ({ localMicrophoneTrack }) =
       setDevices(formattedDevices);
       setPermissionGranted(microphones.some((d) => d.label && d.label !== ""));
 
-      // If no device selected, try to restore from localStorage or use first device
-      if (!selectedMicrophoneId && formattedDevices.length > 0) {
-        const savedId = typeof localStorage !== "undefined"
-          ? localStorage.getItem("selectedMicrophoneId")
-          : null;
-
-        if (savedId && formattedDevices.some((d) => d.deviceId === savedId)) {
-          setSelectedMicrophoneId(savedId);
-        } else {
-          // Find the current device if track exists
-          if (localMicrophoneTrack) {
-            const currentLabel = localMicrophoneTrack.getTrackLabel();
-            const currentDevice = microphones.find((d) => d.label === currentLabel);
-            if (currentDevice) {
-              setSelectedMicrophoneId(currentDevice.deviceId);
-            }
-          }
+      // If no device selected, use current track's device if available (store is hydrated from IndexedDB on load)
+      if (!selectedMicrophoneId && formattedDevices.length > 0 && localMicrophoneTrack) {
+        const currentLabel = localMicrophoneTrack.getTrackLabel();
+        const currentDevice = microphones.find((d) => d.label === currentLabel);
+        if (currentDevice) {
+          setSelectedMicrophoneId(currentDevice.deviceId);
         }
       }
     } catch (err) {
@@ -157,8 +147,12 @@ const VoiceSettings: React.FC<VoiceSettingsProps> = ({ localMicrophoneTrack }) =
             // Current device was unplugged, switch to first available
             const microphones = await AgoraRTC.getMicrophones();
             if (microphones[0] && localMicrophoneTrack) {
-              await localMicrophoneTrack.setDevice(microphones[0].deviceId);
-              setSelectedMicrophoneId(microphones[0].deviceId);
+              const newId = microphones[0].deviceId;
+              await localMicrophoneTrack.setDevice(newId);
+              setSelectedMicrophoneId(newId);
+              setVoiceSettings({ selectedMicrophoneId: newId }).catch((err) =>
+                console.error("[VoiceSettings] Failed to persist voice settings:", err),
+              );
             }
           }
         };
@@ -179,6 +173,9 @@ const VoiceSettings: React.FC<VoiceSettingsProps> = ({ localMicrophoneTrack }) =
   // Handle device selection change
   const handleDeviceChange = async (deviceId: string) => {
     setSelectedMicrophoneId(deviceId);
+    setVoiceSettings({ selectedMicrophoneId: deviceId }).catch((err) =>
+      console.error("[VoiceSettings] Failed to persist voice settings:", err),
+    );
 
     if (localMicrophoneTrack) {
       try {

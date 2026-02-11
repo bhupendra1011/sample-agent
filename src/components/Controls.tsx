@@ -19,6 +19,7 @@ import {
 } from "react-icons/md";
 import { useAgora } from "@/hooks/useAgora";
 import { showToast } from "@/services/uiService";
+import { setAgentSettings as persistAgentSettings } from "@/services/settingsDb";
 import { inviteAgent, stopAgent, updateAgent } from "@/api/agentApi";
 import Modal from "@/components/common/Modal";
 import CopyButton from "@/components/common/CopyButton";
@@ -236,6 +237,12 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
     async (settings: AgentSettings) => {
       const prevSettings = useAppStore.getState().agentSettings;
       setAgentSettings(settings); // This also updates transcriptionMode
+
+      try {
+        await persistAgentSettings(settings);
+      } catch (err) {
+        console.error("[Controls] Failed to persist agent settings to IndexedDB:", err);
+      }
 
       if (isAgentActive && agentId && channelId) {
         const canUpdate = hasUpdatableChanges(prevSettings, settings);

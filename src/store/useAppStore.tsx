@@ -368,17 +368,7 @@ const useAppStore = create<AppState>((set, get) => ({
 
   // --- Voice Settings State & Actions ---
   selectedMicrophoneId: null,
-  setSelectedMicrophoneId: (id) => {
-    set({ selectedMicrophoneId: id });
-    // Persist to localStorage
-    if (typeof localStorage !== "undefined") {
-      if (id) {
-        localStorage.setItem("selectedMicrophoneId", id);
-      } else {
-        localStorage.removeItem("selectedMicrophoneId");
-      }
-    }
-  },
+  setSelectedMicrophoneId: (id) => set({ selectedMicrophoneId: id }),
   // --- END Voice Settings ---
 }));
 

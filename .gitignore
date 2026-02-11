@@ -40,3 +40,5 @@ src/**/*.d.ts
 
 .agents/*
 
+# Local docs (not committed)
+docs/

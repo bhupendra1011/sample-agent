@@ -1,0 +1,141 @@
+/**
+ * IndexedDB persistence for Settings panel (AI Agent, Voice, MCP Server).
+ * Zustand remains the source of truth; this module handles load/save only.
+ */
+
+import type { AgentSettings } from "@/types/agora";
+
+const DB_NAME = "MyAgoraAppSettings";
+const DB_VERSION = 1;
+const STORE_NAME = "settings";
+
+export interface VoiceSettingsPayload {
+  selectedMicrophoneId: string | null;
+}
+
+type SettingsId = "agent" | "voice";
+
+function isBrowser(): boolean {
+  return typeof indexedDB !== "undefined";
+}
+
+function openDb(): Promise<IDBDatabase> {
+  if (!isBrowser()) {
+    return Promise.reject(new Error("IndexedDB is not available"));
+  }
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: "id" });
+      }
+    };
+  });
+}
+
+/**
+ * Get stored agent settings (AI Agent + MCP Server tab data).
+ */
+export async function getAgentSettings(): Promise<AgentSettings | null> {
+  if (!isBrowser()) return null;
+  try {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readonly");
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.get("agent" as unknown as IDBValidKey);
+      request.onerror = () => {
+        db.close();
+        reject(request.error);
+      };
+      request.onsuccess = () => {
+        db.close();
+        const row = request.result as { id: SettingsId; value: AgentSettings } | undefined;
+        resolve(row?.value ?? null);
+      };
+    });
+  } catch (err) {
+    console.error("[settingsDb] getAgentSettings failed:", err);
+    return null;
+  }
+}
+
+/**
+ * Persist agent settings to IndexedDB.
+ */
+export async function setAgentSettings(settings: AgentSettings): Promise<void> {
+  if (!isBrowser()) return;
+  try {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.put({ id: "agent", value: settings });
+      request.onerror = () => {
+        db.close();
+        reject(request.error);
+      };
+      request.onsuccess = () => {
+        db.close();
+        resolve();
+      };
+    });
+  } catch (err) {
+    console.error("[settingsDb] setAgentSettings failed:", err);
+  }
+}
+
+/**
+ * Get stored voice settings (Voice tab: selected microphone).
+ */
+export async function getVoiceSettings(): Promise<VoiceSettingsPayload | null> {
+  if (!isBrowser()) return null;
+  try {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readonly");
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.get("voice" as unknown as IDBValidKey);
+      request.onerror = () => {
+        db.close();
+        reject(request.error);
+      };
+      request.onsuccess = () => {
+        db.close();
+        const row = request.result as { id: SettingsId; value: VoiceSettingsPayload } | undefined;
+        resolve(row?.value ?? null);
+      };
+    });
+  } catch (err) {
+    console.error("[settingsDb] getVoiceSettings failed:", err);
+    return null;
+  }
+}
+
+/**
+ * Persist voice settings to IndexedDB.
+ */
+export async function setVoiceSettings(voice: VoiceSettingsPayload): Promise<void> {
+  if (!isBrowser()) return;
+  try {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.put({ id: "voice", value: voice });
+      request.onerror = () => {
+        db.close();
+        reject(request.error);
+      };
+      request.onsuccess = () => {
+        db.close();
+        resolve();
+      };
+    });
+  } catch (err) {
+    console.error("[settingsDb] setVoiceSettings failed:", err);
+  }
+}
