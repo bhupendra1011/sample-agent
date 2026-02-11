@@ -36,3 +36,9 @@ src/**/*.d.ts
 
 .agents/*
 
+# Local docs (not committed)
+docs/
+
+# Next.js build and cache (do not commit)
+.next/
+out/
