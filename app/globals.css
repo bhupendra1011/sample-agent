@@ -67,3 +67,39 @@ body {
 .animate-fade-in-up {
   animation: fade-in-up 0.6s ease-out forwards;
 }
+
+/* Agent tile: animate icon only (no tile zoom) - subtle pulse */
+@keyframes agent-icon-pulse {
+  0%, 100% { opacity: 0.9; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.04); }
+}
+.animate-agent-icon-pulse {
+  animation: agent-icon-pulse 2.2s ease-in-out infinite;
+}
+
+/* Slightly stronger for speaking state (icon only) */
+@keyframes agent-icon-speaking {
+  0%, 100% { opacity: 0.95; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+.animate-agent-icon-speaking {
+  animation: agent-icon-speaking 1.4s ease-in-out infinite;
+}
+
+/* Dots/bars under icon (RTM state indicators) */
+@keyframes agent-state-soft {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+.animate-agent-state-soft {
+  animation: agent-state-soft 2s ease-in-out infinite;
+}
+
+/* Agent tile: shadow + vintage, less bright */
+.agent-tile-vintage {
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.45),
+    0 4px 12px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  filter: brightness(0.92);
+}

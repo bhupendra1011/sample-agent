@@ -22,7 +22,7 @@ const Select: React.FC<
   <select
     {...props}
     className={`w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-800 border rounded-lg text-gray-900 dark:text-white text-sm
-      focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors
+      focus:outline-none focus:ring-2 focus:ring-agora-accent-blue dark:focus:ring-agora-accent-blue transition-colors
       ${error ? "border-red-500" : "border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500"}
       ${className}`}
   >
@@ -58,7 +58,7 @@ const AudioLevelMeter: React.FC<{ level: number }> = ({ level }) => {
           percentage > 70
             ? "bg-green-500"
             : percentage > 30
-            ? "bg-blue-500"
+            ? "bg-agora-accent-blue"
             : "bg-gray-400 dark:bg-gray-500"
         }`}
         style={{ width: `${percentage}%` }}
@@ -430,7 +430,7 @@ const VoiceSettings: React.FC<VoiceSettingsProps> = ({ localMicrophoneTrack }) =
           className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-colors ${
             isTesting
               ? "bg-red-500 hover:bg-red-600 text-white"
-              : "bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white"
+              : "bg-agora-accent-blue hover:opacity-90 text-white"
           } disabled:opacity-50 disabled:cursor-not-allowed`}
         >
           {isTesting ? <MdStop size={20} /> : <MdMic size={20} />}

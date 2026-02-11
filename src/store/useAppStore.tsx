@@ -193,7 +193,7 @@ const useAppStore = create<AppState>((set, get) => ({
   agentRtcUid: null,
   transcriptItems: [],
   currentInProgressMessage: null,
-  transcriptionMode: "rtc",
+  transcriptionMode: "rtm",
   transcriptRenderMode: ETranscriptRenderMode.AUTO,
   setAgentActive: (agentId, agentRtcUid) =>
     set({
@@ -214,11 +214,11 @@ const useAppStore = create<AppState>((set, get) => ({
       agentRtcUid: null,
       transcriptItems: [],
       currentInProgressMessage: null,
-      transcriptionMode: "rtc",
+      transcriptionMode: "rtm",
     }),
   setAgentSettings: (settings) => {
-    // Derive transcription mode and update both atomically
-    const mode = settings?.advanced_features?.enable_rtm ? "rtm" : "rtc";
+    // Derive transcription mode and update both atomically (default RTM unless explicitly disabled)
+    const mode = settings?.advanced_features?.enable_rtm === false ? "rtc" : "rtm";
     set({ agentSettings: settings, transcriptionMode: mode });
   },
   setAgentState: (state) => set({ agentState: state }),
@@ -313,7 +313,7 @@ const useAppStore = create<AppState>((set, get) => ({
       agentState: EAgentState.IDLE,
       agentRtcUid: null,
       transcriptItems: [],
-      transcriptionMode: "rtc",
+      transcriptionMode: "rtm",
     }),
   clearSessionStartTime: () => set({ sessionStartTime: null }),
   increaseUserCount: () => set((state) => ({ userCount: state.userCount + 1 })),

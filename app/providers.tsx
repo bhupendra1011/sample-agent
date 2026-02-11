@@ -2,7 +2,9 @@
 
 import React, { useEffect, useRef } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { SessionProvider } from "next-auth/react";
 import ToastContainer from "@/components/common/ToastContainer";
+import SessionSync from "@/components/SessionSync";
 import useAppStore from "@/store/useAppStore";
 import {
   getAgentSettings,
@@ -58,9 +60,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
   }, [setAgentSettings, setSelectedMicrophoneId]);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      {children}
-      <ToastContainer />
-    </QueryClientProvider>
+    <SessionProvider>
+      <QueryClientProvider client={queryClient}>
+        <SessionSync />
+        {children}
+        <ToastContainer />
+      </QueryClientProvider>
+    </SessionProvider>
   );
 }

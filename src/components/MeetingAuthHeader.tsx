@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
 import useAppStore from "@/store/useAppStore";
 import { MdLogout, MdPerson } from "react-icons/md";
 
@@ -11,17 +11,16 @@ interface MeetingAuthHeaderProps {
 }
 
 const MeetingAuthHeader: React.FC<MeetingAuthHeaderProps> = ({ inline }) => {
-  const router = useRouter();
   const user = useAppStore((state) => state.user);
   const logout = useAppStore((state) => state.logout);
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const handleLogout = useCallback(() => {
-    logout();
     setOpen(false);
-    router.push("/");
-  }, [logout, router]);
+    logout();
+    void signOut({ callbackUrl: "/" });
+  }, [logout]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {

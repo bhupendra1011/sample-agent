@@ -29,7 +29,7 @@ const TabButton: React.FC<{
     onClick={onClick}
     className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors ${
       active
-        ? "bg-blue-500 text-white dark:bg-blue-600"
+        ? "bg-agora-accent-blue text-white"
         : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
     }`}
   >
@@ -118,7 +118,7 @@ const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
           {isAgentUpdating && activeTab === "ai-agent" && (
             <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
               <div className="flex flex-col items-center gap-3">
-                <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                <div className="w-10 h-10 border-4 border-agora-accent-blue border-t-transparent rounded-full animate-spin" />
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Updating Agent Configuration...
                 </span>
@@ -429,7 +429,7 @@ const Input: React.FC<
   <input
     {...props}
     className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border rounded-lg text-gray-900 dark:text-white text-sm
-      placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400
+      placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-agora-accent-blue dark:focus:ring-agora-accent-blue
       transition-colors ${error ? "border-red-500" : "border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500"}
       ${className}`}
   />
@@ -441,7 +441,7 @@ const Select: React.FC<
   <select
     {...props}
     className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border rounded-lg text-gray-900 dark:text-white text-sm
-      focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors
+      focus:outline-none focus:ring-2 focus:ring-agora-accent-blue dark:focus:ring-agora-accent-blue transition-colors
       ${error ? "border-red-500" : "border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500"}
       ${className}`}
   >
@@ -455,7 +455,7 @@ const Textarea: React.FC<
   <textarea
     {...props}
     className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border rounded-lg text-gray-900 dark:text-white text-sm
-      placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400
+      placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-agora-accent-blue dark:focus:ring-agora-accent-blue
       transition-colors resize-none ${error ? "border-red-500" : "border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500"}
       ${className}`}
   />
@@ -475,12 +475,12 @@ const Section: React.FC<{
       className="w-full flex items-center justify-between px-4 py-3 bg-gray-100 dark:bg-gray-800/50 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
     >
       <div className="flex items-center gap-2">
-        <span className="text-blue-500 dark:text-blue-400">{icon}</span>
+        <span className="text-agora-accent-blue">{icon}</span>
         <span className="font-medium text-gray-900 dark:text-white">
           {title}
         </span>
         {badge && (
-          <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-full">
+          <span className="text-xs px-2 py-0.5 bg-agora-accent-blue/15 text-agora-accent-blue rounded-full">
             {badge}
           </span>
         )}
@@ -512,7 +512,7 @@ const Toggle: React.FC<{
       onClick={() => onChange(!checked)}
       className={`relative w-11 h-6 rounded-full transition-colors ${
         checked
-          ? "bg-blue-500 dark:bg-blue-500"
+          ? "bg-agora-accent-blue"
           : "bg-gray-300 dark:bg-gray-600"
       }`}
     >
@@ -690,7 +690,7 @@ const MCPServerFormModal: React.FC<MCPServerFormModalProps> = ({
                   name="mcp-transport"
                   checked={transport === opt.value}
                   onChange={() => setTransport(opt.value)}
-                  className="text-blue-500 focus:ring-blue-500 dark:focus:ring-blue-400"
+                  className="text-agora-accent-blue focus:ring-agora-accent-blue dark:focus:ring-agora-accent-blue"
                 />
                 <span className="text-sm text-gray-700 dark:text-gray-300">{opt.label}</span>
               </label>
@@ -726,7 +726,7 @@ const MCPServerFormModal: React.FC<MCPServerFormModalProps> = ({
           <button
             type="button"
             onClick={addHeader}
-            className="text-sm text-blue-500 dark:text-blue-400 hover:underline"
+            className="text-sm text-agora-accent-blue hover:underline"
           >
             + Add Header
           </button>
@@ -760,7 +760,7 @@ const MCPServerFormModal: React.FC<MCPServerFormModalProps> = ({
           <button
             type="button"
             onClick={addQuery}
-            className="text-sm text-blue-500 dark:text-blue-400 hover:underline"
+            className="text-sm text-agora-accent-blue hover:underline"
           >
             + Add Parameter
           </button>
@@ -768,7 +768,7 @@ const MCPServerFormModal: React.FC<MCPServerFormModalProps> = ({
         <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
           <button
             onClick={handleSubmit}
-            className="flex-1 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+            className="flex-1 px-4 py-2.5 bg-agora-accent-blue hover:opacity-90 text-white font-medium rounded-lg transition-colors"
           >
             {isEdit ? "Save" : "Add"}
           </button>
@@ -893,7 +893,7 @@ const MCPServerTabContent: React.FC<MCPServerTabContentProps> = ({ onSave, onClo
           <button
             type="button"
             onClick={openAdd}
-            className="p-2 rounded-full bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white transition-colors"
+            className="p-2 rounded-full bg-agora-accent-blue hover:opacity-90 text-white transition-colors"
             title="Add MCP Server"
           >
             <MdAdd size={20} />
@@ -914,7 +914,7 @@ const MCPServerTabContent: React.FC<MCPServerTabContentProps> = ({ onSave, onClo
               >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <MdExtension className="text-blue-500 dark:text-blue-400" size={20} />
+                    <MdExtension className="text-agora-accent-blue" size={20} />
                     <span className="font-medium text-gray-900 dark:text-white">{server.name}</span>
                     <span className="text-xs text-green-600 dark:text-green-400">Configured</span>
                   </div>
@@ -966,7 +966,7 @@ const MCPServerTabContent: React.FC<MCPServerTabContentProps> = ({ onSave, onClo
                           type="checkbox"
                           checked={allowedSet.has(tool.name)}
                           onChange={(e) => toggleTool(server.name, tool.name, e.target.checked)}
-                          className="rounded border-gray-300 dark:border-gray-600 text-blue-500 focus:ring-blue-500 dark:focus:ring-blue-400"
+                          className="rounded border-gray-300 dark:border-gray-600 text-agora-accent-blue focus:ring-agora-accent-blue dark:focus:ring-agora-accent-blue"
                         />
                         <MdBuild size={16} className="text-gray-500 dark:text-gray-400 shrink-0" />
                         <span className="text-sm font-medium text-gray-900 dark:text-white">{tool.name}</span>
@@ -991,7 +991,7 @@ const MCPServerTabContent: React.FC<MCPServerTabContentProps> = ({ onSave, onClo
         <div className="flex gap-3">
           <button
             onClick={handleSave}
-            className="flex-1 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+            className="flex-1 px-4 py-2.5 bg-agora-accent-blue hover:opacity-90 text-white font-medium rounded-lg transition-colors"
           >
             Save
           </button>
@@ -1251,7 +1251,7 @@ const AgentSettingsSidebarContent: React.FC<{
             <p className="text-xs font-medium text-blue-800 dark:text-blue-200 mb-1.5">
               When agent is running:
             </p>
-            <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-0.5">
+            <ul className="text-xs text-agora-accent-blue space-y-0.5">
               <li>• <strong>Auto-update (no restart):</strong> LLM and MLLM params (system prompt, model, params)</li>
               <li>• <strong>Manual restart required:</strong> All advanced settings (TTS, ASR, turn detection, RTM, MLLM toggle, tools)</li>
             </ul>
@@ -1966,7 +1966,7 @@ const AgentSettingsSidebarContent: React.FC<{
         <div className="flex gap-3">
           <button
             onClick={handleSave}
-            className="flex-1 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+            className="flex-1 px-4 py-2.5 bg-agora-accent-blue hover:opacity-90 text-white font-medium rounded-lg transition-colors"
           >
             Save
           </button>

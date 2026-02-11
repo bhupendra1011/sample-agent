@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
 import useAppStore from "@/store/useAppStore";
 import VideoTile from "@/components/VideoTile";
 import AgentTile from "@/components/AgentTile";
@@ -84,8 +85,8 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ channelId }) => {
     await leaveCall();
     callEnd();
     logout();
-    router.push("/");
-  }, [leaveCall, callEnd, logout, router]);
+    void signOut({ callbackUrl: "/" });
+  }, [leaveCall, callEnd, logout]);
 
   useEffect(() => {
     if (remainingMs <= 0 && sessionStartTime != null) {
@@ -286,6 +287,7 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ channelId }) => {
                       agentUid={agentRtcUid}
                       agentState={agentState}
                       agentName={agentSettings?.name || "AI Agent"}
+                      transcriptionMode={transcriptionMode}
                     />
                   );
                 }

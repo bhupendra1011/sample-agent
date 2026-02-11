@@ -1,25 +1,16 @@
 "use client";
 
 import React, { useCallback } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import useAppStore from "@/store/useAppStore";
+import { signIn } from "next-auth/react";
 
 const AGORA_CONVO_AI_URL =
   "https://www.agora.io/en/products/conversational-ai-engine/";
 
 const LandingScreen: React.FC = () => {
-  const router = useRouter();
-  const setUser = useAppStore((state) => state.setUser);
-
   const handleSignInWithGoogle = useCallback(() => {
-    // Dummy auth: set a fake user and go to create/join
-    setUser({
-      displayName: "Demo User",
-      email: "demo@example.com",
-    });
-    router.push("/");
-  }, [setUser, router]);
+    void signIn("google", { callbackUrl: "/" });
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-950 text-gray-100 overflow-hidden">
@@ -132,8 +123,7 @@ const LandingScreen: React.FC = () => {
             Sign in with Google
           </button>
           <p className="text-gray-500 text-xs sm:text-sm text-center max-w-xs">
-            Sign in to create or join meetings. We&apos;ll add full Google SSO
-            next.
+            Sign in with Google to create or join meetings.
           </p>
         </div>
       </main>
