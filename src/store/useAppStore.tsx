@@ -12,6 +12,12 @@ import type { ILocalAudioTrack, ILocalVideoTrack } from "agora-rtc-sdk-ng";
 // Define Theme type
 type Theme = "light" | "dark";
 
+// Dummy auth user (replace with real SSO later)
+export interface AuthUser {
+  displayName: string;
+  email: string;
+}
+
 // Define Toast types
 export type ToastType = "success" | "error" | "warning" | "info";
 
@@ -33,6 +39,8 @@ interface AppState {
   channelId: string;
   hostPassphrase: string;
   viewerPassphrase: string;
+  /** When the call started (for 15-min session timer). Set in callStart, cleared in callEnd. */
+  sessionStartTime: number | null;
   isScreenSharing: boolean;
   remoteParticipants: {
     [uid: string]: Participant;
@@ -113,6 +121,8 @@ interface AppState {
     isHost?: boolean;
   }) => void;
   callEnd: () => void;
+  /** Clear only session timer (e.g. when extending session). Keeps call state. */
+  clearSessionStartTime: () => void;
   increaseUserCount: () => void;
   decreaseUserCount: () => void;
   updateRemoteParticipant: (payload: {
@@ -133,7 +143,13 @@ interface AppState {
   // --- Voice Settings State ---
   selectedMicrophoneId: string | null;
   setSelectedMicrophoneId: (id: string | null) => void;
-  // --- END Voice Settings State ---
+  // --- END Voice Settings ---
+
+  // --- Auth (dummy until SSO) ---
+  user: AuthUser | null;
+  setUser: (user: AuthUser | null) => void;
+  logout: () => void;
+  // --- END Auth ---
 }
 
 /**
@@ -163,6 +179,7 @@ const useAppStore = create<AppState>((set, get) => ({
   channelId: "",
   hostPassphrase: "",
   viewerPassphrase: "",
+  sessionStartTime: null,
   isScreenSharing: false,
   remoteParticipants: {},
 
@@ -267,6 +284,7 @@ const useAppStore = create<AppState>((set, get) => ({
       viewerPassphrase: payload.viewerPassphrase || "",
       isHost: payload.isHost || false,
       userCount: 1, // Start with 1 for local user
+      sessionStartTime: Date.now(),
     }),
   callEnd: () =>
     set({
@@ -278,6 +296,7 @@ const useAppStore = create<AppState>((set, get) => ({
       channelId: "",
       hostPassphrase: "",
       viewerPassphrase: "",
+      sessionStartTime: null,
       isScreenSharing: false,
       remoteParticipants: {},
       whiteboardRoomToken: "",
@@ -296,6 +315,7 @@ const useAppStore = create<AppState>((set, get) => ({
       transcriptItems: [],
       transcriptionMode: "rtc",
     }),
+  clearSessionStartTime: () => set({ sessionStartTime: null }),
   increaseUserCount: () => set((state) => ({ userCount: state.userCount + 1 })),
   decreaseUserCount: () => set((state) => ({ userCount: state.userCount - 1 })),
   updateRemoteParticipant: (payload) =>
@@ -370,6 +390,12 @@ const useAppStore = create<AppState>((set, get) => ({
   selectedMicrophoneId: null,
   setSelectedMicrophoneId: (id) => set({ selectedMicrophoneId: id }),
   // --- END Voice Settings ---
+
+  // --- Auth (dummy until SSO) ---
+  user: null,
+  setUser: (user) => set({ user }),
+  logout: () => set({ user: null }),
+  // --- END Auth ---
 }));
 
 // Apply default theme to HTML root on load (important for initial render)

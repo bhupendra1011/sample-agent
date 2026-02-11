@@ -28,7 +28,7 @@ const Button: React.FC<ButtonProps> = ({
   // UPDATED: Using direct Tailwind default colors for variants
   const variantClasses = {
     primary:
-      "bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 border-blue-600 dark:border-blue-500 hover:border-blue-700 dark:hover:border-blue-600",
+      "bg-agora hover:opacity-90 border-agora border-solid",
     secondary:
       "bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600 border-green-600 dark:border-green-500 hover:border-green-700 dark:hover:border-green-600",
     danger:

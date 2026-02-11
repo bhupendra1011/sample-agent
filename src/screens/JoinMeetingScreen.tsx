@@ -12,6 +12,7 @@ import { MdCallMerge } from "react-icons/md";
 import Card from "@/components/common/Card";
 import Button from "@/components/common/Button";
 import InputField from "@/components/common/InputField";
+import MeetingAuthHeader from "@/components/MeetingAuthHeader";
 
 const JoinMeetingScreen: React.FC = () => {
   const callStart = useAppStore((state) => state.callStart);
@@ -86,10 +87,11 @@ const JoinMeetingScreen: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white p-4 font-inter transition-colors duration-300">
+    <div className="relative flex flex-col items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white p-4 font-inter transition-colors duration-300">
+      <MeetingAuthHeader />
       <Card>
         <div className="flex items-center mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white font-syne">
             Join Meeting
           </h1>
         </div>
@@ -100,7 +102,7 @@ const JoinMeetingScreen: React.FC = () => {
           placeholder="e.g., Alice Smith"
           value={yourName}
           onChange={(e) => setYourName(e.target.value)}
-          focusRingColorClass="focus:ring-green-500 dark:focus:ring-green-400"
+          focusRingColorClass="focus:ring-agora"
         />
 
         <InputField
@@ -109,7 +111,7 @@ const JoinMeetingScreen: React.FC = () => {
           placeholder="Enter meeting passphrase or ID"
           value={meetingID}
           onChange={(e) => setMeetingID(e.target.value)}
-          focusRingColorClass="focus:ring-green-500 dark:focus:ring-green-400"
+          focusRingColorClass="focus:ring-agora"
           wrapperClassName="mb-6 sm:mb-8"
         />
 
@@ -129,7 +131,7 @@ const JoinMeetingScreen: React.FC = () => {
           </span>
           <Link
             href="/"
-            className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold transition-colors duration-200 text-base sm:text-lg"
+            className="text-agora hover:opacity-90 font-semibold transition-colors duration-200 text-base sm:text-lg"
           >
             Create a New Meeting
           </Link>

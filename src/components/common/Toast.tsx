@@ -34,8 +34,8 @@ const typeConfig = {
   },
   info: {
     icon: MdInfo,
-    bgClass: "bg-blue-600 dark:bg-blue-500",
-    borderClass: "border-blue-700 dark:border-blue-400",
+    bgClass: "bg-agora",
+    borderClass: "border-agora",
   },
 };
 

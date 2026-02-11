@@ -12,6 +12,7 @@ import { MdAddCircleOutline } from "react-icons/md";
 import Card from "@/components/common/Card";
 import Button from "@/components/common/Button";
 import InputField from "@/components/common/InputField";
+import MeetingAuthHeader from "@/components/MeetingAuthHeader";
 
 const CreateMeetingScreen: React.FC = () => {
   const callStart = useAppStore((state) => state.callStart);
@@ -91,10 +92,11 @@ const CreateMeetingScreen: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white p-4 font-inter transition-colors duration-300">
+    <div className="relative flex flex-col items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white p-4 font-inter transition-colors duration-300">
+      <MeetingAuthHeader />
       <Card>
         <div className="flex items-center mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white font-syne">
             Create a Meeting
           </h1>
         </div>
@@ -105,7 +107,7 @@ const CreateMeetingScreen: React.FC = () => {
           placeholder="e.g., Jane Doe"
           value={yourName}
           onChange={(e) => setYourName(e.target.value)}
-          focusRingColorClass="focus:ring-blue-500 dark:focus:ring-blue-400"
+          focusRingColorClass="focus:ring-agora"
         />
 
         <InputField
@@ -114,7 +116,7 @@ const CreateMeetingScreen: React.FC = () => {
           placeholder="e.g., The Annual Galactic Meet"
           value={meetingTitle}
           onChange={(e) => setMeetingTitle(e.target.value)}
-          focusRingColorClass="focus:ring-blue-500 dark:focus:ring-blue-400"
+          focusRingColorClass="focus:ring-agora"
           wrapperClassName="mb-6 sm:mb-8"
         />
 
@@ -132,7 +134,7 @@ const CreateMeetingScreen: React.FC = () => {
           <div className="mt-6 sm:mt-8 text-center p-4 sm:p-6 bg-gray-200 dark:bg-gray-700 rounded-lg shadow-inner border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white text-sm sm:text-base">
             <p className="mb-2 sm:mb-3 text-lg">
               Host Passphrase:{" "}
-              <strong className="font-bold text-blue-700 dark:text-blue-400 select-all">
+              <strong className="font-bold text-agora select-all">
                 {hostPassphraseDisplay}
               </strong>
             </p>
@@ -154,7 +156,7 @@ const CreateMeetingScreen: React.FC = () => {
           </span>
           <Link
             href="/join"
-            className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold transition-colors duration-200 text-base sm:text-lg"
+            className="text-agora hover:opacity-90 font-semibold transition-colors duration-200 text-base sm:text-lg"
           >
             Join with a Meeting ID
           </Link>

@@ -282,7 +282,7 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
   );
 
   const controlButtonClass =
-    "flex items-center justify-center w-14 h-14 bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-white text-3xl rounded-full transition-colors duration-300 hover:bg-gray-400 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-opacity-75";
+    "flex items-center justify-center w-14 h-14 bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-white text-3xl rounded-full transition-colors duration-300 hover:bg-gray-400 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-agora focus:ring-opacity-75";
 
   return (
     <React.Fragment>
@@ -318,9 +318,9 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
 
           <button
             onClick={handleToggleWhiteboard}
-            className={`flex items-center justify-center w-14 h-14 text-3xl rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-opacity-75 ${
+            className={`flex items-center justify-center w-14 h-14 text-3xl rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-agora focus:ring-opacity-75 ${
               isWhiteboardActive
-                ? "bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700"
+                ? "bg-agora text-white hover:opacity-90"
                 : "bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-400 dark:hover:bg-gray-600"
             }`}
             title={isWhiteboardActive ? "Close Whiteboard" : "Open Whiteboard"}
@@ -352,7 +352,7 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
               <button
                 onClick={handleToggleAgent}
                 disabled={isAgentLoading || isAgentUpdating}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-opacity-75 ${
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-agora focus:ring-opacity-75 ${
                   isAgentUpdating
                     ? "bg-amber-500 dark:bg-amber-600 text-white animate-pulse"
                     : isAgentLoading
@@ -398,7 +398,7 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
               </button>
               <button
                 onClick={() => setIsSettingsPanelOpen(true)}
-                className="flex items-center justify-center w-10 h-10 rounded-lg text-gray-800 dark:text-white  hover:bg-gray-400 dark:hover:bg-gray-600 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                className="flex items-center justify-center w-10 h-10 rounded-lg text-gray-800 dark:text-white  hover:bg-gray-400 dark:hover:bg-gray-600 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-agora"
                 title="Agent Settings"
               >
                 <MdSettings className="w-5 h-5" />
@@ -406,7 +406,7 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
               {isAgentActive && (
                 <button
                   onClick={() => setIsTranscriptPanelOpen(true)}
-                  className="flex items-center justify-center w-10 h-10 rounded-lg  text-gray-800 dark:text-white transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 hover:bg-gray-400 dark:hover:bg-gray-600"
+                  className="flex items-center justify-center w-10 h-10 rounded-lg  text-gray-800 dark:text-white transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-agora hover:bg-gray-400 dark:hover:bg-gray-600"
                   title="Open Transcript"
                 >
                   <MdMessage className="w-5 h-5" />

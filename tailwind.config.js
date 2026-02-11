@@ -2,19 +2,17 @@
 /** @type {import('tailwindcss').Config} */
 export default {
     content: [
-        "./index.html",
+        "./app/**/*.{js,ts,jsx,tsx}",
         "./src/**/*.{js,ts,jsx,tsx}",
+        "./index.html",
     ],
     darkMode: 'class', // Keep this! It's essential for dark: to work
     theme: {
         extend: {
             colors: {
-                // --- REMOVE ALL YOUR CUSTOM -light and -dark SUFFIXED COLORS HERE ---
-                // For example, remove 'bg-primary-light', 'bg-primary-dark', etc.
-                // Keep ONLY standard Tailwind colors you might have explicitly defined (like 'black', 'white')
-                // if they are not default or you want to redefine them.
                 black: '#000000',
                 white: '#FFFFFF',
+                agora: '#00c2ff',
             },
             // Custom grid utility (keep this)
             gridTemplateColumns: {
@@ -23,6 +21,7 @@ export default {
             // Custom font family (keep this)
             fontFamily: {
                 inter: ['Inter', 'sans-serif'],
+                syne: ['var(--font-syne)', 'sans-serif'],
             }
         },
     },

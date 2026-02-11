@@ -1,6 +1,13 @@
 import type { Metadata } from "next";
+import { Syne } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+
+const syne = Syne({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-syne",
+});
 
 export const metadata: Metadata = {
   title: "My Agora App",
@@ -14,7 +21,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
-      <body>
+      <body className={syne.variable}>
         <Providers>{children}</Providers>
       </body>
     </html>

@@ -23,7 +23,7 @@ const InputField: React.FC<InputFieldProps> = ({
   className,
   wrapperClassName,
   // UPDATED: Default focus ring color using direct Tailwind classes
-  focusRingColorClass = "focus:ring-blue-500 dark:focus:ring-blue-400",
+  focusRingColorClass = "focus:ring-agora",
 }) => {
   return (
     <div className={`mb-4 sm:mb-6 ${wrapperClassName || ""}`}>

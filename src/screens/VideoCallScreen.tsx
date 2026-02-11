@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import useAppStore from "@/store/useAppStore";
 import VideoTile from "@/components/VideoTile";
@@ -10,10 +10,20 @@ import ParticipantListItem from "@/components/ParticipantListItem";
 import Whiteboard from "@/components/Whiteboard";
 import Modal from "@/components/common/Modal";
 import Button from "@/components/common/Button";
+import MeetingAuthHeader from "@/components/MeetingAuthHeader";
 import { useAgora } from "@/hooks/useAgora";
 import { useConversationalAI } from "@/hooks/useConversationalAI";
 import type { IAgoraRTCRemoteUser } from "agora-rtc-sdk-ng";
-import { MdWbSunny, MdDarkMode } from "react-icons/md";
+import { MdWbSunny, MdDarkMode, MdTimer } from "react-icons/md";
+
+const SESSION_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+
+function formatRemaining(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
 
 interface VideoCallScreenProps {
   channelId: string;
@@ -42,13 +52,46 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ channelId }) => {
     agentRtcUid,
     agentSettings,
     transcriptionMode,
+    sessionStartTime,
+    callEnd,
+    logout,
   } = useAppStore();
+
+  const [remainingMs, setRemainingMs] = useState<number>(SESSION_DURATION_MS);
 
   useEffect(() => {
     if (!callActive) {
       router.push("/");
     }
   }, [callActive, router]);
+
+  // Session timer: countdown and auto-logout at 0
+  useEffect(() => {
+    if (!sessionStartTime) return;
+    const update = () => {
+      const elapsed = Date.now() - sessionStartTime;
+      const remaining = SESSION_DURATION_MS - elapsed;
+      setRemainingMs(remaining);
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [sessionStartTime]);
+
+  const { leaveCall } = useAgora();
+
+  const handleSessionExpired = useCallback(async () => {
+    await leaveCall();
+    callEnd();
+    logout();
+    router.push("/");
+  }, [leaveCall, callEnd, logout, router]);
+
+  useEffect(() => {
+    if (remainingMs <= 0 && sessionStartTime != null) {
+      handleSessionExpired();
+    }
+  }, [remainingMs, sessionStartTime, handleSessionExpired]);
 
   const participantCount =
     1 +
@@ -108,7 +151,7 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ channelId }) => {
     <div className="flex flex-col h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-300">
       {/* Top Bar */}
       <div className="flex items-center bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white p-4 text-lg shadow-md transition-colors duration-300">
-        <span className="font-bold text-xl">
+        <span className="font-bold text-xl font-syne">
           Meeting: {meetingName || channelId}
         </span>
 
@@ -126,9 +169,21 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ channelId }) => {
             </span>
           )}
 
+          {sessionStartTime != null && (
+            <span
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-sm font-medium tabular-nums"
+              title="Session ends in 15 minutes; you will be logged out when time runs out."
+            >
+              <MdTimer className="w-4 h-4 text-[var(--agora-accent-blue)] shrink-0" aria-hidden />
+              {formatRemaining(remainingMs)}
+            </span>
+          )}
+
+          <MeetingAuthHeader inline />
+
           <button
             onClick={toggleTheme}
-            className="p-2 rounded-full bg-gray-300 dark:bg-gray-700 hover:bg-gray-400 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all text-gray-800 dark:text-white"
+            className="p-2 rounded-full bg-gray-300 dark:bg-gray-700 hover:bg-gray-400 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-[var(--agora-accent-blue)] transition-all text-gray-800 dark:text-white"
             title={
               theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"
             }

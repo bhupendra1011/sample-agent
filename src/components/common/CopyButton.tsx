@@ -34,11 +34,11 @@ const CopyButton: React.FC<CopyButtonProps> = ({
         onMouseLeave={() => setShowTooltip(false)}
         className={`
           ml-2 px-3 py-1 text-sm rounded-md transition-all duration-200 
-          focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400
+          focus:outline-none focus:ring-2 focus:ring-agora
           ${
             copied
               ? "bg-green-500 dark:bg-green-400 hover:bg-green-600 dark:hover:bg-green-500 text-white"
-              : "bg-blue-500 dark:bg-blue-400 hover:bg-blue-600 dark:hover:bg-blue-500 text-white"
+              : "bg-agora hover:opacity-90 text-white"
           }
           ${className}
         `}
