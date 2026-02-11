@@ -12,6 +12,7 @@ import type {
 import AgoraRTM from "agora-rtm-sdk";
 import useAppStore from "@/store/useAppStore";
 import { AGORA_CONFIG } from "@/api/agoraApi";
+import { stopAgent } from "@/api/agentApi";
 import { showToast } from "@/services/uiService";
 import type { LocalAgoraTracks, HostControlMessage } from "@/types/agora";
 
@@ -813,6 +814,22 @@ export const useAgora = () => {
   // --- 7. Exposed Call Control Functions (MUST BE DEFINED AFTER cleanup helper) ---
 
   const leaveCall = useCallback(async () => {
+    // Stop AI agent and clear uploads so next session is fresh (call end / timer / logout)
+    const state = getAppStore.getState();
+    if (state.agentId) {
+      try {
+        await stopAgent(state.agentId);
+      } catch (err) {
+        console.warn("Stop agent on leave:", err);
+      }
+      state.clearAgent();
+    }
+    try {
+      await fetch("/api/upload/clear", { method: "POST" });
+    } catch (err) {
+      console.warn("Clear uploads on leave:", err);
+    }
+
     await _cleanupAgoraResources(
       localAudioTrackZustand, // Use tracks from Zustand state
       localVideoTrackZustand,

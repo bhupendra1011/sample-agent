@@ -18,6 +18,7 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
   onSendMessage,
 }) => {
   const transcriptItems = useAppStore((state) => state.transcriptItems);
+  const userSentMessages = useAppStore((state) => state.userSentMessages);
   const currentInProgressMessage = useAppStore(
     (state) => state.currentInProgressMessage
   );
@@ -52,9 +53,10 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
     setShouldAutoScroll(isNearBottom);
   }, []);
 
-  // Auto-scroll when new messages arrive (only if user is at bottom)
+  // Auto-scroll when new messages or user-sent messages arrive (only if user is at bottom)
+  const displayCount = transcriptItems.length + userSentMessages.length;
   useEffect(() => {
-    const hasNewMessage = transcriptItems.length > prevMessageLengthRef.current;
+    const hasNewMessage = displayCount > prevMessageLengthRef.current;
     const inProgressChanged =
       currentInProgressMessage?.text !== prevInProgressTextRef.current;
 
@@ -62,9 +64,9 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
       scrollToBottom();
     }
 
-    prevMessageLengthRef.current = transcriptItems.length;
+    prevMessageLengthRef.current = displayCount;
     prevInProgressTextRef.current = currentInProgressMessage?.text || "";
-  }, [transcriptItems, currentInProgressMessage, shouldAutoScroll, scrollToBottom]);
+  }, [displayCount, currentInProgressMessage, shouldAutoScroll, scrollToBottom]);
 
   const handleSendMessage = () => {
     if (!messageText.trim() && !imageFile) return;
@@ -109,6 +111,29 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
 
   const isRTMMode = transcriptionMode === "rtm";
   const canSendMessages = isRTMMode && agentRtcUid && onSendMessage;
+
+  // Merge transcript items with user-sent messages. Exclude "You" from transcript so we only
+  // show one "You" bubble per send (from userSentMessages); otherwise Agora echoes our text
+  // and we'd show the same text twice (once with image, once without).
+  type DisplayItem =
+    | { type: "transcript"; item: ITranscriptHelperItem }
+    | { type: "userMessage"; text?: string; imageUrl?: string; _time: number };
+  const agentOrOtherTranscriptItems = transcriptItems.filter(
+    (item) => item.uid !== String(localUID)
+  );
+  const displayItems: DisplayItem[] = [
+    ...agentOrOtherTranscriptItems.map((item) => ({ type: "transcript" as const, item })),
+    ...userSentMessages.map((msg) => ({
+      type: "userMessage" as const,
+      text: msg.text,
+      imageUrl: msg.imageUrl,
+      _time: msg._time,
+    })),
+  ].sort((a, b) => {
+    const timeA = a.type === "transcript" ? a.item._time : a._time;
+    const timeB = b.type === "transcript" ? b.item._time : b._time;
+    return timeA - timeB;
+  });
 
   return (
     <>
@@ -196,7 +221,7 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
           onScroll={handleScroll}
           className="flex-1 overflow-y-auto px-6 py-4 space-y-4 bg-gray-50 dark:bg-gray-900/50 scroll-smooth"
         >
-          {transcriptItems.length === 0 && !currentInProgressMessage ? (
+          {displayItems.length === 0 && !currentInProgressMessage ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500">
               <p className="text-sm">No transcript available yet.</p>
               <p className="text-xs mt-2">
@@ -207,8 +232,40 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
             </div>
           ) : (
             <>
-              {/* Render completed messages */}
-              {transcriptItems.map((item, index) => {
+              {/* Render completed messages and user-sent images */}
+              {displayItems.map((entry, index) => {
+                if (entry.type === "userMessage") {
+                  return (
+                    <div
+                      key={`user-${entry._time}-${index}`}
+                      className="flex justify-end"
+                    >
+                      <div className="max-w-[80%] rounded-lg overflow-hidden bg-blue-500 dark:bg-blue-600 text-white px-4 py-2">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-medium opacity-80">
+                            You
+                          </span>
+                          <span className="text-xs opacity-60">
+                            {formatTime(entry._time)}
+                          </span>
+                        </div>
+                        {entry.text ? (
+                          <p className="text-sm whitespace-pre-wrap break-words mb-2">
+                            {entry.text}
+                          </p>
+                        ) : null}
+                        {entry.imageUrl ? (
+                          <img
+                            src={entry.imageUrl}
+                            alt="Sent"
+                            className="max-h-48 w-auto rounded object-contain bg-black/20"
+                          />
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                }
+                const item = entry.item;
                 const isAgent = item.uid === agentRtcUid || item.uid === "0";
                 const isUser = item.uid === String(localUID);
 

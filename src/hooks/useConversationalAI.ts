@@ -15,6 +15,7 @@ import {
 import {
   ConversationalAIAPI,
   EConversationalAIAPIEvents,
+  EChatMessageType,
 } from "@/conversational-ai-api";
 import { ETranscriptHelperMode } from "@/conversational-ai-api/type";
 
@@ -44,6 +45,7 @@ export const useConversationalAI = ({
   const setCurrentInProgressMessage = useAppStore(
     (state) => state.setCurrentInProgressMessage
   );
+  const addUserSentMessage = useAppStore((state) => state.addUserSentMessage);
   const transcriptRenderMode = useAppStore((state) => state.transcriptRenderMode);
   const toolkitInitializedRef = useRef(false);
   
@@ -154,16 +156,12 @@ export const useConversationalAI = ({
     }
   }, [isAgentActive, setTranscriptItems, setCurrentInProgressMessage]);
 
-  // Send chat message (RTM mode only)
-  // Note: Without agent_rtm_uid in the join API, sending messages to the agent may not be supported.
-  // For now, we use agentRtcUid as a fallback, but this may not work until Agora adds agent_rtm_uid support.
+  // Send chat message (RTM mode only). Images are uploaded to get a URL, then sent via toolkit chat().
   const sendChatMessage = useCallback(
     async (text: string, image?: File) => {
-      // Use agentRtcUid as fallback (agent_rtm_uid not available in join API)
       const targetUid = agentRtcUid;
-      if (!rtmClient || !targetUid || transcriptionMode !== "rtm") {
-        console.error("Cannot send message: RTM not available, no agent UID, or not in RTM mode", {
-          hasRtmClient: !!rtmClient,
+      if (!targetUid || transcriptionMode !== "rtm") {
+        console.error("Cannot send message: no agent UID or not in RTM mode", {
           agentRtcUid: targetUid,
           transcriptionMode,
         });
@@ -171,54 +169,46 @@ export const useConversationalAI = ({
       }
 
       try {
-        if (
-          typeof rtmClient === "object" &&
-          rtmClient !== null &&
-          "publish" in rtmClient
-        ) {
-          const rtm = rtmClient as {
-            publish: (
-              userId: string,
-              message: string,
-              options?: { channelType?: string; customType?: string }
-            ) => Promise<void>;
-          };
+        const api = ConversationalAIAPI.getInstance();
+        const trimmedText = text.trim();
+        let imageUrl: string | undefined;
 
-          console.log("[sendChatMessage] Sending to agent UID:", targetUid, "(Note: agent_rtm_uid not available in join API)");
-
-          if (image) {
-            // Convert image to base64
-            const reader = new FileReader();
-            reader.onloadend = async () => {
-              const base64 = reader.result as string;
-              const message = {
-                uuid: `img-${Date.now()}`,
-                image_base64: base64.split(",")[1], // Remove data:image/...;base64, prefix
-              };
-              await rtm.publish(targetUid, JSON.stringify(message), {
-                channelType: "USER",
-                customType: "image.upload",
-              });
-            };
-            reader.readAsDataURL(image);
-          } else if (text.trim()) {
-            const message = {
-              priority: "interrupted",
-              interruptable: true,
-              message: text.trim(),
-            };
-            await rtm.publish(targetUid, JSON.stringify(message), {
-              channelType: "USER",
-              customType: "user.transcription",
-            });
+        if (image) {
+          const formData = new FormData();
+          formData.append("file", image);
+          const uploadRes = await fetch("/api/upload/image", {
+            method: "POST",
+            body: formData,
+          });
+          if (!uploadRes.ok) {
+            const errBody = await uploadRes.json().catch(() => ({}));
+            throw new Error((errBody as { error?: string }).error || "Image upload failed");
           }
+          const { url } = (await uploadRes.json()) as { url: string };
+          imageUrl = url;
+          await api.chat(targetUid, {
+            messageType: EChatMessageType.IMAGE,
+            uuid: crypto.randomUUID(),
+            url,
+          });
+        }
+
+        if (trimmedText) {
+          await api.chat(targetUid, {
+            messageType: EChatMessageType.TEXT,
+            text: trimmedText,
+          });
+        }
+
+        if (imageUrl || trimmedText) {
+          addUserSentMessage({ text: trimmedText || undefined, imageUrl });
         }
       } catch (error) {
         console.error("Failed to send chat message:", error);
         throw error;
       }
     },
-    [rtmClient, agentRtcUid, transcriptionMode]
+    [agentRtcUid, transcriptionMode, addUserSentMessage]
   );
 
   return {

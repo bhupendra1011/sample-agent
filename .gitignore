@@ -42,3 +42,6 @@ src/**/*.d.ts
 
 # Local docs (not committed)
 docs/
+
+# Uploaded images (runtime)
+public/uploads/

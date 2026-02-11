@@ -72,6 +72,8 @@ export interface LLMConfig {
   };
   /** MCP server configurations for tool invocation */
   mcp_servers?: MCPServerConfig[];
+  /** LLM input modalities: text only or text + image (default when omitted: ["text", "image"]) */
+  input_modalities?: ("text" | "image")[];
 }
 
 // --- TTS Vendors ---

@@ -54,7 +54,6 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ channelId }) => {
     agentSettings,
     transcriptionMode,
     sessionStartTime,
-    callEnd,
     logout,
   } = useAppStore();
 
@@ -82,11 +81,10 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ channelId }) => {
   const { leaveCall } = useAgora();
 
   const handleSessionExpired = useCallback(async () => {
-    await leaveCall();
-    callEnd();
+    await leaveCall(); // stops agent, clears uploads, runs callEnd
     logout();
     void signOut({ callbackUrl: "/" });
-  }, [leaveCall, callEnd, logout]);
+  }, [leaveCall, logout]);
 
   useEffect(() => {
     if (remainingMs <= 0 && sessionStartTime != null) {

@@ -126,15 +126,7 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
   };
 
   const handleCallEnd = async () => {
-    // Stop agent before leaving if active
-    if (isAgentActive && agentId) {
-      try {
-        await stopAgent(agentId);
-      } catch (error) {
-        console.error("Failed to stop agent on call end:", error);
-      }
-      clearAgent();
-    }
+    // leaveCall() stops agent, clears uploads, and cleans up RTC/RTM
     await leaveCall();
   };
 

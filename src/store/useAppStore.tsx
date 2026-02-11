@@ -90,6 +90,9 @@ interface AppState {
   agentRtcUid: string | null;
   transcriptItems: ITranscriptHelperItem[];
   currentInProgressMessage: ITranscriptHelperItem | null;
+  /** User-sent messages for chat preview (text and/or image per send) */
+  userSentMessages: { text?: string; imageUrl?: string; _time: number }[];
+  addUserSentMessage: (payload: { text?: string; imageUrl?: string }) => void;
   transcriptionMode: "rtc" | "rtm";
   transcriptRenderMode: ETranscriptRenderMode;
   setAgentActive: (agentId: string, agentRtcUid?: string) => void;
@@ -193,6 +196,14 @@ const useAppStore = create<AppState>((set, get) => ({
   agentRtcUid: null,
   transcriptItems: [],
   currentInProgressMessage: null,
+  userSentMessages: [],
+  addUserSentMessage: (payload) =>
+    set((state) => ({
+      userSentMessages: [
+        ...state.userSentMessages,
+        { ...payload, _time: Date.now() },
+      ],
+    })),
   transcriptionMode: "rtm",
   transcriptRenderMode: ETranscriptRenderMode.AUTO,
   setAgentActive: (agentId, agentRtcUid) =>
@@ -214,6 +225,7 @@ const useAppStore = create<AppState>((set, get) => ({
       agentRtcUid: null,
       transcriptItems: [],
       currentInProgressMessage: null,
+      userSentMessages: [],
       transcriptionMode: "rtm",
     }),
   setAgentSettings: (settings) => {
@@ -313,6 +325,7 @@ const useAppStore = create<AppState>((set, get) => ({
       agentState: EAgentState.IDLE,
       agentRtcUid: null,
       transcriptItems: [],
+      userSentMessages: [],
       transcriptionMode: "rtm",
     }),
   clearSessionStartTime: () => set({ sessionStartTime: null }),

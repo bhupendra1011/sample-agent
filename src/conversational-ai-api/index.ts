@@ -17,10 +17,13 @@ import {
   ERTCEvents,
   ERTMEvents,
   EMessageType,
+  EChatMessageType,
   NotFoundError,
 } from "./type";
+import type { IChatMessageText, IChatMessageImage } from "./type";
 
-export { EConversationalAIAPIEvents } from "./type";
+export { EConversationalAIAPIEvents, EChatMessageType } from "./type";
+export type { IChatMessageText, IChatMessageImage } from "./type";
 import type {
   ITranscriptHelperItem,
   IUserTranscription,
@@ -94,6 +97,58 @@ export class ConversationalAIAPI extends EventHelper {
 
   public setAgentRtcUid(uid: string): void {
     this.agentRtcUid = uid;
+  }
+
+  /**
+   * Send chat messages to the conversational agent (text or image by URL).
+   * For IMAGE: sends a small RTM payload { uuid, url }; the engine fetches the image from the URL.
+   * For TEXT: sends user.transcription format.
+   */
+  public async chat(
+    agentUserId: string,
+    message: IChatMessageText | IChatMessageImage
+  ): Promise<void> {
+    const rtm = this.rtmEngine as {
+      publish: (
+        userId: string,
+        message: string,
+        options?: { channelType?: string; customType?: string }
+      ) => Promise<void>;
+    } | null;
+    if (!rtm || typeof rtm.publish !== "function") {
+      throw new Error("ConversationalAIAPI: RTM engine not available or missing publish");
+    }
+
+    if (message.messageType === EChatMessageType.IMAGE) {
+      const img = message as IChatMessageImage;
+      if (!img.url) {
+        throw new Error("ConversationalAIAPI: IMAGE message must include url");
+      }
+      const payload = { uuid: img.uuid, url: img.url };
+      if (this.enableLog) {
+        console.log(`[${TAG}] chat IMAGE to ${agentUserId} uuid=${img.uuid}`);
+      }
+      await rtm.publish(agentUserId, JSON.stringify(payload), {
+        channelType: "USER",
+        customType: "image.upload",
+      });
+    } else if (message.messageType === EChatMessageType.TEXT) {
+      const textMsg = message as IChatMessageText;
+      const payload = {
+        priority: "interrupted",
+        interruptable: true,
+        message: textMsg.text ?? "",
+      };
+      if (this.enableLog) {
+        console.log(`[${TAG}] chat TEXT to ${agentUserId}`);
+      }
+      await rtm.publish(agentUserId, JSON.stringify(payload), {
+        channelType: "USER",
+        customType: "user.transcription",
+      });
+    } else {
+      throw new Error(`ConversationalAIAPI: unsupported message type`);
+    }
   }
 
   /**
