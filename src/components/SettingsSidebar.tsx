@@ -7,6 +7,7 @@ import useAppStore from "@/store/useAppStore";
 import type { AgentSettings, MCPServerConfig, MCPToolInfo } from "@/types/agora";
 import Modal from "@/components/common/Modal";
 import type { IMicrophoneAudioTrack } from "agora-rtc-sdk-ng";
+import { HEYGEN_AVATAR_GROUPS, HEYGEN_DEFAULT_AVATAR_ID } from "@/constants/heygenAvatars";
 
 type SettingsTab = "ai-agent" | "voice" | "mcp-server";
 
@@ -341,7 +342,7 @@ const getDefaultAvatarParams = (
         api_key: getEnvVar("HEYGEN_API_KEY"),
         quality: (getEnvVar("HEYGEN_QUALITY", "medium") || "medium") as "low" | "medium" | "high",
         agora_uid: "",
-        avatar_id: getEnvVar("HEYGEN_AVATAR_ID"),
+        avatar_id: HEYGEN_DEFAULT_AVATAR_ID,
         disable_idle_timeout: false,
         activity_idle_timeout: 60,
       };
@@ -1794,14 +1795,24 @@ const AgentSettingsSidebarContent: React.FC<{
               </FormField>
 
               <FormField
-                label="Avatar ID"
-                hint="Optional - unique identifier for HeyGen avatar"
+                label="Avatar"
+                required
+                hint="Choose a HeyGen avatar character"
               >
-                <Input
-                  value={getAvatarParam("avatar_id")}
+                <Select
+                  value={getAvatarParam("avatar_id") || HEYGEN_DEFAULT_AVATAR_ID}
                   onChange={(e) => setAvatarParam("avatar_id", e.target.value)}
-                  placeholder="HeyGen avatar ID (optional)"
-                />
+                >
+                  {HEYGEN_AVATAR_GROUPS.map((group) => (
+                    <optgroup key={group.group} label={group.group}>
+                      {group.options.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </Select>
               </FormField>
 
               <FormField

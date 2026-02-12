@@ -88,6 +88,8 @@ interface AppState {
   agentSettings: AgentSettings | null;
   agentState: EAgentState;
   agentRtcUid: string | null;
+  /** When avatar is enabled, the avatar joins with this RTC UID (e.g. 999999). Used to show avatar video in the agent tile. */
+  agentAvatarRtcUid: string | null;
   transcriptItems: ITranscriptHelperItem[];
   currentInProgressMessage: ITranscriptHelperItem | null;
   /** User-sent messages for chat preview (text and/or image per send) */
@@ -95,7 +97,7 @@ interface AppState {
   addUserSentMessage: (payload: { text?: string; imageUrl?: string }) => void;
   transcriptionMode: "rtc" | "rtm";
   transcriptRenderMode: ETranscriptRenderMode;
-  setAgentActive: (agentId: string, agentRtcUid?: string) => void;
+  setAgentActive: (agentId: string, agentRtcUid?: string, avatarRtcUid?: string) => void;
   setAgentLoading: (loading: boolean) => void;
   setAgentUpdating: (updating: boolean) => void;
   clearAgent: () => void;
@@ -194,6 +196,7 @@ const useAppStore = create<AppState>((set, get) => ({
   agentSettings: null,
   agentState: EAgentState.IDLE,
   agentRtcUid: null,
+  agentAvatarRtcUid: null,
   transcriptItems: [],
   currentInProgressMessage: null,
   userSentMessages: [],
@@ -206,10 +209,11 @@ const useAppStore = create<AppState>((set, get) => ({
     })),
   transcriptionMode: "rtm",
   transcriptRenderMode: ETranscriptRenderMode.AUTO,
-  setAgentActive: (agentId, agentRtcUid) =>
+  setAgentActive: (agentId, agentRtcUid, avatarRtcUid) =>
     set({
       agentId,
       agentRtcUid: agentRtcUid || null,
+      agentAvatarRtcUid: avatarRtcUid ?? null,
       isAgentActive: true,
       isAgentLoading: false,
     }),
@@ -223,6 +227,7 @@ const useAppStore = create<AppState>((set, get) => ({
       isAgentUpdating: false,
       agentState: EAgentState.IDLE,
       agentRtcUid: null,
+      agentAvatarRtcUid: null,
       transcriptItems: [],
       currentInProgressMessage: null,
       userSentMessages: [],
@@ -324,6 +329,7 @@ const useAppStore = create<AppState>((set, get) => ({
       isAgentUpdating: false,
       agentState: EAgentState.IDLE,
       agentRtcUid: null,
+      agentAvatarRtcUid: null,
       transcriptItems: [],
       userSentMessages: [],
       transcriptionMode: "rtm",

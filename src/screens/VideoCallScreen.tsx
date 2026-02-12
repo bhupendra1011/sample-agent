@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import useAppStore from "@/store/useAppStore";
@@ -14,7 +14,7 @@ import Button from "@/components/common/Button";
 import MeetingAuthHeader from "@/components/MeetingAuthHeader";
 import { useAgora } from "@/hooks/useAgora";
 import { useConversationalAI } from "@/hooks/useConversationalAI";
-import type { IAgoraRTCRemoteUser } from "agora-rtc-sdk-ng";
+import type { IAgoraRTCRemoteUser, IRemoteVideoTrack } from "agora-rtc-sdk-ng";
 import { MdWbSunny, MdDarkMode, MdTimer } from "react-icons/md";
 
 const SESSION_DURATION_MS = 15 * 60 * 1000; // 15 minutes
@@ -24,6 +24,40 @@ function formatRemaining(ms: number): string {
   const m = Math.floor(totalSeconds / 60);
   const s = totalSeconds % 60;
   return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+/** Dedicated tile that only shows avatar video + name overlay (no icon/state toggle). */
+function AvatarVideoTile({
+  videoTrack,
+  agentName,
+}: {
+  videoTrack: IRemoteVideoTrack;
+  agentName: string;
+}) {
+  const videoContainerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (videoContainerRef.current && videoTrack) {
+      videoTrack.play(videoContainerRef.current);
+      return () => {
+        videoTrack.stop();
+      };
+    }
+  }, [videoTrack]);
+  return (
+    <div className="relative bg-agora-accent-blue rounded-lg overflow-hidden h-full w-full flex flex-col items-center justify-center text-white agent-tile-vintage">
+      <div
+        ref={videoContainerRef}
+        className="absolute inset-0 w-full h-full rounded-lg bg-black"
+        aria-hidden
+      />
+      <div className="absolute inset-0 rounded-lg bg-gradient-to-t from-black/25 via-transparent to-black/5 pointer-events-none" aria-hidden />
+      <div className="absolute bottom-2 left-2 right-2 z-10 flex justify-start">
+        <div className="w-fit max-w-full bg-gray-900/80 dark:bg-gray-800/80 backdrop-blur-sm px-3 py-1.5 rounded-md text-sm shadow-md">
+          <span className="font-medium truncate block">{agentName}</span>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 interface VideoCallScreenProps {
@@ -51,6 +85,7 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ channelId }) => {
     isAgentActive,
     agentState,
     agentRtcUid,
+    agentAvatarRtcUid,
     agentSettings,
     transcriptionMode,
     sessionStartTime,
@@ -101,6 +136,7 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ channelId }) => {
   const {
     localTracks,
     remoteUsers,
+    avatarVideoTrack: hookAvatarVideoTrack,
     sendHostControlRequest,
     acceptUnmuteRequest,
     declineUnmuteRequest,
@@ -262,8 +298,17 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ channelId }) => {
                   );
                 }
 
+                // Avatar video track comes directly from useAgora (tracked independently, like the sample)
+                // No need to look it up in remoteUsers - it's set directly from user-published events
+
+                // Exclude agent (0) and avatar (999999) UIDs from "other" tiles; they are shown in the single agent tile
+                const agentAndAvatarUids = new Set<string>();
+                if (agentRtcUid) agentAndAvatarUids.add(agentRtcUid);
+                if (agentAvatarRtcUid) agentAndAvatarUids.add(agentAvatarRtcUid);
                 remoteUsers.forEach((user: IAgoraRTCRemoteUser) => {
-                  const participantInfo = remoteParticipants[String(user.uid)];
+                  const uidStr = String(user.uid);
+                  if (agentAndAvatarUids.has(uidStr)) return;
+                  const participantInfo = remoteParticipants[uidStr];
                   allTiles.push(
                     <VideoTile
                       key={user.uid}
@@ -277,17 +322,29 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ channelId }) => {
                   );
                 });
 
-                // Add Agent Tile if agent is active
+                // Agent: separate render paths — dedicated avatar video tile vs normal/waiting AgentTile
                 if (isAgentActive && agentRtcUid) {
-                  allTiles.push(
-                    <AgentTile
-                      key={`agent-${agentRtcUid}`}
-                      agentUid={agentRtcUid}
-                      agentState={agentState}
-                      agentName={agentSettings?.name || "AI Agent"}
-                      transcriptionMode={transcriptionMode}
-                    />
-                  );
+                  if (agentAvatarRtcUid && hookAvatarVideoTrack) {
+                    allTiles.push(
+                      <AvatarVideoTile
+                        key={`agent-avatar-${agentRtcUid}`}
+                        videoTrack={hookAvatarVideoTrack}
+                        agentName={agentSettings?.name || "AI Agent"}
+                      />
+                    );
+                  } else {
+                    allTiles.push(
+                      <AgentTile
+                        key={`agent-${agentRtcUid}`}
+                        agentUid={agentRtcUid}
+                        agentState={agentState}
+                        agentName={agentSettings?.name || "AI Agent"}
+                        transcriptionMode={transcriptionMode}
+                        videoTrack={null}
+                        avatarWaiting={!!(agentAvatarRtcUid && !hookAvatarVideoTrack)}
+                      />
+                    );
+                  }
                 }
 
                 const count = allTiles.length;
@@ -359,24 +416,38 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ channelId }) => {
                 </div>
               )}
 
-              {remoteUsers.map((user: IAgoraRTCRemoteUser) => {
-                const participantInfo = remoteParticipants[String(user.uid)];
-                return (
-                  <div
-                    key={user.uid}
-                    className="aspect-video rounded-lg overflow-hidden"
-                  >
-                    <VideoTile
-                      uid={user.uid}
-                      name={participantInfo?.name || `User ${user.uid}`}
-                      isLocal={false}
-                      track={user.videoTrack || null}
-                      micMuted={participantInfo?.micMuted || true}
-                      videoMuted={participantInfo?.videoMuted || true}
-                    />
-                  </div>
-                );
-              })}
+              {remoteUsers
+                .filter((user) => {
+                  const uidStr = String(user.uid);
+                  if (agentRtcUid && uidStr === agentRtcUid) return false;
+                  if (agentAvatarRtcUid && uidStr === agentAvatarRtcUid) return false;
+                  if (isAgentActive && agentAvatarRtcUid && user.videoTrack) {
+                    const dedicated = remoteUsers.find((u) => String(u.uid) === agentAvatarRtcUid);
+                    if (!dedicated?.videoTrack) {
+                      const fallback = remoteUsers.find((u) => u.videoTrack);
+                      if (fallback && String(fallback.uid) === uidStr) return false;
+                    }
+                  }
+                  return true;
+                })
+                .map((user: IAgoraRTCRemoteUser) => {
+                  const participantInfo = remoteParticipants[String(user.uid)];
+                  return (
+                    <div
+                      key={user.uid}
+                      className="aspect-video rounded-lg overflow-hidden"
+                    >
+                      <VideoTile
+                        uid={user.uid}
+                        name={participantInfo?.name || `User ${user.uid}`}
+                        isLocal={false}
+                        track={user.videoTrack || null}
+                        micMuted={participantInfo?.micMuted || true}
+                        videoMuted={participantInfo?.videoMuted || true}
+                      />
+                    </div>
+                  );
+                })}
             </div>
           </div>
         )}

@@ -161,7 +161,7 @@ export async function POST(request: NextRequest) {
       token: agentRtcToken,
       agent_rtc_uid: String(agentUid),
       remote_rtc_uids: remoteRtcUids,
-      enable_string_uid: true,
+      enable_string_uid: false,
       idle_timeout: agentSettings.idle_timeout || 30,
       llm: llmPayload,
       tts: ttsPayload,
@@ -220,10 +220,14 @@ export async function POST(request: NextRequest) {
       };
     }
 
+    // Avatar RTC UID for client (returned when avatar is enabled)
+    let avatarRtcUidReturn: string | null = null;
+
     // Add avatar configuration if enabled
     if (avatar?.enable) {
       // Use a distinct avatar UID (999999) to avoid conflicts with agent (0) or user
       const avatarUid = 999999;
+      avatarRtcUidReturn = String(avatarUid);
       const avatarRtcToken = RtcTokenBuilder.buildTokenWithUid(
         APP_ID,
         APP_CERTIFICATE,
@@ -257,12 +261,29 @@ export async function POST(request: NextRequest) {
           disable_idle_timeout?: boolean;
           activity_idle_timeout?: number;
         };
-        avatarParams.api_key =
+        const heygenApiKey =
           heygenParams.api_key || process.env.HEYGEN_API_KEY || process.env.NEXT_PUBLIC_HEYGEN_API_KEY || "";
+        const heygenAvatarId = heygenParams.avatar_id ?? "";
+        if (!heygenApiKey.trim()) {
+          console.warn("[Agent invite] HeyGen avatar enabled but api_key is missing. Set HEYGEN_API_KEY or pass avatar.params.api_key.");
+          return NextResponse.json(
+            { error: "HeyGen avatar requires api_key. Set HEYGEN_API_KEY or configure avatar.params.api_key." },
+            { status: 400 }
+          );
+        }
+        if (!heygenAvatarId.trim()) {
+          console.warn("[Agent invite] HeyGen avatar enabled but avatar_id is missing. Select an avatar from the settings panel.");
+          return NextResponse.json(
+            { error: "HeyGen avatar requires avatar_id. Please select an avatar from the settings panel." },
+            { status: 400 }
+          );
+        }
+        avatarParams.api_key = heygenApiKey;
         avatarParams.quality = heygenParams.quality || process.env.NEXT_PUBLIC_HEYGEN_QUALITY || "medium";
-        avatarParams.avatar_id = heygenParams.avatar_id ?? process.env.NEXT_PUBLIC_HEYGEN_AVATAR_ID ?? "";
+        avatarParams.avatar_id = heygenAvatarId;
         avatarParams.disable_idle_timeout = heygenParams.disable_idle_timeout ?? false;
         avatarParams.activity_idle_timeout = heygenParams.activity_idle_timeout ?? 60;
+        // HeyGen avatars only support TTS at 24,000 Hz. Ensure TTS is configured for 24k when using HeyGen.
       }
 
       propertiesPayload.avatar = {
@@ -335,11 +356,15 @@ export async function POST(request: NextRequest) {
 
     console.log("Agent started successfully with ID:", responseData.agent_id);
 
-    return NextResponse.json({
+    const response: { agentId: string; status: string; agentRtcUid: string; avatarRtcUid?: string } = {
       agentId: responseData.agent_id,
       status: responseData.status,
       agentRtcUid: String(agentUid),
-    });
+    };
+    if (avatarRtcUidReturn != null) {
+      response.avatarRtcUid = avatarRtcUidReturn;
+    }
+    return NextResponse.json(response);
   } catch (error) {
     console.error("Agent invite error:", error);
     return NextResponse.json(

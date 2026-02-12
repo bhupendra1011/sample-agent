@@ -68,12 +68,21 @@ export const useAgora = () => {
     (state) => state.setScreenShareStatus
   );
   const callEnd = useAppStore((state) => state.callEnd);
+  const isAgentActive = useAppStore((state) => state.isAgentActive);
+  const agentAvatarRtcUid = useAppStore((state) => state.agentAvatarRtcUid);
 
   // --- 2. Local React States (useState) and Refs (useRef) ---
   const [remoteUsers, setRemoteUsers] = useState<IAgoraRTCRemoteUser[]>([]);
   const remoteUsersRef = useRef<Record<string, IAgoraRTCRemoteUser>>({});
   // Track which remote users have been counted to prevent double counting
   const countedUsersRef = useRef<Set<string>>(new Set());
+
+  // Dedicated avatar video track - tracked independently from remoteUsers to avoid
+  // race conditions with the effect system that can wipe remoteUsers state.
+  // This mirrors the pattern from the react-video-client-avatar sample where
+  // remoteVideoTrack is a standalone state variable set directly from user-published.
+  const [avatarVideoTrack, setAvatarVideoTrack] = useState<import("agora-rtc-sdk-ng").IRemoteVideoTrack | null>(null);
+  const [avatarAudioTrack, setAvatarAudioTrack] = useState<import("agora-rtc-sdk-ng").IRemoteAudioTrack | null>(null);
 
   const localTracksRef = useRef<LocalAgoraTracks>({
     audioTrack: null,
@@ -88,6 +97,10 @@ export const useAgora = () => {
       mediaType: "video" | "audio"
     ) => {
       console.log("User published:", user.uid, mediaType);
+      const avatarUid = getAppStore.getState().agentAvatarRtcUid;
+      if (avatarUid && String(user.uid) === avatarUid) {
+        console.log("[Avatar] Remote stream published: uid", avatarUid, "mediaType:", mediaType);
+      }
 
       try {
         // Subscribe to the user's tracks
@@ -95,13 +108,28 @@ export const useAgora = () => {
         console.log("Successfully subscribed to user:", user.uid, mediaType);
 
         // IMPORTANT: Play audio track immediately after subscribing
-        // Remote audio tracks must be explicitly played to be heard
+        // Remote audio tracks must be explicitly played to be heard (e.g. agent TTS)
         if (mediaType === "audio" && user.audioTrack) {
           user.audioTrack.play();
+          if (typeof user.audioTrack.setVolume === "function") {
+            user.audioTrack.setVolume(100);
+          }
           console.log("Playing audio track for user:", user.uid);
         }
 
         const userUidStr = String(user.uid);
+
+        // Track avatar tracks independently (bypasses remoteUsers state race conditions)
+        if (avatarUid && userUidStr === avatarUid) {
+          if (mediaType === "video" && user.videoTrack) {
+            console.log("[Avatar] Setting avatar video track for uid:", avatarUid);
+            setAvatarVideoTrack(user.videoTrack);
+          }
+          if (mediaType === "audio" && user.audioTrack) {
+            console.log("[Avatar] Setting avatar audio track for uid:", avatarUid);
+            setAvatarAudioTrack(user.audioTrack);
+          }
+        }
 
         // Count user on FIRST publish event (audio or video) to prevent missed counts
         const shouldIncrementCount = !countedUsersRef.current.has(userUidStr);
@@ -159,6 +187,12 @@ export const useAgora = () => {
     (user: IAgoraRTCRemoteUser, mediaType: "video" | "audio") => {
       console.log("User unpublished:", user.uid, mediaType);
 
+      const avatarUid = getAppStore.getState().agentAvatarRtcUid;
+      if (avatarUid && String(user.uid) === avatarUid) {
+        if (mediaType === "video") setAvatarVideoTrack(null);
+        if (mediaType === "audio") setAvatarAudioTrack(null);
+      }
+
       if (mediaType === "video") {
         setRemoteUsers((prev) => {
           delete remoteUsersRef.current[String(user.uid)];
@@ -179,6 +213,13 @@ export const useAgora = () => {
     (user: IAgoraRTCRemoteUser) => {
       console.log("User left:", user.uid);
       const userUidStr = String(user.uid);
+
+      // Clear avatar tracks if this was the avatar user
+      const avatarUid = getAppStore.getState().agentAvatarRtcUid;
+      if (avatarUid && userUidStr === avatarUid) {
+        setAvatarVideoTrack(null);
+        setAvatarAudioTrack(null);
+      }
 
       // Remove from remote users
       delete remoteUsersRef.current[userUidStr];
@@ -897,8 +938,10 @@ export const useAgora = () => {
           }
         }
 
-        // Reset remote users state and counted users
+        // Reset remote users state, avatar tracks, and counted users
         setRemoteUsers([]);
+        setAvatarVideoTrack(null);
+        setAvatarAudioTrack(null);
         remoteUsersRef.current = {};
         countedUsersRef.current.clear();
 
@@ -985,7 +1028,9 @@ export const useAgora = () => {
     getRtcClient().on("user-left", handleUserLeft);
 
     // Sync existing remote users from RTC_CLIENT into local state
-    // This handles the case where users published before this hook instance mounted
+    // This handles the case where users published before this hook instance mounted.
+    // Merge by uid: add any client user not already in prev (do not use ref to decide;
+    // otherwise we can overwrite prev with [] when ref was set by handleUserPublished before state flushed).
     if (getRtcClient().connectionState === "CONNECTED") {
       const existingRemoteUsers = getRtcClient().remoteUsers;
       if (existingRemoteUsers.length > 0) {
@@ -993,9 +1038,12 @@ export const useAgora = () => {
           const newUsers = [...prev];
           existingRemoteUsers.forEach((user) => {
             const uidStr = String(user.uid);
-            if (!remoteUsersRef.current[uidStr]) {
+            const inPrev = newUsers.some((u) => String(u.uid) === uidStr);
+            if (!inPrev) {
               remoteUsersRef.current[uidStr] = user;
               newUsers.push(user);
+            } else {
+              remoteUsersRef.current[uidStr] = user;
             }
           });
           return newUsers;
@@ -1010,6 +1058,95 @@ export const useAgora = () => {
       getRtcClient().removeAllListeners("user-left");
     };
   }, [handleUserPublished, handleUserUnpublished, handleUserLeft]);
+
+  // When agent is active, proactively ensure all remote users' audio is played (agent TTS may publish after join; catch missed or late user-published)
+  useEffect(() => {
+    if (!isAgentActive) return;
+    const client = getRtcClient();
+    if (client.connectionState !== "CONNECTED") return;
+    const interval = setInterval(() => {
+      const remotes = client.remoteUsers;
+      remotes.forEach((user) => {
+        const track = user.audioTrack;
+        if (track) {
+          if (!track.isPlaying) {
+            track.play();
+            if (typeof track.setVolume === "function") track.setVolume(100);
+            console.log("[useAgora] Proactively playing remote audio for user:", user.uid);
+          }
+        }
+      });
+    }, 2000);
+    const timeout = setTimeout(() => clearInterval(interval), 30000);
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [isAgentActive]);
+
+  // --- Single effect: clear then retroactively capture avatar tracks ---
+  // Always clear first (handles stop/disable/reinvite). If avatar is enabled, then retroactively
+  // capture tracks so we don't have a second effect wiping them.
+  useEffect(() => {
+    setAvatarVideoTrack(null);
+    setAvatarAudioTrack(null);
+
+    if (!agentAvatarRtcUid) return;
+
+    console.log("[Avatar] agentAvatarRtcUid set to:", agentAvatarRtcUid, "- checking for existing remote user tracks");
+
+    const checkAndCapture = () => {
+      try {
+        const client = getRtcClient();
+        if (client.connectionState !== "CONNECTED") return false;
+
+        const avatarUser = client.remoteUsers.find(
+          (u) => String(u.uid) === agentAvatarRtcUid
+        );
+
+        if (!avatarUser) {
+          console.log("[Avatar] User", agentAvatarRtcUid, "not yet in remoteUsers, will retry");
+          return false;
+        }
+
+        let captured = false;
+        if (avatarUser.videoTrack) {
+          console.log("[Avatar] Retroactively captured video track for uid:", agentAvatarRtcUid);
+          setAvatarVideoTrack(avatarUser.videoTrack);
+          captured = true;
+        }
+        if (avatarUser.audioTrack) {
+          console.log("[Avatar] Retroactively captured audio track for uid:", agentAvatarRtcUid);
+          setAvatarAudioTrack(avatarUser.audioTrack);
+          if (!avatarUser.audioTrack.isPlaying) {
+            avatarUser.audioTrack.play();
+            if (typeof avatarUser.audioTrack.setVolume === "function") {
+              avatarUser.audioTrack.setVolume(100);
+            }
+          }
+          captured = true;
+        }
+        return captured;
+      } catch {
+        return false;
+      }
+    };
+
+    if (checkAndCapture()) return;
+
+    const interval = setInterval(() => {
+      if (checkAndCapture()) {
+        clearInterval(interval);
+      }
+    }, 500);
+
+    const timeout = setTimeout(() => clearInterval(interval), 15000);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [agentAvatarRtcUid]);
 
   const updateLocalMediaState = async () => {
     try {
@@ -1120,6 +1257,9 @@ export const useAgora = () => {
       videoTrack: localVideoTrackZustand,
     },
     remoteUsers: remoteUsers,
+    // Avatar tracks tracked independently from remoteUsers (like the react-video-client-avatar sample)
+    avatarVideoTrack,
+    avatarAudioTrack,
     startScreenshare,
     stopScreenshare,
     isScreenSharing,

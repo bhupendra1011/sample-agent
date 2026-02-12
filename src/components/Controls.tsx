@@ -186,8 +186,8 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
     setAgentLoading(true);
     try {
       const result = await inviteAgent(channelId, localUID, agentSettings);
-      // Agent UID is typically "0" (as set in backend)
-      setAgentActive(result.agentId, result.agentRtcUid || "0");
+      // Agent UID is typically "0"; when avatar is enabled, avatarRtcUid is e.g. "999999"
+      setAgentActive(result.agentId, result.agentRtcUid || "0", result.avatarRtcUid);
       // Ensure transcription mode is set based on current settings
       const mode = agentSettings?.advanced_features?.enable_rtm ? "rtm" : "rtc";
       useAppStore.getState().setTranscriptionMode(mode);

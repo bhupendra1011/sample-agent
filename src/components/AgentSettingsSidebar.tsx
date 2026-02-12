@@ -31,6 +31,7 @@ import {
   ASR_PRESETS,
   SUPPORTED_LANGUAGES,
 } from "@/types/agora";
+import { HEYGEN_AVATAR_GROUPS, HEYGEN_DEFAULT_AVATAR_ID } from "@/constants/heygenAvatars";
 
 interface AgentSettingsSidebarProps {
   isOpen: boolean;
@@ -196,7 +197,7 @@ const getDefaultAvatarParams = (
         quality: (getEnvVar("HEYGEN_QUALITY", "medium") ||
           "medium") as "low" | "medium" | "high",
         agora_uid: "", // Will be set by server
-        avatar_id: getEnvVar("HEYGEN_AVATAR_ID"),
+        avatar_id: HEYGEN_DEFAULT_AVATAR_ID,
         disable_idle_timeout: false,
         activity_idle_timeout: 60,
       };
@@ -1250,17 +1251,27 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
                 </FormField>
 
                 <FormField
-                  label="Avatar ID"
-                  hint="Optional - unique identifier for HeyGen avatar"
-                  tooltip="Optional HeyGen avatar identifier."
+                  label="Avatar"
+                  required
+                  hint="Choose a HeyGen avatar character"
+                  tooltip="Select one of the available HeyGen public avatars."
                 >
-                  <Input
-                    value={getAvatarParam("avatar_id")}
+                  <Select
+                    value={getAvatarParam("avatar_id") || HEYGEN_DEFAULT_AVATAR_ID}
                     onChange={(e) =>
                       setAvatarParam("avatar_id", e.target.value)
                     }
-                    placeholder="HeyGen avatar ID (optional)"
-                  />
+                  >
+                    {HEYGEN_AVATAR_GROUPS.map((group) => (
+                      <optgroup key={group.group} label={group.group}>
+                        {group.options.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </Select>
                 </FormField>
 
                 <FormField

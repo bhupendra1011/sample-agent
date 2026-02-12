@@ -9,7 +9,7 @@ export async function inviteAgent(
   channelName: string,
   uid: string,
   agentSettings: AgentSettings
-): Promise<{ agentId: string; status: string; agentRtcUid?: string }> {
+): Promise<{ agentId: string; status: string; agentRtcUid?: string; avatarRtcUid?: string }> {
   const response = await fetch("/api/agent/invite", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

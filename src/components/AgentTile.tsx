@@ -1,7 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useRef, useEffect } from "react";
 import { EAgentState } from "@/types/agora";
+import type { IRemoteVideoTrack } from "agora-rtc-sdk-ng";
 
 interface AgentTileProps {
   agentUid: string;
@@ -9,6 +10,10 @@ interface AgentTileProps {
   agentName?: string;
   /** When "rtc", status label (e.g. Idle) is hidden since RTC has no state updates. When "rtm", show speaking/listening etc. with animation. */
   transcriptionMode?: "rtc" | "rtm";
+  /** When provided (e.g. avatar video from remote user 999999), render the video in the tile instead of only the static icon. */
+  videoTrack?: IRemoteVideoTrack | null;
+  /** When true and no videoTrack, show a short "Waiting for avatar…" hint (avatar enabled but HeyGen not connected yet). */
+  avatarWaiting?: boolean;
 }
 
 const AgentTile: React.FC<AgentTileProps> = ({
@@ -16,8 +21,20 @@ const AgentTile: React.FC<AgentTileProps> = ({
   agentState,
   agentName = "AI Agent",
   transcriptionMode = "rtm",
+  videoTrack = null,
+  avatarWaiting = false,
 }) => {
+  const videoContainerRef = useRef<HTMLDivElement>(null);
   const isRtm = transcriptionMode === "rtm";
+
+  useEffect(() => {
+    if (videoContainerRef.current && videoTrack) {
+      videoTrack.play(videoContainerRef.current);
+      return () => {
+        videoTrack.stop();
+      };
+    }
+  }, [videoTrack]);
 
   // Animation only on the icon (never on the tile - tile stays fixed). RTM: animate by state; RTC: no state so no animation.
   const getIconAnimationClass = () => {
@@ -81,35 +98,52 @@ const AgentTile: React.FC<AgentTileProps> = ({
     }
   };
 
+  const hasVideo = Boolean(videoTrack);
+
   return (
     <div
       id={`agent-${agentUid}`}
       className="relative bg-agora-accent-blue rounded-lg overflow-hidden h-full w-full flex flex-col items-center justify-center text-white agent-tile-vintage"
     >
+      {/* Avatar video when available (e.g. HeyGen avatar stream) */}
+      {hasVideo && (
+        <div
+          ref={videoContainerRef}
+          className="absolute inset-0 w-full h-full rounded-lg bg-black"
+          aria-hidden
+        />
+      )}
       {/* Subtle dark overlay for vintage / less bright */}
       <div className="absolute inset-0 rounded-lg bg-gradient-to-t from-black/25 via-transparent to-black/5 pointer-events-none" aria-hidden />
-      {/* Agent Avatar/Icon */}
-      <div className="relative flex flex-col items-center justify-center flex-1 p-4">
-        {/* Bot Icon - animation only here, tile stays fixed; ring + shadow for contrast */}
-        <div
-          className={`w-24 h-24 rounded-full flex items-center justify-center mb-4 backdrop-blur-sm ring-2 ring-white/50 shadow-[0_4px_14px_rgba(0,0,0,0.25)] bg-white/25 dark:bg-white/20 ${getIconAnimationClass()}`}
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            className="w-12 h-12 text-white"
-            style={{ filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.4))" }}
-          >
-            <path d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1a1 1 0 011 1v3a1 1 0 01-1 1h-1v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1H2a1 1 0 01-1-1v-3a1 1 0 011-1h1a7 7 0 017-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 012-2zm-3 9a1 1 0 00-1 1v2a1 1 0 002 0v-2a1 1 0 00-1-1zm6 0a1 1 0 00-1 1v2a1 1 0 002 0v-2a1 1 0 00-1-1z" />
-          </svg>
-        </div>
+      {/* Agent Avatar/Icon - shown when no video or as overlay */}
+      <div className="relative flex flex-col items-center justify-center flex-1 p-4 z-[1]">
+        {!hasVideo && (
+          <>
+            {/* Bot Icon - animation only here, tile stays fixed; ring + shadow for contrast */}
+            <div
+              className={`w-24 h-24 rounded-full flex items-center justify-center mb-4 backdrop-blur-sm ring-2 ring-white/50 shadow-[0_4px_14px_rgba(0,0,0,0.25)] bg-white/25 dark:bg-white/20 ${getIconAnimationClass()}`}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                className="w-12 h-12 text-white"
+                style={{ filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.4))" }}
+              >
+                <path d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1a1 1 0 011 1v3a1 1 0 01-1 1h-1v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1H2a1 1 0 01-1-1v-3a1 1 0 011-1h1a7 7 0 017-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 012-2zm-3 9a1 1 0 00-1 1v2a1 1 0 002 0v-2a1 1 0 00-1-1zm6 0a1 1 0 00-1 1v2a1 1 0 002 0v-2a1 1 0 00-1-1z" />
+              </svg>
+            </div>
 
-        {/* State Animation (RTM only) */}
-        {getStateContent()}
+            {/* State Animation (RTM only) */}
+            {getStateContent()}
 
-        {/* State Label: only in RTM (RTC has no status updates) */}
-        {isRtm && (
-          <div className="mt-2 text-sm font-medium opacity-90">{getStateLabel()}</div>
+            {/* State Label: only in RTM (RTC has no status updates) */}
+            {isRtm && (
+              <div className="mt-2 text-sm font-medium opacity-90">{getStateLabel()}</div>
+            )}
+            {avatarWaiting && (
+              <div className="mt-2 text-xs opacity-80">Waiting for avatar…</div>
+            )}
+          </>
         )}
       </div>
 
