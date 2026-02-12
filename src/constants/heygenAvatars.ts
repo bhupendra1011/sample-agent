@@ -95,5 +95,5 @@ export const HEYGEN_ALL_AVATARS: HeyGenAvatarOption[] = HEYGEN_AVATAR_GROUPS.fla
   (g) => g.options
 );
 
-/** Default avatar ID (first character avatar) */
-export const HEYGEN_DEFAULT_AVATAR_ID = CHARACTER_AVATARS.options[0].value;
+/** Default avatar ID (Shawn – Therapist) */
+export const HEYGEN_DEFAULT_AVATAR_ID = "Shawn_Therapist_public";

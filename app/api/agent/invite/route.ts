@@ -250,9 +250,25 @@ export async function POST(request: NextRequest) {
           api_key?: string;
           avatar_id?: string;
         };
-        avatarParams.api_key =
-          akoolParams.api_key || process.env.AKOOL_API_KEY || "";
-        avatarParams.avatar_id = akoolParams.avatar_id || "";
+        const akoolApiKey =
+          akoolParams.api_key?.trim() || process.env.AKOOL_API_KEY?.trim() || "";
+        const akoolAvatarId = (akoolParams.avatar_id ?? process.env.NEXT_PUBLIC_AKOOL_AVATAR_ID ?? "").trim();
+        if (!akoolApiKey) {
+          console.warn("[Agent invite] Akool avatar enabled but api_key is missing. Set AKOOL_API_KEY or pass avatar.params.api_key.");
+          return NextResponse.json(
+            { error: "Akool avatar requires api_key. Set AKOOL_API_KEY or configure avatar.params.api_key." },
+            { status: 400 }
+          );
+        }
+        if (!akoolAvatarId) {
+          console.warn("[Agent invite] Akool avatar enabled but avatar_id is missing. Set NEXT_PUBLIC_AKOOL_AVATAR_ID or pass avatar.params.avatar_id.");
+          return NextResponse.json(
+            { error: "Akool avatar requires avatar_id. Set NEXT_PUBLIC_AKOOL_AVATAR_ID or select an avatar in settings." },
+            { status: 400 }
+          );
+        }
+        avatarParams.api_key = akoolApiKey;
+        avatarParams.avatar_id = akoolAvatarId;
       } else if (avatar.vendor === "heygen") {
         const heygenParams = avatar.params as {
           api_key?: string;

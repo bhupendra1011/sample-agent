@@ -28,12 +28,27 @@ const AgentTile: React.FC<AgentTileProps> = ({
   const isRtm = transcriptionMode === "rtm";
 
   useEffect(() => {
-    if (videoContainerRef.current && videoTrack) {
-      videoTrack.play(videoContainerRef.current);
-      return () => {
-        videoTrack.stop();
-      };
+    const container = videoContainerRef.current;
+    if (!container || !videoTrack) return;
+    videoTrack.play(container);
+
+    const setContain = (el: Element) => {
+      (el as HTMLVideoElement).style.objectFit = "contain";
+    };
+    const video = container.querySelector("video");
+    if (video) {
+      setContain(video);
     }
+    // Agora may inject <video> async; observe so we override object-fit when it appears
+    const observer = new MutationObserver(() => {
+      const v = container.querySelector("video");
+      if (v) setContain(v);
+    });
+    observer.observe(container, { childList: true, subtree: true });
+    return () => {
+      observer.disconnect();
+      videoTrack.stop();
+    };
   }, [videoTrack]);
 
   // Animation only on the icon (never on the tile - tile stays fixed). RTM: animate by state; RTC: no state so no animation.
@@ -109,7 +124,7 @@ const AgentTile: React.FC<AgentTileProps> = ({
       {hasVideo && (
         <div
           ref={videoContainerRef}
-          className="absolute inset-0 w-full h-full rounded-lg bg-black"
+          className="absolute inset-0 w-full h-full rounded-lg bg-black [&_video]:!object-contain [&_video]:!w-full [&_video]:!h-full"
           aria-hidden
         />
       )}

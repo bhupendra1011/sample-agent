@@ -36,18 +36,29 @@ function AvatarVideoTile({
 }) {
   const videoContainerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (videoContainerRef.current && videoTrack) {
-      videoTrack.play(videoContainerRef.current);
-      return () => {
-        videoTrack.stop();
-      };
-    }
+    const container = videoContainerRef.current;
+    if (!container || !videoTrack) return;
+    videoTrack.play(container);
+    const setContain = (el: Element) => {
+      (el as HTMLVideoElement).style.objectFit = "contain";
+    };
+    const video = container.querySelector("video");
+    if (video) setContain(video);
+    const observer = new MutationObserver(() => {
+      const v = container.querySelector("video");
+      if (v) setContain(v);
+    });
+    observer.observe(container, { childList: true, subtree: true });
+    return () => {
+      observer.disconnect();
+      videoTrack.stop();
+    };
   }, [videoTrack]);
   return (
     <div className="relative bg-agora-accent-blue rounded-lg overflow-hidden h-full w-full flex flex-col items-center justify-center text-white agent-tile-vintage">
       <div
         ref={videoContainerRef}
-        className="absolute inset-0 w-full h-full rounded-lg bg-black"
+        className="absolute inset-0 w-full h-full rounded-lg bg-black [&_video]:!object-contain [&_video]:!w-full [&_video]:!h-full"
         aria-hidden
       />
       <div className="absolute inset-0 rounded-lg bg-gradient-to-t from-black/25 via-transparent to-black/5 pointer-events-none" aria-hidden />

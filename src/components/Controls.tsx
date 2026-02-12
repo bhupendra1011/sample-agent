@@ -337,10 +337,20 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
           </button>
         </div>
 
-        {/* Right side - Agent controls */}
+        {/* Right side - Agent controls: message icon before Start/Stop to avoid layout shift when RTM enabled */}
         <div className="flex-1 flex justify-end items-center gap-2">
           {isHost && (
             <div className="flex items-center space-x-2">
+              {transcriptionMode === "rtm" && (
+                <button
+                  onClick={() => setIsTranscriptPanelOpen(true)}
+                  className="flex items-center justify-center w-10 h-10 rounded-lg text-gray-800 dark:text-white transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-agora hover:bg-gray-400 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={isAgentActive ? "Open Transcript" : "Transcript (start agent to chat)"}
+                  disabled={!isAgentActive}
+                >
+                  <MdMessage className="w-5 h-5" />
+                </button>
+              )}
               <button
                 onClick={handleToggleAgent}
                 disabled={isAgentLoading || isAgentUpdating}
@@ -395,15 +405,6 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
               >
                 <MdSettings className="w-5 h-5" />
               </button>
-              {isAgentActive && (
-                <button
-                  onClick={() => setIsTranscriptPanelOpen(true)}
-                  className="flex items-center justify-center w-10 h-10 rounded-lg  text-gray-800 dark:text-white transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-agora hover:bg-gray-400 dark:hover:bg-gray-600"
-                  title="Open Transcript"
-                >
-                  <MdMessage className="w-5 h-5" />
-                </button>
-              )}
             </div>
           )}
         </div>
