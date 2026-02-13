@@ -13,7 +13,12 @@ export interface VoiceSettingsPayload {
   selectedMicrophoneId: string | null;
 }
 
-type SettingsId = "agent" | "voice";
+type SettingsId = "agent" | "voice" | "customAgent";
+
+export interface CustomAgentSettingsPayload {
+  useCustomPayload: boolean;
+  customPayloadJson: string;
+}
 
 function isBrowser(): boolean {
   return typeof indexedDB !== "undefined";
@@ -53,7 +58,9 @@ export async function getAgentSettings(): Promise<AgentSettings | null> {
       };
       request.onsuccess = () => {
         db.close();
-        const row = request.result as { id: SettingsId; value: AgentSettings } | undefined;
+        const row = request.result as
+          | { id: SettingsId; value: AgentSettings }
+          | undefined;
         resolve(row?.value ?? null);
       };
     });
@@ -63,17 +70,40 @@ export async function getAgentSettings(): Promise<AgentSettings | null> {
   }
 }
 
+const MASKED_PLACEHOLDER = "***MASKED***";
+
+/** Clone settings and mask API key fields so they are never persisted. */
+function maskKeysForPersistence(settings: AgentSettings): AgentSettings {
+  const out = JSON.parse(JSON.stringify(settings)) as AgentSettings;
+  if (out.llm?.api_key?.trim()) out.llm.api_key = MASKED_PLACEHOLDER;
+  if (out.tts?.params && typeof out.tts.params === "object") {
+    const p = out.tts.params as Record<string, unknown>;
+    if (String(p.key ?? "").trim()) p.key = MASKED_PLACEHOLDER;
+  }
+  if (out.asr?.params && typeof out.asr.params === "object") {
+    const p = out.asr.params as Record<string, unknown>;
+    if (String(p.api_key ?? "").trim()) p.api_key = MASKED_PLACEHOLDER;
+    if (String(p.key ?? "").trim()) p.key = MASKED_PLACEHOLDER;
+  }
+  if (out.avatar?.params && typeof out.avatar.params === "object") {
+    const p = out.avatar.params as unknown as Record<string, unknown>;
+    if (String(p.api_key ?? "").trim()) p.api_key = MASKED_PLACEHOLDER;
+  }
+  return out;
+}
+
 /**
- * Persist agent settings to IndexedDB.
+ * Persist agent settings to IndexedDB. API keys are masked before writing.
  */
 export async function setAgentSettings(settings: AgentSettings): Promise<void> {
   if (!isBrowser()) return;
   try {
+    const toStore = maskKeysForPersistence(settings);
     const db = await openDb();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, "readwrite");
       const store = tx.objectStore(STORE_NAME);
-      const request = store.put({ id: "agent", value: settings });
+      const request = store.put({ id: "agent", value: toStore });
       request.onerror = () => {
         db.close();
         reject(request.error);
@@ -105,7 +135,9 @@ export async function getVoiceSettings(): Promise<VoiceSettingsPayload | null> {
       };
       request.onsuccess = () => {
         db.close();
-        const row = request.result as { id: SettingsId; value: VoiceSettingsPayload } | undefined;
+        const row = request.result as
+          | { id: SettingsId; value: VoiceSettingsPayload }
+          | undefined;
         resolve(row?.value ?? null);
       };
     });
@@ -118,7 +150,9 @@ export async function getVoiceSettings(): Promise<VoiceSettingsPayload | null> {
 /**
  * Persist voice settings to IndexedDB.
  */
-export async function setVoiceSettings(voice: VoiceSettingsPayload): Promise<void> {
+export async function setVoiceSettings(
+  voice: VoiceSettingsPayload,
+): Promise<void> {
   if (!isBrowser()) return;
   try {
     const db = await openDb();
@@ -137,5 +171,61 @@ export async function setVoiceSettings(voice: VoiceSettingsPayload): Promise<voi
     });
   } catch (err) {
     console.error("[settingsDb] setVoiceSettings failed:", err);
+  }
+}
+
+/**
+ * Get stored custom agent settings (toggle + masked JSON). Never contains real API keys.
+ */
+export async function getCustomAgentSettings(): Promise<CustomAgentSettingsPayload | null> {
+  if (!isBrowser()) return null;
+  try {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readonly");
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.get("customAgent" as unknown as IDBValidKey);
+      request.onerror = () => {
+        db.close();
+        reject(request.error);
+      };
+      request.onsuccess = () => {
+        db.close();
+        const row = request.result as
+          | { id: SettingsId; value: CustomAgentSettingsPayload }
+          | undefined;
+        resolve(row?.value ?? null);
+      };
+    });
+  } catch (err) {
+    console.error("[settingsDb] getCustomAgentSettings failed:", err);
+    return null;
+  }
+}
+
+/**
+ * Persist custom agent settings. customPayloadJson must already be masked (no real keys).
+ */
+export async function setCustomAgentSettings(
+  payload: CustomAgentSettingsPayload,
+): Promise<void> {
+  if (!isBrowser()) return;
+  try {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.put({ id: "customAgent", value: payload });
+      request.onerror = () => {
+        db.close();
+        reject(request.error);
+      };
+      request.onsuccess = () => {
+        db.close();
+        resolve();
+      };
+    });
+  } catch (err) {
+    console.error("[settingsDb] setCustomAgentSettings failed:", err);
   }
 }

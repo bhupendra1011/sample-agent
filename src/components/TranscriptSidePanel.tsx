@@ -112,17 +112,29 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
   const isRTMMode = transcriptionMode === "rtm";
   const canSendMessages = isRTMMode && agentRtcUid && onSendMessage;
 
-  // Merge transcript items with user-sent messages. Exclude "You" from transcript so we only
-  // show one "You" bubble per send (from userSentMessages); otherwise Agora echoes our text
-  // and we'd show the same text twice (once with image, once without).
+  // Merge transcript items with user-sent messages.
+  // Include local user's completed transcript items so spoken text persists (not only in-progress).
+  // Dedupe: when user types, we add to userSentMessages and Agora may echo as transcript—show only one.
   type DisplayItem =
     | { type: "transcript"; item: ITranscriptHelperItem }
     | { type: "userMessage"; text?: string; imageUrl?: string; _time: number };
+  const DEDUPE_MS = 15000; // same "You" text within 15s = treat as same message
+  const localTranscriptItems = transcriptItems.filter(
+    (item) => item.uid === String(localUID)
+  );
   const agentOrOtherTranscriptItems = transcriptItems.filter(
     (item) => item.uid !== String(localUID)
   );
+  const userSentSet = new Set(
+    userSentMessages.map((m) => `${(m._time / DEDUPE_MS) | 0}-${(m.text ?? "").trim()}`)
+  );
+  const localTranscriptDisplay = localTranscriptItems.filter((item) => {
+    const key = `${(item._time / DEDUPE_MS) | 0}-${(item.text ?? "").trim()}`;
+    return !userSentSet.has(key);
+  });
   const displayItems: DisplayItem[] = [
     ...agentOrOtherTranscriptItems.map((item) => ({ type: "transcript" as const, item })),
+    ...localTranscriptDisplay.map((item) => ({ type: "transcript" as const, item })),
     ...userSentMessages.map((msg) => ({
       type: "userMessage" as const,
       text: msg.text,

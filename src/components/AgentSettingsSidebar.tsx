@@ -31,7 +31,10 @@ import {
   ASR_PRESETS,
   SUPPORTED_LANGUAGES,
 } from "@/types/agora";
-import { HEYGEN_AVATAR_GROUPS, HEYGEN_DEFAULT_AVATAR_ID } from "@/constants/heygenAvatars";
+import {
+  HEYGEN_AVATAR_GROUPS,
+  HEYGEN_DEFAULT_AVATAR_ID,
+} from "@/constants/heygenAvatars";
 
 interface AgentSettingsSidebarProps {
   isOpen: boolean;
@@ -42,41 +45,45 @@ interface AgentSettingsSidebarProps {
 // Section collapse state
 type SectionKey = "llm" | "tts" | "asr" | "avatar" | "advanced";
 
-// Environment variable helpers - these must be NEXT_PUBLIC_ prefixed to work client-side
-// Note: Next.js requires explicit references, so we map known keys
+// Environment variable helpers (no API keys; server injects them from server-only env vars)
 const ENV_MAP: Record<string, string | undefined> = {
   LLM_VENDOR: process.env.NEXT_PUBLIC_LLM_VENDOR,
   TTS_VENDOR: process.env.NEXT_PUBLIC_TTS_VENDOR,
   ASR_VENDOR: process.env.NEXT_PUBLIC_ASR_VENDOR,
   LLM_URL: process.env.NEXT_PUBLIC_LLM_URL,
-  LLM_API_KEY: process.env.NEXT_PUBLIC_LLM_API_KEY,
   LLM_MODEL: process.env.NEXT_PUBLIC_LLM_MODEL,
-  MICROSOFT_TTS_KEY: process.env.NEXT_PUBLIC_MICROSOFT_TTS_KEY,
   MICROSOFT_TTS_REGION: process.env.NEXT_PUBLIC_MICROSOFT_TTS_REGION,
   MICROSOFT_TTS_VOICE: process.env.NEXT_PUBLIC_MICROSOFT_TTS_VOICE,
-  ELEVENLABS_API_KEY: process.env.NEXT_PUBLIC_ELEVENLABS_API_KEY,
   ELEVENLABS_VOICE_ID: process.env.NEXT_PUBLIC_ELEVENLABS_VOICE_ID,
   ELEVENLABS_MODEL_ID: process.env.NEXT_PUBLIC_ELEVENLABS_MODEL_ID,
   ELEVENLABS_SAMPLE_RATE: process.env.NEXT_PUBLIC_ELEVENLABS_SAMPLE_RATE,
-  OPENAI_TTS_KEY: process.env.NEXT_PUBLIC_OPENAI_TTS_KEY,
   OPENAI_TTS_MODEL: process.env.NEXT_PUBLIC_OPENAI_TTS_MODEL,
   OPENAI_TTS_VOICE: process.env.NEXT_PUBLIC_OPENAI_TTS_VOICE,
-  DEEPGRAM_API_KEY: process.env.NEXT_PUBLIC_DEEPGRAM_API_KEY,
   DEEPGRAM_URL: process.env.NEXT_PUBLIC_DEEPGRAM_URL,
   DEEPGRAM_MODEL: process.env.NEXT_PUBLIC_DEEPGRAM_MODEL,
   DEEPGRAM_LANGUAGE: process.env.NEXT_PUBLIC_DEEPGRAM_LANGUAGE,
-  MICROSOFT_ASR_KEY: process.env.NEXT_PUBLIC_MICROSOFT_ASR_KEY,
   MICROSOFT_ASR_REGION: process.env.NEXT_PUBLIC_MICROSOFT_ASR_REGION,
   ASR_LANGUAGE: process.env.NEXT_PUBLIC_ASR_LANGUAGE,
-  AKOOL_API_KEY: process.env.NEXT_PUBLIC_AKOOL_API_KEY,
   AKOOL_AVATAR_ID: process.env.NEXT_PUBLIC_AKOOL_AVATAR_ID,
-  HEYGEN_API_KEY: process.env.NEXT_PUBLIC_HEYGEN_API_KEY,
   HEYGEN_AVATAR_ID: process.env.NEXT_PUBLIC_HEYGEN_AVATAR_ID,
   HEYGEN_QUALITY: process.env.NEXT_PUBLIC_HEYGEN_QUALITY,
 };
 
 const getEnvVar = (key: string, defaultValue: string = ""): string => {
   return ENV_MAP[key] || defaultValue;
+};
+
+/** Never show API keys in the DOM; show placeholder when non-empty. */
+const maskKeyForDisplay = (key: string | undefined): string =>
+  key && String(key).trim() !== "" ? "••••••••" : "";
+
+const keyChange = (
+  newValue: string,
+  currentKey: string | undefined,
+  setKey: (k: string) => void,
+) => {
+  if (newValue === "••••••••") setKey(currentKey ?? "");
+  else setKey(newValue);
 };
 
 // Get default TTS vendor from env
@@ -101,12 +108,12 @@ const getDefaultASRVendor = (): ASRVendor => {
   return "ares";
 };
 
-// Build default TTS params based on vendor
+// Build default TTS params (API keys left empty; server injects from env)
 const getDefaultTTSParams = (vendor: TTSVendor): Record<string, unknown> => {
   switch (vendor) {
     case "elevenlabs":
       return {
-        key: getEnvVar("ELEVENLABS_API_KEY"),
+        key: "",
         voice_id: getEnvVar("ELEVENLABS_VOICE_ID"),
         model_id: getEnvVar("ELEVENLABS_MODEL_ID", "eleven_flash_v2_5"),
         sample_rate: parseInt(getEnvVar("ELEVENLABS_SAMPLE_RATE", "24000"), 10),
@@ -114,7 +121,7 @@ const getDefaultTTSParams = (vendor: TTSVendor): Record<string, unknown> => {
       };
     case "openai":
       return {
-        key: getEnvVar("OPENAI_TTS_KEY"),
+        key: "",
         model: getEnvVar("OPENAI_TTS_MODEL", "tts-1"),
         voice: getEnvVar("OPENAI_TTS_VOICE", "alloy"),
         speed: 1.0,
@@ -122,7 +129,7 @@ const getDefaultTTSParams = (vendor: TTSVendor): Record<string, unknown> => {
     case "microsoft":
     default:
       return {
-        key: getEnvVar("MICROSOFT_TTS_KEY"),
+        key: "",
         region: getEnvVar("MICROSOFT_TTS_REGION", "eastus"),
         voice_name: getEnvVar(
           "MICROSOFT_TTS_VOICE",
@@ -134,7 +141,7 @@ const getDefaultTTSParams = (vendor: TTSVendor): Record<string, unknown> => {
   }
 };
 
-// Build default ASR config based on vendor
+// Build default ASR config (API keys left empty; server injects from env)
 const getDefaultASRConfig = (vendor: ASRVendor): ASRConfig => {
   const language = getEnvVar("ASR_LANGUAGE", "en-US");
 
@@ -144,7 +151,7 @@ const getDefaultASRConfig = (vendor: ASRVendor): ASRConfig => {
         vendor: "deepgram",
         language,
         params: {
-          api_key: getEnvVar("DEEPGRAM_API_KEY"),
+          api_key: "",
           url: getEnvVar("DEEPGRAM_URL", "wss://api.deepgram.com/v1/listen"),
           model: getEnvVar("DEEPGRAM_MODEL", "nova-2"),
           language: getEnvVar("DEEPGRAM_LANGUAGE", "en"),
@@ -155,7 +162,7 @@ const getDefaultASRConfig = (vendor: ASRVendor): ASRConfig => {
         vendor: "microsoft",
         language,
         params: {
-          key: getEnvVar("MICROSOFT_ASR_KEY"),
+          key: "",
           region: getEnvVar("MICROSOFT_ASR_REGION", "eastus"),
         },
       };
@@ -180,23 +187,25 @@ const AVATAR_PRESETS: Record<AvatarVendor, { label: string; value: string }> = {
   },
 };
 
-// Build default avatar params based on vendor
+// Build default avatar params (API keys left empty; server injects from env)
 const getDefaultAvatarParams = (
   vendor: AvatarVendor,
 ): AvatarAkoolParams | AvatarHeyGenParams => {
   switch (vendor) {
     case "akool":
       return {
-        api_key: getEnvVar("AKOOL_API_KEY"),
-        agora_uid: "", // Will be set by server
+        api_key: "",
+        agora_uid: "",
         avatar_id: getEnvVar("AKOOL_AVATAR_ID"),
       };
     case "heygen":
       return {
-        api_key: getEnvVar("HEYGEN_API_KEY"),
-        quality: (getEnvVar("HEYGEN_QUALITY", "medium") ||
-          "medium") as "low" | "medium" | "high",
-        agora_uid: "", // Will be set by server
+        api_key: "",
+        quality: (getEnvVar("HEYGEN_QUALITY", "medium") || "medium") as
+          | "low"
+          | "medium"
+          | "high",
+        agora_uid: "",
         avatar_id: HEYGEN_DEFAULT_AVATAR_ID,
         disable_idle_timeout: false,
         activity_idle_timeout: 60,
@@ -213,7 +222,7 @@ const getDefaultSettings = (): AgentSettings => {
     name: `agent-${Date.now()}`,
     llm: {
       url: getEnvVar("LLM_URL", LLM_PRESETS.openai.url!),
-      api_key: getEnvVar("LLM_API_KEY"),
+      api_key: "",
       system_messages: [
         {
           role: "system",
@@ -389,9 +398,7 @@ const Toggle: React.FC<{
     <button
       onClick={() => onChange(!checked)}
       className={`relative w-11 h-6 rounded-full transition-colors ${
-        checked
-          ? "bg-agora-accent-blue"
-          : "bg-gray-300 dark:bg-gray-600"
+        checked ? "bg-agora-accent-blue" : "bg-gray-300 dark:bg-gray-600"
       }`}
     >
       <span
@@ -430,9 +437,8 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
   const [selectedASRVendor, setSelectedASRVendor] = useState<ASRVendor>(
     getDefaultASRVendor(),
   );
-  const [selectedAvatarVendor, setSelectedAvatarVendor] = useState<AvatarVendor>(
-    "heygen",
-  );
+  const [selectedAvatarVendor, setSelectedAvatarVendor] =
+    useState<AvatarVendor>("heygen");
 
   // Sync with existing settings on open
   useEffect(() => {
@@ -635,13 +641,18 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
   const setAvatarParam = (key: string, value: unknown) => {
     setSettings((prev) => {
       if (!prev.avatar) return prev;
-      const currentParams = prev.avatar.params as unknown as Record<string, unknown>;
+      const currentParams = prev.avatar.params as unknown as Record<
+        string,
+        unknown
+      >;
       const newParams = { ...currentParams, [key]: value };
       return {
         ...prev,
         avatar: {
           ...prev.avatar,
-          params: newParams as unknown as AvatarAkoolParams | AvatarHeyGenParams,
+          params: newParams as unknown as
+            | AvatarAkoolParams
+            | AvatarHeyGenParams,
         },
       };
     });
@@ -742,13 +753,17 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
             <FormField
               label="API Key"
               required
-              tooltip="Verification key for the LLM."
+              tooltip="Leave empty to use server-configured key (LLM_API_KEY in .env)."
             >
               <Input
                 type="password"
-                value={settings.llm.api_key}
-                onChange={(e) => updateLLM({ api_key: e.target.value })}
-                placeholder="sk-..."
+                value={maskKeyForDisplay(settings.llm.api_key)}
+                onChange={(e) =>
+                  keyChange(e.target.value, settings.llm.api_key, (k) =>
+                    updateLLM({ api_key: k }),
+                  )
+                }
+                placeholder="Leave empty for server key, or enter your key"
               />
             </FormField>
 
@@ -890,12 +905,20 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
               </Select>
             </FormField>
 
-            <FormField label="API Key" required>
+            <FormField
+              label="API Key"
+              required
+              hint="Leave empty to use server key (ELEVENLABS_API_KEY / MICROSOFT_TTS_KEY / OPENAI_TTS_KEY)"
+            >
               <Input
                 type="password"
-                value={getTTSParam("key")}
-                onChange={(e) => setTTSParam("key", e.target.value)}
-                placeholder="Your TTS API key"
+                value={maskKeyForDisplay(getTTSParam("key"))}
+                onChange={(e) =>
+                  keyChange(e.target.value, getTTSParam("key"), (k) =>
+                    setTTSParam("key", k),
+                  )
+                }
+                placeholder="Leave empty for server key, or enter TTS API key"
               />
             </FormField>
 
@@ -1087,12 +1110,20 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
             {/* Vendor-specific ASR fields */}
             {selectedASRVendor === "microsoft" && (
               <>
-                <FormField label="API Key" required>
+                <FormField
+                  label="API Key"
+                  required
+                  hint="Leave empty to use server key (MICROSOFT_ASR_KEY)"
+                >
                   <Input
                     type="password"
-                    value={getASRParam("key")}
-                    onChange={(e) => setASRParam("key", e.target.value)}
-                    placeholder="Azure Speech API key"
+                    value={maskKeyForDisplay(getASRParam("key"))}
+                    onChange={(e) =>
+                      keyChange(e.target.value, getASRParam("key"), (k) =>
+                        setASRParam("key", k),
+                      )
+                    }
+                    placeholder="Leave empty for server key, or Azure Speech API key"
                   />
                 </FormField>
                 <FormField label="Region" required>
@@ -1107,12 +1138,20 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
 
             {selectedASRVendor === "deepgram" && (
               <>
-                <FormField label="API Key" required>
+                <FormField
+                  label="API Key"
+                  required
+                  hint="Leave empty to use server key (DEEPGRAM_API_KEY)"
+                >
                   <Input
                     type="password"
-                    value={getASRParam("key")}
-                    onChange={(e) => setASRParam("key", e.target.value)}
-                    placeholder="Deepgram API key"
+                    value={maskKeyForDisplay(getASRParam("api_key"))}
+                    onChange={(e) =>
+                      keyChange(e.target.value, getASRParam("api_key"), (k) =>
+                        setASRParam("api_key", k),
+                      )
+                    }
+                    placeholder="Leave empty for server key, or Deepgram API key"
                   />
                 </FormField>
                 <FormField label="Model">
@@ -1146,7 +1185,9 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
                 updateAvatar({
                   enable: checked,
                   vendor: settings.avatar?.vendor || selectedAvatarVendor,
-                  params: settings.avatar?.params || getDefaultAvatarParams(selectedAvatarVendor),
+                  params:
+                    settings.avatar?.params ||
+                    getDefaultAvatarParams(selectedAvatarVendor),
                 });
               }}
               hint="Enable AI avatar for visual representation of the agent"
@@ -1155,7 +1196,9 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
             {settings.avatar?.enable && (
               <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                 <p className="text-xs text-blue-800 dark:text-blue-200">
-                  <strong>Note:</strong> When avatar is enabled, the agent subscribes only to your UID (not all participants). This is required by Agora when using AI avatars.
+                  <strong>Note:</strong> When avatar is enabled, the agent
+                  subscribes only to your UID (not all participants). This is
+                  required by Agora when using AI avatars.
                 </p>
               </div>
             )}
@@ -1199,15 +1242,23 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
               </p>
             </div>
 
-            <FormField label="API Key" required>
+            <FormField
+              label="API Key"
+              required
+              hint="Leave empty to use server key (HEYGEN_API_KEY / AKOOL_API_KEY)"
+            >
               <Input
                 type="password"
-                value={getAvatarParam("api_key")}
-                onChange={(e) => setAvatarParam("api_key", e.target.value)}
+                value={maskKeyForDisplay(getAvatarParam("api_key"))}
+                onChange={(e) =>
+                  keyChange(e.target.value, getAvatarParam("api_key"), (k) =>
+                    setAvatarParam("api_key", k),
+                  )
+                }
                 placeholder={
                   selectedAvatarVendor === "akool"
-                    ? "Akool API key"
-                    : "HeyGen API key"
+                    ? "Leave empty for server key, or enter Akool API key"
+                    : "Leave empty for server key, or enter HeyGen API key"
                 }
               />
             </FormField>
@@ -1222,9 +1273,7 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
               >
                 <Input
                   value={getAvatarParam("avatar_id")}
-                  onChange={(e) =>
-                    setAvatarParam("avatar_id", e.target.value)
-                  }
+                  onChange={(e) => setAvatarParam("avatar_id", e.target.value)}
                   placeholder="Akool avatar ID"
                 />
               </FormField>
@@ -1240,9 +1289,7 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
                 >
                   <Select
                     value={getAvatarParam("quality") || "medium"}
-                    onChange={(e) =>
-                      setAvatarParam("quality", e.target.value)
-                    }
+                    onChange={(e) => setAvatarParam("quality", e.target.value)}
                   >
                     <option value="low">Low (360p)</option>
                     <option value="medium">Medium (480p)</option>
@@ -1257,7 +1304,9 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
                   tooltip="Select one of the available HeyGen public avatars."
                 >
                   <Select
-                    value={getAvatarParam("avatar_id") || HEYGEN_DEFAULT_AVATAR_ID}
+                    value={
+                      getAvatarParam("avatar_id") || HEYGEN_DEFAULT_AVATAR_ID
+                    }
                     onChange={(e) =>
                       setAvatarParam("avatar_id", e.target.value)
                     }
@@ -1283,9 +1332,7 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
                     type="number"
                     min={0}
                     max={300}
-                    value={
-                      getAvatarParam("activity_idle_timeout") || "60"
-                    }
+                    value={getAvatarParam("activity_idle_timeout") || "60"}
                     onChange={(e) =>
                       setAvatarParam(
                         "activity_idle_timeout",
@@ -1297,14 +1344,15 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
 
                 <Toggle
                   label="Disable Idle Timeout"
-                  checked={
-                    (() => {
-                      if (!settings.avatar?.params) return false;
-                      const params = settings.avatar.params as unknown as Record<string, unknown>;
-                      const val = params["disable_idle_timeout"];
-                      return val === true || val === "true";
-                    })()
-                  }
+                  checked={(() => {
+                    if (!settings.avatar?.params) return false;
+                    const params = settings.avatar.params as unknown as Record<
+                      string,
+                      unknown
+                    >;
+                    const val = params["disable_idle_timeout"];
+                    return val === true || val === "true";
+                  })()}
                   onChange={(checked) =>
                     setAvatarParam("disable_idle_timeout", checked)
                   }

@@ -1,23 +1,43 @@
 // src/api/agentApi.ts
 import type { AgentSettings } from "@/types/agora";
 
+export interface CustomJoinPayload {
+  name: string;
+  properties: Record<string, unknown>;
+}
+
 /**
  * Invites an AI agent to the current call via the server-side API route.
- * Passes the complete AgentSettings to the API.
+ * When useCustomPayload is true, sends customJoinPayload instead of agentSettings.
  */
 export async function inviteAgent(
   channelName: string,
   uid: string,
-  agentSettings: AgentSettings
-): Promise<{ agentId: string; status: string; agentRtcUid?: string; avatarRtcUid?: string }> {
+  agentSettings: AgentSettings,
+  options?: {
+    useCustomPayload?: boolean;
+    customJoinPayload?: CustomJoinPayload;
+  },
+): Promise<{
+  agentId: string;
+  status: string;
+  agentRtcUid?: string;
+  avatarRtcUid?: string;
+}> {
+  const body: Record<string, unknown> = {
+    channelName,
+    uid,
+    agentSettings,
+  };
+  if (options?.useCustomPayload && options?.customJoinPayload) {
+    body.useCustomPayload = true;
+    body.customJoinPayload = options.customJoinPayload;
+  }
+
   const response = await fetch("/api/agent/invite", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      channelName,
-      uid,
-      agentSettings,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
@@ -35,7 +55,7 @@ export async function inviteAgent(
 export async function updateAgent(
   agentId: string,
   channelName: string,
-  agentSettings: AgentSettings
+  agentSettings: AgentSettings,
 ): Promise<{ agentId: string; status: string }> {
   const response = await fetch("/api/agent/update", {
     method: "POST",
@@ -58,7 +78,9 @@ export async function updateAgent(
 /**
  * Stops the AI agent and removes it from the call.
  */
-export async function stopAgent(agentId: string): Promise<{ success: boolean }> {
+export async function stopAgent(
+  agentId: string,
+): Promise<{ success: boolean }> {
   const response = await fetch("/api/agent/stop", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

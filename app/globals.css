@@ -53,6 +53,41 @@ body {
   /* --- END NEW --- */
 }
 
+/* Theme-aligned scrollbars (light: subtle gray; dark: dark gray to match sidebar) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(209 213 219) rgb(243 244 246);
+}
+.dark * {
+  scrollbar-color: rgb(75 85 99) rgb(31 41 55);
+}
+
+/* WebKit (Chrome, Safari, Edge) */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: rgb(243 244 246);
+}
+*::-webkit-scrollbar-thumb {
+  background: rgb(209 213 219);
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgb(156 163 175);
+}
+.dark *::-webkit-scrollbar-track {
+  background: rgb(31 41 55);
+}
+.dark *::-webkit-scrollbar-thumb {
+  background: rgb(75 85 99);
+  border-radius: 4px;
+}
+.dark *::-webkit-scrollbar-thumb:hover {
+  background: rgb(107 114 128);
+}
+
 /* Landing page staggered reveal */
 @keyframes fade-in-up {
   from {

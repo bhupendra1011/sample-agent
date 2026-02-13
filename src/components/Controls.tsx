@@ -19,8 +19,12 @@ import {
 } from "react-icons/md";
 import { useAgora } from "@/hooks/useAgora";
 import { showToast } from "@/services/uiService";
-import { setAgentSettings as persistAgentSettings } from "@/services/settingsDb";
+import {
+  setAgentSettings as persistAgentSettings,
+  getCustomAgentSettings,
+} from "@/services/settingsDb";
 import { inviteAgent, stopAgent, updateAgent } from "@/api/agentApi";
+import { sanitizeCustomJoinPayload } from "@/utils/customPayloadSanitize";
 import Modal from "@/components/common/Modal";
 import CopyButton from "@/components/common/CopyButton";
 import SettingsSidebar from "@/components/SettingsSidebar";
@@ -185,11 +189,56 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
 
     setAgentLoading(true);
     try {
-      const result = await inviteAgent(channelId, localUID, agentSettings);
-      // Agent UID is typically "0"; when avatar is enabled, avatarRtcUid is e.g. "999999"
-      setAgentActive(result.agentId, result.agentRtcUid || "0", result.avatarRtcUid);
-      // Ensure transcription mode is set based on current settings
-      const mode = agentSettings?.advanced_features?.enable_rtm ? "rtm" : "rtc";
+      const custom = await getCustomAgentSettings();
+      const useCustom =
+        custom?.useCustomPayload && custom.customPayloadJson?.trim();
+      let options:
+        | {
+            useCustomPayload?: boolean;
+            customJoinPayload?: {
+              name: string;
+              properties: Record<string, unknown>;
+            };
+          }
+        | undefined;
+      if (useCustom) {
+        try {
+          const parsed = JSON.parse(custom!.customPayloadJson!) as Record<
+            string,
+            unknown
+          >;
+          const sanitized = sanitizeCustomJoinPayload(parsed);
+          if (sanitized)
+            options = { useCustomPayload: true, customJoinPayload: sanitized };
+        } catch (e) {
+          console.warn(
+            "Custom payload JSON invalid, using normal settings:",
+            e,
+          );
+        }
+      }
+      const result = await inviteAgent(
+        channelId,
+        localUID,
+        agentSettings,
+        options,
+      );
+      setAgentActive(
+        result.agentId,
+        result.agentRtcUid || "0",
+        result.avatarRtcUid,
+      );
+      const mode = options?.useCustomPayload
+        ? (
+            options.customJoinPayload?.properties?.advanced_features as
+              | { enable_rtm?: boolean }
+              | undefined
+          )?.enable_rtm
+          ? "rtm"
+          : "rtc"
+        : agentSettings?.advanced_features?.enable_rtm
+          ? "rtm"
+          : "rtc";
       useAppStore.getState().setTranscriptionMode(mode);
       showToast("AI Agent joined the call!", "success");
     } catch (error) {
@@ -233,7 +282,10 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
       try {
         await persistAgentSettings(settings);
       } catch (err) {
-        console.error("[Controls] Failed to persist agent settings to IndexedDB:", err);
+        console.error(
+          "[Controls] Failed to persist agent settings to IndexedDB:",
+          err,
+        );
       }
 
       if (isAgentActive && agentId && channelId) {
@@ -345,7 +397,11 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
                 <button
                   onClick={() => setIsTranscriptPanelOpen(true)}
                   className="flex items-center justify-center w-10 h-10 rounded-lg text-gray-800 dark:text-white transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-agora hover:bg-gray-400 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                  title={isAgentActive ? "Open Transcript" : "Transcript (start agent to chat)"}
+                  title={
+                    isAgentActive
+                      ? "Open Transcript"
+                      : "Transcript (start agent to chat)"
+                  }
                   disabled={!isAgentActive}
                 >
                   <MdMessage className="w-5 h-5" />
