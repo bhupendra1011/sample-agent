@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { RtcTokenBuilder, RtcRole } from "agora-token";
-import type { AgentSettings } from "@/types/agora";
+import type {
+  AgentSettings,
+  TurnDetectionConfig,
+  FillerWordsConfig,
+  SalConfig,
+} from "@/types/agora";
 
 const APP_ID = process.env.NEXT_PUBLIC_AGORA_APP_ID!;
 const APP_CERTIFICATE = process.env.AGORA_APP_CERTIFICATE!;
@@ -468,14 +473,133 @@ export async function POST(request: NextRequest) {
       propertiesPayload.asr = asrPayload;
     }
 
-    // Add turn detection settings
-    if (turn_detection) {
-      propertiesPayload.turn_detection = {
-        ...(turn_detection.silence_duration_ms && {
-          silence_duration_ms: turn_detection.silence_duration_ms,
-        }),
-        ...(turn_detection.mode && { mode: turn_detection.mode }),
+    // Add turn detection (Agora v2 config format)
+    const legacyTurn = turn_detection as { silence_duration_ms?: number; mode?: string } | undefined;
+    const turnDetectionNormalized =
+      turn_detection && (turn_detection as TurnDetectionConfig).config
+        ? (turn_detection as TurnDetectionConfig)
+        : turn_detection && !(turn_detection as TurnDetectionConfig).config
+        ? ({
+            mode: "default" as const,
+            config: {
+              speech_threshold: 0.5,
+              start_of_speech: {
+                mode: "vad" as const,
+                vad_config: {
+                  interrupt_duration_ms: 160,
+                  speaking_interrupt_duration_ms: 160,
+                  prefix_padding_ms: 800,
+                },
+              },
+              end_of_speech: {
+                mode: (legacyTurn?.mode === "semantic" ? "semantic" : "vad") as "vad" | "semantic",
+                ...(legacyTurn?.mode === "semantic"
+                  ? {
+                      semantic_config: {
+                        silence_duration_ms: 320,
+                        max_wait_ms: 3000,
+                      },
+                    }
+                  : {
+                      vad_config: {
+                        silence_duration_ms: legacyTurn?.silence_duration_ms ?? 640,
+                      },
+                    }),
+              },
+            },
+          } as TurnDetectionConfig)
+        : null;
+    // Only include turn_detection when user has enabled it (draft vs apply)
+    if (agentSettings.enable_turn_detection && turnDetectionNormalized) {
+      const td = turnDetectionNormalized;
+      const cfg = td.config!;
+      const start = cfg.start_of_speech;
+      const end = cfg.end_of_speech;
+      const turnPayload: Record<string, unknown> = {
+        mode: td.mode ?? "default",
+        config: {
+          ...(cfg.speech_threshold != null && { speech_threshold: cfg.speech_threshold }),
+          ...(start && (() => {
+            const base: Record<string, unknown> = { mode: start.mode };
+            if (start.mode === "vad" && start.vad_config) {
+              base.vad_config = {
+                interrupt_duration_ms: start.vad_config.interrupt_duration_ms ?? 160,
+                speaking_interrupt_duration_ms: start.vad_config.speaking_interrupt_duration_ms ?? 160,
+                prefix_padding_ms: start.vad_config.prefix_padding_ms ?? 800,
+              };
+            }
+            if (start.mode === "keywords" && start.keywords_config) {
+              base.keywords_config = {
+                interrupt_duration_ms: start.keywords_config.interrupt_duration_ms ?? 160,
+                prefix_padding_ms: start.keywords_config.prefix_padding_ms ?? 800,
+                ...(start.keywords_config.triggered_keywords?.length && {
+                  triggered_keywords: start.keywords_config.triggered_keywords,
+                }),
+              };
+            }
+            if (start.mode === "disabled" && start.disabled_config) {
+              base.disabled_config = {
+                strategy: start.disabled_config.strategy ?? "append",
+              };
+            }
+            return { start_of_speech: base };
+          })()),
+          ...(end && (() => {
+            const base: Record<string, unknown> = { mode: end.mode };
+            if (end.mode === "vad" && end.vad_config) {
+              base.vad_config = {
+                silence_duration_ms: end.vad_config.silence_duration_ms ?? 640,
+              };
+            }
+            if (end.mode === "semantic" && end.semantic_config) {
+              base.semantic_config = {
+                silence_duration_ms: end.semantic_config.silence_duration_ms ?? 320,
+                max_wait_ms: end.semantic_config.max_wait_ms ?? 3000,
+              };
+            }
+            return { end_of_speech: base };
+          })()),
+        },
       };
+      propertiesPayload.turn_detection = turnPayload;
+    }
+
+    // Add filler words when enabled
+    const filler_words = agentSettings.filler_words as FillerWordsConfig | undefined;
+    if (filler_words?.enable) {
+      const responseWaitMs = filler_words.trigger?.fixed_time_config?.response_wait_ms ?? 1500;
+      const phrases = filler_words.content?.static_config?.phrases ?? [
+        "Please wait.",
+        "Okay.",
+        "Uh-huh.",
+      ];
+      const selectionRule = filler_words.content?.static_config?.selection_rule ?? "shuffle";
+      propertiesPayload.filler_words = {
+        enable: true,
+        trigger: {
+          mode: "fixed_time",
+          fixed_time_config: { response_wait_ms: responseWaitMs },
+        },
+        content: {
+          mode: "static",
+          static_config: {
+            phrases: phrases.length ? phrases : ["Please wait.", "Okay.", "Uh-huh."],
+            selection_rule: selectionRule,
+          },
+        },
+      };
+    }
+
+    // Add SAL only when advanced_features.enable_sal is true
+    if (advanced_features?.enable_sal) {
+      const sal = agentSettings.sal as SalConfig | undefined;
+      const salPayload: Record<string, unknown> = {
+        sal_mode: sal?.sal_mode ?? "locking",
+      };
+      if (sal?.sample_urls && Object.keys(sal.sample_urls).length > 0) {
+        salPayload.sample_urls = sal.sample_urls;
+      }
+      propertiesPayload.sal = salPayload;
     }
 
     // When image modality is enabled, RTM is required for picture messages
@@ -490,9 +614,6 @@ export async function POST(request: NextRequest) {
     const enableTools = hasMcpServers || advanced_features?.enable_tools;
     if (advanced_features || hasMcpServers || needsRtmForImage) {
       propertiesPayload.advanced_features = {
-        ...(advanced_features?.enable_mllm !== undefined && {
-          enable_mllm: advanced_features.enable_mllm,
-        }),
         // Enable RTM when explicitly set or when image modality is used (required for picture messages)
         enable_rtm:
           (needsRtmForImage || advanced_features?.enable_rtm) ?? false,

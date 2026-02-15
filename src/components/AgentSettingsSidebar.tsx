@@ -24,6 +24,11 @@ import type {
   AvatarConfig,
   AvatarAkoolParams,
   AvatarHeyGenParams,
+  TurnDetectionConfig,
+  FillerWordsConfig,
+  SalConfig,
+  TurnDetectionStartOfSpeechMode,
+  TurnDetectionEndOfSpeechMode,
 } from "@/types/agora";
 import {
   LLM_PRESETS,
@@ -247,12 +252,45 @@ const getDefaultSettings = (): AgentSettings => {
     },
     asr: getDefaultASRConfig(asrVendor),
     idle_timeout: 0,
+    enable_turn_detection: false,
     turn_detection: {
-      silence_duration_ms: 500,
-      mode: "server_vad",
+      mode: "default",
+      config: {
+        speech_threshold: 0.5,
+        start_of_speech: {
+          mode: "vad",
+          vad_config: {
+            interrupt_duration_ms: 160,
+            speaking_interrupt_duration_ms: 160,
+            prefix_padding_ms: 800,
+          },
+        },
+        end_of_speech: {
+          mode: "vad",
+          vad_config: { silence_duration_ms: 640 },
+        },
+      },
+    },
+    filler_words: {
+      enable: false,
+      trigger: {
+        mode: "fixed_time",
+        fixed_time_config: { response_wait_ms: 1500 },
+      },
+      content: {
+        mode: "static",
+        static_config: {
+          phrases: ["Please wait.", "Okay.", "Uh-huh."],
+          selection_rule: "shuffle",
+        },
+      },
+    },
+    sal: {
+      sal_mode: "locking",
+      sample_urls: {},
     },
     advanced_features: {
-      enable_mllm: false,
+      enable_sal: false,
       enable_rtm: false,
       enable_tools: false,
     },
@@ -263,6 +301,48 @@ const getDefaultSettings = (): AgentSettings => {
     },
   };
 };
+
+/** Normalize persisted settings: old turn_detection shape -> new config shape; ensure filler_words/sal exist */
+function normalizeAgentSettings(prev: AgentSettings): AgentSettings {
+  const turn = prev.turn_detection as TurnDetectionConfig & {
+    silence_duration_ms?: number;
+    mode?: string;
+  } | undefined;
+  let turn_detection: TurnDetectionConfig = prev.turn_detection ?? getDefaultSettings().turn_detection!;
+  const legacyMode = (turn as { mode?: string } | undefined)?.mode;
+  if (turn?.silence_duration_ms != null || (legacyMode && legacyMode !== "default")) {
+    const eosMode = legacyMode === "semantic" ? "semantic" : "vad";
+    turn_detection = {
+      mode: "default",
+      config: {
+        speech_threshold: 0.5,
+        start_of_speech: {
+          mode: "vad",
+          vad_config: {
+            interrupt_duration_ms: 160,
+            speaking_interrupt_duration_ms: 160,
+            prefix_padding_ms: 800,
+          },
+        },
+        end_of_speech: {
+          mode: eosMode,
+          ...(eosMode === "vad"
+            ? { vad_config: { silence_duration_ms: turn?.silence_duration_ms ?? 640 } }
+            : { semantic_config: { silence_duration_ms: 320, max_wait_ms: 3000 } }),
+        },
+      },
+    };
+  }
+  const filler_words: FillerWordsConfig = prev.filler_words ?? getDefaultSettings().filler_words!;
+  const sal: SalConfig = prev.sal ?? getDefaultSettings().sal!;
+  return {
+    ...prev,
+    enable_turn_detection: prev.enable_turn_detection ?? false,
+    turn_detection,
+    filler_words,
+    sal,
+  };
+}
 
 // Bot icon SVG component
 const BotIcon: React.FC<{ className?: string; size?: number }> = ({
@@ -318,20 +398,54 @@ const Input: React.FC<
   />
 );
 
-// Styled select
-const Select: React.FC<
-  React.SelectHTMLAttributes<HTMLSelectElement> & { error?: boolean }
-> = ({ error, className = "", children, ...props }) => (
-  <select
-    {...props}
-    className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border rounded-lg text-gray-900 dark:text-white text-sm
-      focus:outline-none focus:ring-2 focus:ring-agora-accent-blue dark:focus:ring-agora-accent-blue transition-colors
-      ${error ? "border-red-500" : "border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500"}
-      ${className}`}
-  >
-    {children}
-  </select>
-);
+// Custom styled dropdown (button + menu) for consistent look with Input
+const CustomSelect: React.FC<{
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+  error?: boolean;
+  className?: string;
+}> = ({ value, onChange, options, error, className = "" }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const selectedLabel = options.find((o) => o.value === value)?.label ?? value;
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border rounded-lg text-gray-900 dark:text-white text-sm
+          text-left flex items-center justify-between
+          focus:outline-none focus:ring-2 focus:ring-agora-accent-blue transition-colors
+          ${error ? "border-red-500" : "border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500"}
+          ${className}`}
+      >
+        <span>{selectedLabel}</span>
+        <MdExpandMore className={`transition-transform ${isOpen ? "rotate-180" : ""}`} size={20} />
+      </button>
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} aria-hidden />
+          <div className="absolute z-20 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-auto">
+            {options.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => {
+                  onChange(opt.value);
+                  setIsOpen(false);
+                }}
+                className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors
+                  ${opt.value === value ? "bg-agora-accent-blue/10 text-agora-accent-blue" : "text-gray-900 dark:text-white"}`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
 
 // Styled textarea
 const Textarea: React.FC<
@@ -390,14 +504,14 @@ const Toggle: React.FC<{
   onChange: (checked: boolean) => void;
   hint?: string;
 }> = ({ label, checked, onChange, hint }) => (
-  <div className="flex items-center justify-between py-2">
-    <div>
-      <span className="text-sm text-gray-700 dark:text-gray-300">{label}</span>
-      {hint && <p className="text-xs text-gray-500">{hint}</p>}
+  <div className="flex items-start justify-between gap-4 py-2">
+    <div className="min-w-0 w-[13rem] flex-shrink-0">
+      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{label}</span>
+      {hint && <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{hint}</p>}
     </div>
     <button
       onClick={() => onChange(!checked)}
-      className={`relative w-11 h-6 rounded-full transition-colors ${
+      className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
         checked ? "bg-agora-accent-blue" : "bg-gray-300 dark:bg-gray-600"
       }`}
     >
@@ -407,6 +521,43 @@ const Toggle: React.FC<{
         }`}
       />
     </button>
+  </div>
+);
+
+// Collapsible subsection for nested configurations
+const CollapsibleSubSection: React.FC<{
+  title: string;
+  description?: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}> = ({ title, description, isOpen, onToggle, children }) => (
+  <div className="mb-4 border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
+    <button
+      onClick={onToggle}
+      className="w-full flex items-center justify-between px-3 py-2.5 bg-gray-100 dark:bg-gray-800/70 hover:bg-gray-150 dark:hover:bg-gray-800 transition-colors text-left"
+    >
+      <div className="flex-1 min-w-0">
+        <h5 className="text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+          {title}
+        </h5>
+        {description && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+            {description}
+          </p>
+        )}
+      </div>
+      {isOpen ? (
+        <MdExpandLess className="text-gray-500 dark:text-gray-400 flex-shrink-0 ml-2" size={18} />
+      ) : (
+        <MdExpandMore className="text-gray-500 dark:text-gray-400 flex-shrink-0 ml-2" size={18} />
+      )}
+    </button>
+    {isOpen && (
+      <div className="px-3 py-3 bg-gray-50 dark:bg-gray-900/30 border-t border-gray-200 dark:border-gray-600">
+        {children}
+      </div>
+    )}
   </div>
 );
 
@@ -422,12 +573,29 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
   const [expandedSections, setExpandedSections] = useState<
     Record<SectionKey, boolean>
   >({
-    llm: true,
-    tts: true,
+    llm: false,
+    tts: false,
     asr: false,
-    avatar: true,
+    avatar: false,
     advanced: false,
   });
+  // Turn detection subsection collapse states
+  const [turnDetectionSubsections, setTurnDetectionSubsections] = useState({
+    startOfSpeech: false,
+    endOfSpeech: false,
+  });
+  // Advanced section sub-panels (Turn detection, Filler words, Features)
+  const [advancedSubsections, setAdvancedSubsections] = useState({
+    turnDetection: false,
+    fillerWords: false,
+    features: false,
+  });
+  const toggleAdvancedSubsection = (key: keyof typeof advancedSubsections) => {
+    setAdvancedSubsections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+  const toggleTurnDetectionSubsection = (key: "startOfSpeech" | "endOfSpeech") => {
+    setTurnDetectionSubsections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
   const [selectedLLMVendor, setSelectedLLMVendor] = useState<LLMVendor>(
     (getEnvVar("LLM_VENDOR", "openai") as LLMVendor) || "openai",
   );
@@ -440,10 +608,10 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
   const [selectedAvatarVendor, setSelectedAvatarVendor] =
     useState<AvatarVendor>("heygen");
 
-  // Sync with existing settings on open
+  // Sync with existing settings on open (normalize old turn_detection / ensure filler_words & sal)
   useEffect(() => {
     if (isOpen && existingSettings) {
-      setSettings(existingSettings);
+      setSettings(normalizeAgentSettings(existingSettings));
       if (existingSettings.avatar?.vendor) {
         setSelectedAvatarVendor(existingSettings.avatar.vendor);
       } else {
@@ -724,18 +892,14 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
               required
               tooltip="LLM provider selection."
             >
-              <Select
+              <CustomSelect
                 value={selectedLLMVendor}
-                onChange={(e) =>
-                  handleLLMVendorChange(e.target.value as LLMVendor)
-                }
-              >
-                {Object.entries(LLM_PRESETS).map(([key, preset]) => (
-                  <option key={key} value={key}>
-                    {preset.label}
-                  </option>
-                ))}
-              </Select>
+                onChange={(v) => handleLLMVendorChange(v as LLMVendor)}
+                options={Object.entries(LLM_PRESETS).map(([key, preset]) => ({
+                  value: key,
+                  label: preset.label,
+                }))}
+              />
             </FormField>
 
             <FormField
@@ -773,20 +937,18 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
               tooltip="Model name for the selected LLM vendor."
             >
               {LLM_PRESETS[selectedLLMVendor].models ? (
-                <Select
+                <CustomSelect
                   value={settings.llm.params?.model || ""}
-                  onChange={(e) =>
+                  onChange={(v) =>
                     updateLLM({
-                      params: { ...settings.llm.params, model: e.target.value },
+                      params: { ...settings.llm.params, model: v },
                     })
                   }
-                >
-                  {LLM_PRESETS[selectedLLMVendor].models!.map((model) => (
-                    <option key={model} value={model}>
-                      {model}
-                    </option>
-                  ))}
-                </Select>
+                  options={LLM_PRESETS[selectedLLMVendor].models!.map((model) => ({
+                    value: model,
+                    label: model,
+                  }))}
+                />
               ) : (
                 <Input
                   value={settings.llm.params?.model || ""}
@@ -891,18 +1053,14 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
             badge="Required"
           >
             <FormField label="Vendor" required>
-              <Select
+              <CustomSelect
                 value={selectedTTSVendor}
-                onChange={(e) =>
-                  handleTTSVendorChange(e.target.value as TTSVendor)
-                }
-              >
-                {Object.entries(TTS_PRESETS).map(([key, preset]) => (
-                  <option key={key} value={key}>
-                    {preset.label}
-                  </option>
-                ))}
-              </Select>
+                onChange={(v) => handleTTSVendorChange(v as TTSVendor)}
+                options={Object.entries(TTS_PRESETS).map(([key, preset]) => ({
+                  value: key,
+                  label: preset.label,
+                }))}
+              />
             </FormField>
 
             <FormField
@@ -933,17 +1091,14 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
                   />
                 </FormField>
                 <FormField label="Voice Name" required>
-                  <Select
+                  <CustomSelect
                     value={getTTSParam("voice_name")}
-                    onChange={(e) => setTTSParam("voice_name", e.target.value)}
-                  >
-                    {TTS_PRESETS.microsoft.voices?.map((voice) => (
-                      <option key={voice} value={voice}>
-                        {voice}
-                      </option>
-                    ))}
-                    <option value="">Custom...</option>
-                  </Select>
+                    onChange={(v) => setTTSParam("voice_name", v)}
+                    options={[
+                      ...(TTS_PRESETS.microsoft.voices?.map((voice) => ({ value: voice, label: voice })) ?? []),
+                      { value: "", label: "Custom..." },
+                    ]}
+                  />
                   {!getTTSParam("voice_name") && (
                     <Input
                       className="mt-2"
@@ -987,16 +1142,11 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
             {selectedTTSVendor === "elevenlabs" && (
               <>
                 <FormField label="Model" required>
-                  <Select
+                  <CustomSelect
                     value={getTTSParam("model_id")}
-                    onChange={(e) => setTTSParam("model_id", e.target.value)}
-                  >
-                    {TTS_PRESETS.elevenlabs.models?.map((model) => (
-                      <option key={model} value={model}>
-                        {model}
-                      </option>
-                    ))}
-                  </Select>
+                    onChange={(v) => setTTSParam("model_id", v)}
+                    options={(TTS_PRESETS.elevenlabs.models ?? []).map((model) => ({ value: model, label: model }))}
+                  />
                 </FormField>
                 <FormField
                   label="Voice ID"
@@ -1042,28 +1192,18 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
             {selectedTTSVendor === "openai" && (
               <>
                 <FormField label="Model" required>
-                  <Select
+                  <CustomSelect
                     value={getTTSParam("model")}
-                    onChange={(e) => setTTSParam("model", e.target.value)}
-                  >
-                    {TTS_PRESETS.openai.models?.map((model) => (
-                      <option key={model} value={model}>
-                        {model}
-                      </option>
-                    ))}
-                  </Select>
+                    onChange={(v) => setTTSParam("model", v)}
+                    options={(TTS_PRESETS.openai.models ?? []).map((model) => ({ value: model, label: model }))}
+                  />
                 </FormField>
                 <FormField label="Voice" required>
-                  <Select
+                  <CustomSelect
                     value={getTTSParam("voice")}
-                    onChange={(e) => setTTSParam("voice", e.target.value)}
-                  >
-                    {TTS_PRESETS.openai.voices?.map((voice) => (
-                      <option key={voice} value={voice}>
-                        {voice}
-                      </option>
-                    ))}
-                  </Select>
+                    onChange={(v) => setTTSParam("voice", v)}
+                    options={(TTS_PRESETS.openai.voices ?? []).map((voice) => ({ value: voice, label: voice }))}
+                  />
                 </FormField>
               </>
             )}
@@ -1080,31 +1220,25 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
               label="Vendor"
               hint="ARES is Agora's built-in ASR (no API key needed)"
             >
-              <Select
+              <CustomSelect
                 value={selectedASRVendor}
-                onChange={(e) =>
-                  handleASRVendorChange(e.target.value as ASRVendor)
-                }
-              >
-                {Object.entries(ASR_PRESETS).map(([key, preset]) => (
-                  <option key={key} value={key}>
-                    {preset.label}
-                  </option>
-                ))}
-              </Select>
+                onChange={(v) => handleASRVendorChange(v as ASRVendor)}
+                options={Object.entries(ASR_PRESETS).map(([key, preset]) => ({
+                  value: key,
+                  label: preset.label,
+                }))}
+              />
             </FormField>
 
             <FormField label="Language" required>
-              <Select
+              <CustomSelect
                 value={settings.asr?.language || "en-US"}
-                onChange={(e) => updateASR({ language: e.target.value })}
-              >
-                {SUPPORTED_LANGUAGES.map((lang) => (
-                  <option key={lang.code} value={lang.code}>
-                    {lang.label} ({lang.code})
-                  </option>
-                ))}
-              </Select>
+                onChange={(v) => updateASR({ language: v })}
+                options={SUPPORTED_LANGUAGES.map((lang) => ({
+                  value: lang.code,
+                  label: `${lang.label} (${lang.code})`,
+                }))}
+              />
             </FormField>
 
             {/* Vendor-specific ASR fields */}
@@ -1155,16 +1289,11 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
                   />
                 </FormField>
                 <FormField label="Model">
-                  <Select
+                  <CustomSelect
                     value={getASRParam("model") || "nova-3"}
-                    onChange={(e) => setASRParam("model", e.target.value)}
-                  >
-                    {ASR_PRESETS.deepgram.models?.map((model) => (
-                      <option key={model} value={model}>
-                        {model}
-                      </option>
-                    ))}
-                  </Select>
+                    onChange={(v) => setASRParam("model", v)}
+                    options={(ASR_PRESETS.deepgram.models ?? []).map((model) => ({ value: model, label: model }))}
+                  />
                 </FormField>
               </>
             )}
@@ -1208,13 +1337,12 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
               required
               tooltip="Avatar provider selection."
             >
-              <Select
+              <CustomSelect
                 value={selectedAvatarVendor}
-                onChange={(e) => {
-                  const vendor = e.target.value as AvatarVendor;
+                onChange={(v) => {
+                  const vendor = v as AvatarVendor;
                   setSelectedAvatarVendor(vendor);
                   handleAvatarVendorChange(vendor);
-                  // Auto-enable avatar when vendor is selected
                   if (!settings.avatar?.enable) {
                     updateAvatar({
                       enable: true,
@@ -1223,13 +1351,11 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
                     });
                   }
                 }}
-              >
-                {Object.entries(AVATAR_PRESETS).map(([key, preset]) => (
-                  <option key={key} value={key}>
-                    {preset.label}
-                  </option>
-                ))}
-              </Select>
+                options={Object.entries(AVATAR_PRESETS).map(([key, preset]) => ({
+                  value: key,
+                  label: preset.label,
+                }))}
+              />
             </FormField>
 
             {/* TTS Sample Rate Warning */}
@@ -1287,14 +1413,15 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
                   required
                   tooltip="Video quality: low (360p), medium (480p), high (720p)"
                 >
-                  <Select
+                  <CustomSelect
                     value={getAvatarParam("quality") || "medium"}
-                    onChange={(e) => setAvatarParam("quality", e.target.value)}
-                  >
-                    <option value="low">Low (360p)</option>
-                    <option value="medium">Medium (480p)</option>
-                    <option value="high">High (720p)</option>
-                  </Select>
+                    onChange={(v) => setAvatarParam("quality", v)}
+                    options={[
+                      { value: "low", label: "Low (360p)" },
+                      { value: "medium", label: "Medium (480p)" },
+                      { value: "high", label: "High (720p)" },
+                    ]}
+                  />
                 </FormField>
 
                 <FormField
@@ -1303,24 +1430,13 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
                   hint="Choose a HeyGen avatar character"
                   tooltip="Select one of the available HeyGen public avatars."
                 >
-                  <Select
-                    value={
-                      getAvatarParam("avatar_id") || HEYGEN_DEFAULT_AVATAR_ID
-                    }
-                    onChange={(e) =>
-                      setAvatarParam("avatar_id", e.target.value)
-                    }
-                  >
-                    {HEYGEN_AVATAR_GROUPS.map((group) => (
-                      <optgroup key={group.group} label={group.group}>
-                        {group.options.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </Select>
+                  <CustomSelect
+                    value={getAvatarParam("avatar_id") || HEYGEN_DEFAULT_AVATAR_ID}
+                    onChange={(v) => setAvatarParam("avatar_id", v)}
+                    options={HEYGEN_AVATAR_GROUPS.flatMap((group) =>
+                      group.options.map((opt) => ({ value: opt.value, label: opt.label }))
+                    )}
+                  />
                 </FormField>
 
                 <FormField
@@ -1376,83 +1492,718 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
             >
               <Input
                 type="number"
-                min={10}
+                min={0}
                 max={300}
-                value={settings.idle_timeout || 30}
+                value={settings.idle_timeout ?? 30}
                 onChange={(e) =>
                   setSettings({
                     ...settings,
-                    idle_timeout: parseInt(e.target.value) || 30,
+                    idle_timeout: parseInt(e.target.value, 10) || 0,
                   })
                 }
               />
             </FormField>
 
-            <FormField
-              label="Silence Duration (ms)"
-              hint="Wait before processing response"
-              tooltip="Milliseconds of silence before processing."
+            {/* Turn detection (Agora v2: mode + config per https://docs.agora.io/en/conversational-ai/rest-api/agent/join#properties-turn-detection) */}
+            <CollapsibleSubSection
+              title="Turn detection"
+              description="When the agent detects user speech start and end (turn_detection)"
+              isOpen={advancedSubsections.turnDetection}
+              onToggle={() => toggleAdvancedSubsection("turnDetection")}
             >
-              <Input
-                type="number"
-                min={100}
-                max={2000}
-                step={100}
-                value={settings.turn_detection?.silence_duration_ms || 500}
-                onChange={(e) =>
-                  setSettings({
-                    ...settings,
-                    turn_detection: {
-                      ...settings.turn_detection,
-                      silence_duration_ms: parseInt(e.target.value) || 500,
-                    },
-                  })
-                }
-              />
-            </FormField>
-
-            <FormField
-              label="VAD Mode"
-              tooltip="server_vad or semantic turn detection."
-            >
-              <Select
-                value={settings.turn_detection?.mode || "server_vad"}
-                onChange={(e) =>
-                  setSettings({
-                    ...settings,
-                    turn_detection: {
-                      ...settings.turn_detection,
-                      mode: e.target.value as "server_vad" | "semantic",
-                    },
-                  })
-                }
-              >
-                <option value="server_vad">Server VAD</option>
-                <option value="semantic">Semantic</option>
-              </Select>
-            </FormField>
-
-            <div className="border-t border-gray-200 dark:border-gray-700 my-4 pt-4">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                Features
-              </h4>
               <Toggle
-                label="Enable MLLM (Vision)"
-                checked={settings.advanced_features?.enable_mllm || false}
+                label="Enable turn detection"
+                checked={settings.enable_turn_detection ?? false}
+                onChange={(checked) =>
+                  setSettings({
+                    ...settings,
+                    enable_turn_detection: checked,
+                  })
+                }
+                hint="When enabled, turn_detection is sent in the join payload; when off, it is omitted so you can save a draft without applying."
+              />
+              {/* config.speech_threshold */}
+              <FormField
+                label="Speech threshold"
+                hint="0–1. Lower = easier to detect speech; higher = ignore weak sounds. Default 0.5."
+                tooltip="Voice activity detection sensitivity. Determines the sound level considered as speech."
+              >
+                <Input
+                  type="number"
+                  min={0}
+                  max={1}
+                  step={0.1}
+                  value={settings.turn_detection?.config?.speech_threshold ?? 0.5}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      turn_detection: {
+                        ...settings.turn_detection,
+                        mode: "default",
+                        config: {
+                          ...settings.turn_detection?.config,
+                          speech_threshold: parseFloat(e.target.value) || 0.5,
+                          start_of_speech:
+                            settings.turn_detection?.config?.start_of_speech ??
+                            getDefaultSettings().turn_detection!.config!.start_of_speech,
+                          end_of_speech:
+                            settings.turn_detection?.config?.end_of_speech ??
+                            getDefaultSettings().turn_detection!.config!.end_of_speech,
+                        },
+                      },
+                    })
+                  }
+                />
+              </FormField>
+
+              {/* config.start_of_speech - Collapsible */}
+              <CollapsibleSubSection
+                title="Start of speech"
+                description="When the user is considered to have started speaking"
+                isOpen={turnDetectionSubsections.startOfSpeech}
+                onToggle={() => toggleTurnDetectionSubsection("startOfSpeech")}
+              >
+                <FormField
+                  label="Mode"
+                  hint="VAD = by audio level; Keywords = trigger phrase; Disabled = do not auto-detect."
+                  tooltip="Start-of-speech detection mode."
+                >
+                  <CustomSelect
+                    value={
+                      (settings.turn_detection?.config?.start_of_speech?.mode ?? "vad") as TurnDetectionStartOfSpeechMode
+                    }
+                    onChange={(v) => {
+                      const mode = v as TurnDetectionStartOfSpeechMode;
+                      const defaults = getDefaultSettings().turn_detection!.config!;
+                      setSettings({
+                        ...settings,
+                        turn_detection: {
+                          ...settings.turn_detection,
+                          mode: "default",
+                          config: {
+                            ...settings.turn_detection?.config,
+                            start_of_speech: {
+                              mode,
+                              ...(mode === "vad" && {
+                                vad_config: settings.turn_detection?.config?.start_of_speech?.vad_config ?? defaults.start_of_speech?.vad_config ?? {
+                                  interrupt_duration_ms: 160,
+                                  speaking_interrupt_duration_ms: 160,
+                                  prefix_padding_ms: 800,
+                                },
+                              }),
+                              ...(mode === "keywords" && {
+                                keywords_config: settings.turn_detection?.config?.start_of_speech?.keywords_config ?? {
+                                  interrupt_duration_ms: 160,
+                                  prefix_padding_ms: 800,
+                                  triggered_keywords: [],
+                                },
+                              }),
+                              ...(mode === "disabled" && {
+                                disabled_config: settings.turn_detection?.config?.start_of_speech?.disabled_config ?? { strategy: "append" },
+                              }),
+                            },
+                            end_of_speech:
+                              settings.turn_detection?.config?.end_of_speech ?? defaults.end_of_speech,
+                          },
+                        },
+                      });
+                    }}
+                    options={[
+                      { value: "vad", label: "VAD" },
+                      { value: "keywords", label: "Keywords" },
+                      { value: "disabled", label: "Disabled" },
+                    ]}
+                  />
+                </FormField>
+
+                {/* VAD mode config */}
+                {(settings.turn_detection?.config?.start_of_speech?.mode ?? "vad") === "vad" && (
+                  <div className="grid grid-cols-1 gap-2 mt-3 pl-3 border-l-2 border-agora-accent-blue/30">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium">vad_config</p>
+                    <FormField
+                      label="Interrupt duration (ms)"
+                      hint="How long voice must exceed VAD threshold before speech start is detected. Default 160."
+                    >
+                      <Input
+                        type="number"
+                        min={0}
+                        value={
+                          settings.turn_detection?.config?.start_of_speech?.vad_config?.interrupt_duration_ms ?? 160
+                        }
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            turn_detection: {
+                              ...settings.turn_detection,
+                              mode: "default",
+                              config: {
+                                ...settings.turn_detection?.config,
+                                start_of_speech: {
+                                  ...settings.turn_detection?.config?.start_of_speech,
+                                  mode: "vad",
+                                  vad_config: {
+                                    ...settings.turn_detection?.config?.start_of_speech?.vad_config,
+                                    interrupt_duration_ms: parseInt(e.target.value, 10) || 160,
+                                    speaking_interrupt_duration_ms:
+                                      settings.turn_detection?.config?.start_of_speech?.vad_config?.speaking_interrupt_duration_ms ?? 160,
+                                    prefix_padding_ms:
+                                      settings.turn_detection?.config?.start_of_speech?.vad_config?.prefix_padding_ms ?? 800,
+                                  },
+                                },
+                              },
+                            },
+                          })
+                        }
+                      />
+                    </FormField>
+                    <FormField
+                      label="Speaking interrupt duration (ms)"
+                      hint="Same as above when agent is speaking (for interruption). Default 160."
+                    >
+                      <Input
+                        type="number"
+                        min={0}
+                        value={
+                          settings.turn_detection?.config?.start_of_speech?.vad_config?.speaking_interrupt_duration_ms ?? 160
+                        }
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            turn_detection: {
+                              ...settings.turn_detection,
+                              mode: "default",
+                              config: {
+                                ...settings.turn_detection?.config,
+                                start_of_speech: {
+                                  ...settings.turn_detection?.config?.start_of_speech,
+                                  mode: "vad",
+                                  vad_config: {
+                                    ...settings.turn_detection?.config?.start_of_speech?.vad_config,
+                                    interrupt_duration_ms:
+                                      settings.turn_detection?.config?.start_of_speech?.vad_config?.interrupt_duration_ms ?? 160,
+                                    speaking_interrupt_duration_ms: parseInt(e.target.value, 10) || 160,
+                                    prefix_padding_ms:
+                                      settings.turn_detection?.config?.start_of_speech?.vad_config?.prefix_padding_ms ?? 800,
+                                  },
+                                },
+                              },
+                            },
+                          })
+                        }
+                      />
+                    </FormField>
+                    <FormField
+                      label="Prefix padding (ms)"
+                      hint="Extra audio captured before detected start to avoid cutting off the beginning. Default 800."
+                    >
+                      <Input
+                        type="number"
+                        min={0}
+                        value={
+                          settings.turn_detection?.config?.start_of_speech?.vad_config?.prefix_padding_ms ?? 800
+                        }
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            turn_detection: {
+                              ...settings.turn_detection,
+                              mode: "default",
+                              config: {
+                                ...settings.turn_detection?.config,
+                                start_of_speech: {
+                                  ...settings.turn_detection?.config?.start_of_speech,
+                                  mode: "vad",
+                                  vad_config: {
+                                    ...settings.turn_detection?.config?.start_of_speech?.vad_config,
+                                    interrupt_duration_ms:
+                                      settings.turn_detection?.config?.start_of_speech?.vad_config?.interrupt_duration_ms ?? 160,
+                                    speaking_interrupt_duration_ms:
+                                      settings.turn_detection?.config?.start_of_speech?.vad_config?.speaking_interrupt_duration_ms ?? 160,
+                                    prefix_padding_ms: parseInt(e.target.value, 10) || 800,
+                                  },
+                                },
+                              },
+                            },
+                          })
+                        }
+                      />
+                    </FormField>
+                  </div>
+                )}
+
+                {/* Keywords mode config */}
+                {(settings.turn_detection?.config?.start_of_speech?.mode ?? "vad") === "keywords" && (
+                  <div className="mt-3 pl-3 border-l-2 border-agora-accent-blue/30">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-medium">keywords_config</p>
+                    <FormField
+                      label="Triggered keywords"
+                      hint="Phrases that start a turn when detected. Comma-separated."
+                    >
+                      <Input
+                        value={
+                          (settings.turn_detection?.config?.start_of_speech?.keywords_config?.triggered_keywords ?? []).join(", ")
+                        }
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            turn_detection: {
+                              ...settings.turn_detection,
+                              mode: "default",
+                              config: {
+                                ...settings.turn_detection?.config,
+                                start_of_speech: {
+                                  ...settings.turn_detection?.config?.start_of_speech,
+                                  mode: "keywords",
+                                  keywords_config: {
+                                    ...settings.turn_detection?.config?.start_of_speech?.keywords_config,
+                                    triggered_keywords: e.target.value
+                                      .split(",")
+                                      .map((s) => s.trim())
+                                      .filter(Boolean),
+                                    interrupt_duration_ms:
+                                      settings.turn_detection?.config?.start_of_speech?.keywords_config?.interrupt_duration_ms ?? 160,
+                                    prefix_padding_ms:
+                                      settings.turn_detection?.config?.start_of_speech?.keywords_config?.prefix_padding_ms ?? 800,
+                                  },
+                                },
+                              },
+                            },
+                          })
+                        }
+                        placeholder="e.g. hello, are you there"
+                      />
+                    </FormField>
+                  </div>
+                )}
+
+                {/* Disabled mode config */}
+                {(settings.turn_detection?.config?.start_of_speech?.mode ?? "vad") === "disabled" && (
+                  <div className="mt-3 pl-3 border-l-2 border-agora-accent-blue/30">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-medium">disabled_config</p>
+                    <FormField
+                      label="Strategy"
+                      hint="Append = queue user speech; Ignored = discard input while agent is active."
+                    >
+                      <CustomSelect
+                        value={
+                          settings.turn_detection?.config?.start_of_speech?.disabled_config?.strategy ?? "append"
+                        }
+                        onChange={(v) =>
+                          setSettings({
+                            ...settings,
+                            turn_detection: {
+                              ...settings.turn_detection,
+                              mode: "default",
+                              config: {
+                                ...settings.turn_detection?.config,
+                                start_of_speech: {
+                                  ...settings.turn_detection?.config?.start_of_speech,
+                                  mode: "disabled",
+                                  disabled_config: { strategy: v as "append" | "ignored" },
+                                },
+                              },
+                            },
+                          })
+                        }
+                        options={[
+                          { value: "append", label: "Append" },
+                          { value: "ignored", label: "Ignored" },
+                        ]}
+                      />
+                    </FormField>
+                  </div>
+                )}
+              </CollapsibleSubSection>
+
+              {/* config.end_of_speech - Collapsible */}
+              <CollapsibleSubSection
+                title="End of speech"
+                description="When the user is considered to have finished speaking"
+                isOpen={turnDetectionSubsections.endOfSpeech}
+                onToggle={() => toggleTurnDetectionSubsection("endOfSpeech")}
+              >
+                <FormField
+                  label="Mode"
+                  hint="VAD = fixed silence duration; Semantic = model decides (more natural)."
+                  tooltip="End-of-speech detection mode."
+                >
+                  <CustomSelect
+                    value={
+                      (settings.turn_detection?.config?.end_of_speech?.mode ?? "vad") as TurnDetectionEndOfSpeechMode
+                    }
+                    onChange={(v) => {
+                      const mode = v as TurnDetectionEndOfSpeechMode;
+                      const defaults = getDefaultSettings().turn_detection!.config!;
+                      setSettings({
+                        ...settings,
+                        turn_detection: {
+                          ...settings.turn_detection,
+                          mode: "default",
+                          config: {
+                            ...settings.turn_detection?.config,
+                            end_of_speech: {
+                              mode,
+                              ...(mode === "vad" && {
+                                vad_config: settings.turn_detection?.config?.end_of_speech?.vad_config ?? defaults.end_of_speech?.vad_config ?? { silence_duration_ms: 640 },
+                              }),
+                              ...(mode === "semantic" && {
+                                semantic_config: settings.turn_detection?.config?.end_of_speech?.semantic_config ?? { silence_duration_ms: 320, max_wait_ms: 3000 },
+                              }),
+                            },
+                            start_of_speech:
+                              settings.turn_detection?.config?.start_of_speech ?? defaults.start_of_speech,
+                          },
+                        },
+                      });
+                    }}
+                    options={[
+                      { value: "vad", label: "VAD" },
+                      { value: "semantic", label: "Semantic" },
+                    ]}
+                  />
+                </FormField>
+
+                {/* VAD mode config */}
+                {(settings.turn_detection?.config?.end_of_speech?.mode ?? "vad") === "vad" && (
+                  <div className="mt-3 pl-3 border-l-2 border-agora-accent-blue/30">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-medium">vad_config</p>
+                    <FormField
+                      label="Silence duration (ms)"
+                      hint="Ms of silence after speech to treat as end of turn. Default 640."
+                    >
+                      <Input
+                        type="number"
+                        min={0}
+                        max={2000}
+                        value={
+                          settings.turn_detection?.config?.end_of_speech?.vad_config?.silence_duration_ms ?? 640
+                        }
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            turn_detection: {
+                              ...settings.turn_detection,
+                              mode: "default",
+                              config: {
+                                ...settings.turn_detection?.config,
+                                end_of_speech: {
+                                  ...settings.turn_detection?.config?.end_of_speech,
+                                  mode: "vad",
+                                  vad_config: {
+                                    silence_duration_ms: parseInt(e.target.value, 10) || 640,
+                                  },
+                                },
+                              },
+                            },
+                          })
+                        }
+                      />
+                    </FormField>
+                  </div>
+                )}
+
+                {/* Semantic mode config */}
+                {(settings.turn_detection?.config?.end_of_speech?.mode ?? "vad") === "semantic" && (
+                  <div className="mt-3 pl-3 border-l-2 border-agora-accent-blue/30">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-medium">semantic_config</p>
+                    <FormField
+                      label="Silence duration (ms)"
+                      hint="Minimum silence at end of segment. Default 320."
+                    >
+                      <Input
+                        type="number"
+                        min={0}
+                        max={2000}
+                        value={
+                          settings.turn_detection?.config?.end_of_speech?.semantic_config?.silence_duration_ms ?? 320
+                        }
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            turn_detection: {
+                              ...settings.turn_detection,
+                              mode: "default",
+                              config: {
+                                ...settings.turn_detection?.config,
+                                end_of_speech: {
+                                  ...settings.turn_detection?.config?.end_of_speech,
+                                  mode: "semantic",
+                                  semantic_config: {
+                                    ...settings.turn_detection?.config?.end_of_speech?.semantic_config,
+                                    silence_duration_ms: parseInt(e.target.value, 10) || 320,
+                                    max_wait_ms:
+                                      settings.turn_detection?.config?.end_of_speech?.semantic_config?.max_wait_ms ?? 3000,
+                                  },
+                                },
+                              },
+                            },
+                          })
+                        }
+                      />
+                    </FormField>
+                    <FormField
+                      label="Max wait (ms)"
+                      hint="Maximum time to wait for semantic end-of-speech decision. Default 3000."
+                    >
+                      <Input
+                        type="number"
+                        min={0}
+                        max={10000}
+                        value={
+                          settings.turn_detection?.config?.end_of_speech?.semantic_config?.max_wait_ms ?? 3000
+                        }
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            turn_detection: {
+                              ...settings.turn_detection,
+                              mode: "default",
+                              config: {
+                                ...settings.turn_detection?.config,
+                                end_of_speech: {
+                                  ...settings.turn_detection?.config?.end_of_speech,
+                                  mode: "semantic",
+                                  semantic_config: {
+                                    ...settings.turn_detection?.config?.end_of_speech?.semantic_config,
+                                    silence_duration_ms:
+                                      settings.turn_detection?.config?.end_of_speech?.semantic_config?.silence_duration_ms ?? 320,
+                                    max_wait_ms: parseInt(e.target.value, 10) || 3000,
+                                  },
+                                },
+                              },
+                            },
+                          })
+                        }
+                      />
+                    </FormField>
+                  </div>
+                )}
+              </CollapsibleSubSection>
+            </CollapsibleSubSection>
+
+            {/* Filler words */}
+            <CollapsibleSubSection
+              title="Filler words"
+              description="Play phrases while waiting for LLM response"
+              isOpen={advancedSubsections.fillerWords}
+              onToggle={() => toggleAdvancedSubsection("fillerWords")}
+            >
+              <Toggle
+                label="Enable filler words"
+                checked={settings.filler_words?.enable ?? false}
+                onChange={(checked) =>
+                  setSettings({
+                    ...settings,
+                    filler_words: {
+                      ...settings.filler_words,
+                      enable: checked,
+                      trigger: settings.filler_words?.trigger ?? {
+                        mode: "fixed_time",
+                        fixed_time_config: { response_wait_ms: 1500 },
+                      },
+                      content: settings.filler_words?.content ?? {
+                        mode: "static",
+                        static_config: {
+                          phrases: ["Please wait.", "Okay.", "Uh-huh."],
+                          selection_rule: "shuffle",
+                        },
+                      },
+                    },
+                  })
+                }
+                hint="Play phrases while waiting for LLM response."
+              />
+              {(settings.filler_words?.enable ?? false) && (
+                <>
+                  <FormField
+                    label="Response wait (ms)"
+                    hint="100–10000; default 1500"
+                    tooltip="Trigger filler after this many ms waiting for LLM."
+                  >
+                    <Input
+                      type="number"
+                      min={100}
+                      max={10000}
+                      value={
+                        settings.filler_words?.trigger?.fixed_time_config?.response_wait_ms ?? 1500
+                      }
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          filler_words: {
+                            ...settings.filler_words,
+                            trigger: {
+                              mode: "fixed_time",
+                              fixed_time_config: {
+                                response_wait_ms: parseInt(e.target.value, 10) || 1500,
+                              },
+                            },
+                          },
+                        })
+                      }
+                    />
+                  </FormField>
+                  <FormField
+                    label="Phrases"
+                    hint="One per line; max 100, each ≤50 words"
+                    tooltip="Filler phrases to play."
+                  >
+                    <Textarea
+                      rows={3}
+                      value={
+                        (settings.filler_words?.content?.static_config?.phrases ?? []).join("\n")
+                      }
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          filler_words: {
+                            ...settings.filler_words,
+                            content: {
+                              mode: "static",
+                              static_config: {
+                                ...settings.filler_words?.content?.static_config,
+                                phrases: e.target.value
+                                  .split("\n")
+                                  .map((s) => s.trim())
+                                  .filter(Boolean),
+                                selection_rule:
+                                  settings.filler_words?.content?.static_config?.selection_rule ?? "shuffle",
+                              },
+                            },
+                          },
+                        })
+                      }
+                      placeholder={'Please wait.\nOkay.\nUh-huh.'}
+                    />
+                  </FormField>
+                  <FormField label="Selection rule" tooltip="shuffle or round_robin">
+                    <CustomSelect
+                      value={
+                        settings.filler_words?.content?.static_config?.selection_rule ?? "shuffle"
+                      }
+                      onChange={(v) =>
+                        setSettings({
+                          ...settings,
+                          filler_words: {
+                            ...settings.filler_words,
+                            content: {
+                              mode: "static",
+                              static_config: {
+                                ...settings.filler_words?.content?.static_config,
+                                selection_rule: v as "shuffle" | "round_robin",
+                              },
+                            },
+                          },
+                        })
+                      }
+                      options={[
+                        { value: "shuffle", label: "Shuffle" },
+                        { value: "round_robin", label: "Round robin" },
+                      ]}
+                    />
+                  </FormField>
+                </>
+              )}
+            </CollapsibleSubSection>
+
+            <CollapsibleSubSection
+              title="Features"
+              description="SAL, RTM, Tools"
+              isOpen={advancedSubsections.features}
+              onToggle={() => toggleAdvancedSubsection("features")}
+            >
+              <Toggle
+                label="Enable SAL"
+                checked={settings.advanced_features?.enable_sal ?? false}
                 onChange={(checked) =>
                   setSettings({
                     ...settings,
                     advanced_features: {
                       ...settings.advanced_features,
-                      enable_mllm: checked,
+                      enable_sal: checked,
                     },
                   })
                 }
-                hint="Multimodal LLM for vision."
+                hint="Selective Attention Locking (SAL). Configure the sal field for speaker recognition or locking modes."
               />
+              {(settings.advanced_features?.enable_sal ?? false) && (
+                <div className="ml-0 mt-3 pl-0">
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    SAL configuration
+                  </h4>
+                  <FormField
+                    label="SAL mode"
+                    tooltip="locking or recognition."
+                  >
+                    <CustomSelect
+                      value={settings.sal?.sal_mode ?? "locking"}
+                      onChange={(v) =>
+                        setSettings({
+                          ...settings,
+                          sal: {
+                            ...settings.sal,
+                            sal_mode: v as "locking" | "recognition",
+                            sample_urls: settings.sal?.sample_urls ?? {},
+                          },
+                        })
+                      }
+                      options={[
+                        { value: "locking", label: "Locking" },
+                        { value: "recognition", label: "Recognition" },
+                      ]}
+                    />
+                  </FormField>
+                  <FormField
+                    label="Voiceprint name (optional)"
+                    hint="e.g. speaker1; must not be 'unknown'"
+                  >
+                    <Input
+                      value={
+                        Object.keys(settings.sal?.sample_urls ?? {})[0] ?? ""
+                      }
+                      onChange={(e) => {
+                        const name = e.target.value.trim();
+                        const urls = settings.sal?.sample_urls ?? {};
+                        const currentUrl = Object.values(urls)[0] ?? "";
+                        const next = name && name !== "unknown" ? { [name]: currentUrl } : {};
+                        setSettings({
+                          ...settings,
+                          sal: { ...settings.sal, sample_urls: next },
+                        });
+                      }}
+                      placeholder="speaker1"
+                    />
+                  </FormField>
+                  <FormField
+                    label="Voiceprint URL (optional)"
+                    hint="16kHz 16-bit mono PCM .pcm, 10–15s, max 2MB"
+                  >
+                    <Input
+                      value={
+                        Object.values(settings.sal?.sample_urls ?? {})[0] ?? ""
+                      }
+                      onChange={(e) => {
+                        const url = e.target.value.trim();
+                        const name = Object.keys(settings.sal?.sample_urls ?? {})[0] ?? "speaker1";
+                        const next =
+                          name && name !== "unknown"
+                            ? { [name]: url }
+                            : url
+                              ? { speaker1: url }
+                              : {};
+                        setSettings({
+                          ...settings,
+                          sal: { ...settings.sal, sample_urls: next },
+                        });
+                      }}
+                      placeholder="https://example.com/speaker1.pcm"
+                    />
+                  </FormField>
+                </div>
+              )}
               <Toggle
                 label="Enable RTM"
-                checked={settings.advanced_features?.enable_rtm || false}
+                checked={settings.advanced_features?.enable_rtm ?? false}
                 onChange={(checked) =>
                   setSettings({
                     ...settings,
@@ -1466,7 +2217,7 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
               />
               <Toggle
                 label="Enable Tools"
-                checked={settings.advanced_features?.enable_tools || false}
+                checked={settings.advanced_features?.enable_tools ?? false}
                 onChange={(checked) =>
                   setSettings({
                     ...settings,
@@ -1478,7 +2229,7 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
                 }
                 hint="Function calling support."
               />
-            </div>
+            </CollapsibleSubSection>
           </Section>
         </div>
 

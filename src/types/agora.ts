@@ -158,24 +158,107 @@ export interface ASRConfig {
   params?: ASRMicrosoftParams | ASRDeepgramParams | Record<string, unknown>;
 }
 
-// --- Turn Detection ---
-export interface TurnDetectionConfig {
-  /** Silence duration (ms) before processing response (default 500) */
+// --- Turn Detection (Agora join API v2 config format) ---
+/** VAD-based start-of-speech config */
+export interface TurnDetectionVadConfig {
+  interrupt_duration_ms?: number;
+  speaking_interrupt_duration_ms?: number;
+  prefix_padding_ms?: number;
+}
+
+/** Keyword-trigger start-of-speech config */
+export interface TurnDetectionKeywordsConfig {
+  interrupt_duration_ms?: number;
+  prefix_padding_ms?: number;
+  triggered_keywords?: string[];
+}
+
+/** Disabled start-of-speech config */
+export interface TurnDetectionDisabledConfig {
+  strategy?: "append" | "ignored";
+}
+
+export type TurnDetectionStartOfSpeechMode = "vad" | "keywords" | "disabled";
+
+export interface TurnDetectionStartOfSpeech {
+  mode: TurnDetectionStartOfSpeechMode;
+  vad_config?: TurnDetectionVadConfig;
+  keywords_config?: TurnDetectionKeywordsConfig;
+  disabled_config?: TurnDetectionDisabledConfig;
+}
+
+/** End-of-speech VAD config */
+export interface TurnDetectionEndOfSpeechVadConfig {
   silence_duration_ms?: number;
-  /** Voice activity detection mode */
-  mode?: "server_vad" | "semantic";
+}
+
+/** End-of-speech semantic config */
+export interface TurnDetectionEndOfSpeechSemanticConfig {
+  silence_duration_ms?: number;
+  max_wait_ms?: number;
+}
+
+export type TurnDetectionEndOfSpeechMode = "vad" | "semantic";
+
+export interface TurnDetectionEndOfSpeech {
+  mode: TurnDetectionEndOfSpeechMode;
+  vad_config?: TurnDetectionEndOfSpeechVadConfig;
+  semantic_config?: TurnDetectionEndOfSpeechSemanticConfig;
+}
+
+export interface TurnDetectionConfigConfig {
+  /** Voice activity detection sensitivity (0.0–1.0, default 0.5) */
+  speech_threshold?: number;
+  start_of_speech?: TurnDetectionStartOfSpeech;
+  end_of_speech?: TurnDetectionEndOfSpeech;
+}
+
+export interface TurnDetectionConfig {
+  /** Conversation turn detection mode (default: "default") */
+  mode?: "default";
+  /** Detailed configuration for conversation turn detection */
+  config?: TurnDetectionConfigConfig;
+}
+
+// --- Filler Words ---
+export interface FillerWordsTriggerConfig {
+  mode: "fixed_time";
+  fixed_time_config?: { response_wait_ms?: number };
+}
+
+export interface FillerWordsContentConfig {
+  mode: "static";
+  static_config?: {
+    phrases?: string[];
+    selection_rule?: "shuffle" | "round_robin";
+  };
+}
+
+export interface FillerWordsConfig {
+  /** Whether to enable filler words (default false) */
+  enable?: boolean;
+  trigger?: FillerWordsTriggerConfig;
+  content?: FillerWordsContentConfig;
+}
+
+// --- SAL (Selective Attention Locking) ---
+export interface SalConfig {
+  /** locking | recognition (default "locking") */
+  sal_mode?: "locking" | "recognition";
+  /** Voiceprint name → download URL (e.g. { "speaker1": "https://..." }) */
+  sample_urls?: Record<string, string>;
 }
 
 // --- Advanced Features ---
 export interface AdvancedFeaturesConfig {
-  /** Enable Multimodal LLM (vision capabilities) */
-  enable_mllm?: boolean;
   /** Enable RTM messaging */
   enable_rtm?: boolean;
-  /** Enable Server Automation Library */
+  /** Enable Selective Attention Locking (SAL). When enabled, configure the sal field for speaker recognition or locking modes. Default: false */
   enable_sal?: boolean;
   /** Enable function calling / tools */
   enable_tools?: boolean;
+  /** Enable MLLM (Multimodal LLM) for voice-to-voice */
+  enable_mllm?: boolean;
 }
 
 // --- Agent Parameters ---
@@ -302,8 +385,17 @@ export interface AgentSettings {
   // Idle timeout in seconds (default 30)
   idle_timeout?: number;
 
-  // Turn detection settings
+  /** When true, turn_detection is sent in the join payload; when false, it is omitted so user can draft without applying. */
+  enable_turn_detection?: boolean;
+
+  // Turn detection settings (Agora v2 config format; only sent when enable_turn_detection is true)
   turn_detection?: TurnDetectionConfig;
+
+  // Filler words (played while waiting for LLM)
+  filler_words?: FillerWordsConfig;
+
+  // SAL config (only sent when advanced_features.enable_sal is true)
+  sal?: SalConfig;
 
   // Advanced features
   advanced_features?: AdvancedFeaturesConfig;
