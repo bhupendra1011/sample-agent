@@ -54,6 +54,11 @@ const CreateMeetingScreen: React.FC = () => {
         meetingInfo.hostPassphrase,
         meetingInfo.viewerPassphrase,
         yourName,
+        meetingInfo.screenShare?.rtc,
+        meetingInfo.screenShare?.uid != null
+          ? Number(meetingInfo.screenShare.uid)
+          : undefined,
+        meetingInfo.screenShare?.rtm ?? undefined,
       );
 
       callStart({
@@ -64,6 +69,11 @@ const CreateMeetingScreen: React.FC = () => {
         hostPassphrase: meetingInfo.hostPassphrase,
         viewerPassphrase: meetingInfo.viewerPassphrase,
         isHost: true,
+        screenShareRtcToken: meetingInfo.screenShare?.rtc,
+        screenShareUid:
+          meetingInfo.screenShare?.uid != null
+            ? String(meetingInfo.screenShare.uid)
+            : undefined,
       });
 
       if (

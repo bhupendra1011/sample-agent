@@ -101,6 +101,12 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ channelId }) => {
     transcriptionMode,
     sessionStartTime,
     logout,
+    activeScreenShareUid,
+    screenShareUid,
+    isScreenSharing,
+    localScreenVideoTrack,
+    remoteScreenVideoTrack,
+    screenSharerName,
   } = useAppStore();
 
   const [remainingMs, setRemainingMs] = useState<number>(SESSION_DURATION_MS);
@@ -141,7 +147,9 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ channelId }) => {
   const participantCount =
     1 +
     Object.keys(remoteParticipants).filter(
-      (uid) => uid !== String(localUID)
+      (uid) =>
+        uid !== String(localUID) &&
+        (screenShareUid == null || uid !== screenShareUid)
     ).length;
 
   const {
@@ -154,6 +162,8 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ channelId }) => {
     rtcClient,
     rtmClient,
   } = useAgora();
+
+  const useSidebarLayout = isWhiteboardActive || !!activeScreenShareUid;
 
   // Initialize conversational AI hook for transcript handling
   const { sendChatMessage } = useConversationalAI({
@@ -245,7 +255,7 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ channelId }) => {
 
       {/* Main Content Area */}
       <div className="flex flex-1 overflow-hidden">
-        {!isWhiteboardActive && (
+        {!useSidebarLayout && (
           <div className="w-56 bg-gray-200 dark:bg-gray-800 p-4 border-r border-gray-300 dark:border-gray-700 overflow-y-auto hidden sm:block shadow-inner transition-colors duration-300">
             <strong className="text-xl mb-4 block text-gray-900 dark:text-white">
               Participants: {participantCount}
@@ -280,7 +290,42 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ channelId }) => {
         )}
 
         <div className="flex-1 overflow-hidden bg-gray-100 dark:bg-gray-900 transition-colors duration-300">
-          {isWhiteboardActive ? (
+          {activeScreenShareUid ? (
+            <div className="h-full w-full flex items-center justify-center p-4 bg-black/5 dark:bg-black/20">
+              {isScreenSharing && localScreenVideoTrack ? (
+                // Local user is sharing - show their own screen
+                <div className="w-full h-full max-w-full flex items-center justify-center [&_video]:object-contain">
+                  <VideoTile
+                    key="local-screen"
+                    uid={activeScreenShareUid}
+                    name={`${screenSharerName || localUsername}'s Screen`}
+                    isLocal={true}
+                    track={localScreenVideoTrack}
+                    micMuted={true}
+                    videoMuted={false}
+                  />
+                </div>
+              ) : remoteScreenVideoTrack ? (
+                // Remote user is sharing - show their screen from the dedicated track
+                <div className="w-full h-full max-w-full flex items-center justify-center [&_video]:object-contain">
+                  <VideoTile
+                    key={`screen-${activeScreenShareUid}`}
+                    uid={activeScreenShareUid}
+                    name={`${screenSharerName || "Someone"}'s Screen`}
+                    isLocal={false}
+                    track={remoteScreenVideoTrack}
+                    micMuted={true}
+                    videoMuted={false}
+                  />
+                </div>
+              ) : (
+                // Waiting for the screen share stream to arrive
+                <div className="text-gray-500 dark:text-gray-400">
+                  Waiting for screen share…
+                </div>
+              )}
+            </div>
+          ) : isWhiteboardActive ? (
             <div className="h-full w-full p-2">
               <Whiteboard
                 roomUuid={whiteboardRoomUuid}
@@ -312,10 +357,11 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ channelId }) => {
                 // Avatar video track comes directly from useAgora (tracked independently, like the sample)
                 // No need to look it up in remoteUsers - it's set directly from user-published events
 
-                // Exclude agent (0) and avatar (999999) UIDs from "other" tiles; they are shown in the single agent tile
+                // Exclude agent, avatar, and screen-share UIDs from "other" tiles
                 const agentAndAvatarUids = new Set<string>();
                 if (agentRtcUid) agentAndAvatarUids.add(agentRtcUid);
                 if (agentAvatarRtcUid) agentAndAvatarUids.add(agentAvatarRtcUid);
+                if (screenShareUid) agentAndAvatarUids.add(screenShareUid);
                 remoteUsers.forEach((user: IAgoraRTCRemoteUser) => {
                   const uidStr = String(user.uid);
                   if (agentAndAvatarUids.has(uidStr)) return;
@@ -405,7 +451,7 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ channelId }) => {
           )}
         </div>
 
-        {isWhiteboardActive && (
+        {useSidebarLayout && (
           <div className="w-64 bg-gray-200 dark:bg-gray-800 border-l border-gray-300 dark:border-gray-700 overflow-y-auto hidden sm:flex flex-col shadow-inner transition-colors duration-300">
             <div className="p-3 border-b border-gray-300 dark:border-gray-700">
               <strong className="text-sm text-gray-900 dark:text-white">
@@ -430,6 +476,8 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ channelId }) => {
               {remoteUsers
                 .filter((user) => {
                   const uidStr = String(user.uid);
+                  if (activeScreenShareUid && uidStr === activeScreenShareUid) return false;
+                  if (screenShareUid && uidStr === screenShareUid) return false;
                   if (agentRtcUid && uidStr === agentRtcUid) return false;
                   if (agentAvatarRtcUid && uidStr === agentAvatarRtcUid) return false;
                   if (isAgentActive && agentAvatarRtcUid && user.videoTrack) {

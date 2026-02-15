@@ -7,7 +7,7 @@ import type {
   ITranscriptHelperItem,
 } from "@/types/agora";
 import { EAgentState, ETranscriptRenderMode } from "@/types/agora";
-import type { ILocalAudioTrack, ILocalVideoTrack } from "agora-rtc-sdk-ng";
+import type { ILocalAudioTrack, ILocalVideoTrack, IRemoteVideoTrack } from "agora-rtc-sdk-ng";
 
 // Define Theme type
 type Theme = "light" | "dark";
@@ -116,6 +116,21 @@ interface AppState {
   // Existing actions...
   toggleVideoMute: () => void;
   toggleAudioMute: () => void;
+  /** Screen share credentials from join API; used to start screen share. */
+  screenShareRtcToken: string;
+  screenShareUid: string | null;
+  /** UID of the user currently sharing screen (local or remote); drives layout. */
+  activeScreenShareUid: string | null;
+  setActiveScreenShareUid: (uid: string | null) => void;
+  /** Local screen video track when current user is sharing; stored globally so all components see it. */
+  localScreenVideoTrack: ILocalVideoTrack | null;
+  setLocalScreenVideoTrack: (track: ILocalVideoTrack | null) => void;
+  /** Remote screen video track when another user is sharing; stored globally for reliable access. */
+  remoteScreenVideoTrack: IRemoteVideoTrack | null;
+  setRemoteScreenVideoTrack: (track: IRemoteVideoTrack | null) => void;
+  /** Name of the user sharing screen (for display). */
+  screenSharerName: string | null;
+  setScreenSharerName: (name: string | null) => void;
   callStart: (payload: {
     userName: string;
     uid: string;
@@ -124,6 +139,8 @@ interface AppState {
     hostPassphrase?: string;
     viewerPassphrase?: string;
     isHost?: boolean;
+    screenShareRtcToken?: string;
+    screenShareUid?: string;
   }) => void;
   callEnd: () => void;
   /** Clear only session timer (e.g. when extending session). Keeps call state. */
@@ -287,6 +304,18 @@ const useAppStore = create<AppState>((set, get) => ({
     }),
   // --- END Whiteboard ---
 
+  // Screen share state (credentials from API; active sharer for layout)
+  screenShareRtcToken: "",
+  screenShareUid: null as string | null,
+  activeScreenShareUid: null as string | null,
+  setActiveScreenShareUid: (uid) => set({ activeScreenShareUid: uid }),
+  localScreenVideoTrack: null as ILocalVideoTrack | null,
+  setLocalScreenVideoTrack: (track) => set({ localScreenVideoTrack: track }),
+  remoteScreenVideoTrack: null as IRemoteVideoTrack | null,
+  setRemoteScreenVideoTrack: (track) => set({ remoteScreenVideoTrack: track }),
+  screenSharerName: null as string | null,
+  setScreenSharerName: (name) => set({ screenSharerName: name }),
+
   // Existing actions...
   toggleVideoMute: () => set((state) => ({ videoMuted: !state.videoMuted })),
   toggleAudioMute: () => set((state) => ({ audioMuted: !state.audioMuted })),
@@ -302,6 +331,9 @@ const useAppStore = create<AppState>((set, get) => ({
       isHost: payload.isHost || false,
       userCount: 1, // Start with 1 for local user
       sessionStartTime: Date.now(),
+      screenShareRtcToken: payload.screenShareRtcToken || "",
+      screenShareUid: payload.screenShareUid ?? null,
+      activeScreenShareUid: null,
     }),
   callEnd: () =>
     set({
@@ -321,6 +353,12 @@ const useAppStore = create<AppState>((set, get) => ({
       whiteboardAppIdentifier: "",
       whiteboardRegion: "",
       isWhiteboardActive: false,
+      screenShareRtcToken: "",
+      screenShareUid: null,
+      activeScreenShareUid: null,
+      localScreenVideoTrack: null,
+      remoteScreenVideoTrack: null,
+      screenSharerName: null,
       isHost: false,
       pendingUnmuteRequest: null,
       agentId: null,

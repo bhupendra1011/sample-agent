@@ -67,6 +67,18 @@ export const useAgora = () => {
   const setScreenShareStatus = useAppStore(
     (state) => state.setScreenShareStatus
   );
+  const setActiveScreenShareUid = useAppStore(
+    (state) => state.setActiveScreenShareUid
+  );
+  const setLocalScreenVideoTrack = useAppStore(
+    (state) => state.setLocalScreenVideoTrack
+  );
+  const setScreenSharerName = useAppStore(
+    (state) => state.setScreenSharerName
+  );
+  const setRemoteScreenVideoTrack = useAppStore(
+    (state) => state.setRemoteScreenVideoTrack
+  );
   const callEnd = useAppStore((state) => state.callEnd);
   const isAgentActive = useAppStore((state) => state.isAgentActive);
   const agentAvatarRtcUid = useAppStore((state) => state.agentAvatarRtcUid);
@@ -131,12 +143,27 @@ export const useAgora = () => {
           }
         }
 
-        // Count user on FIRST publish event (audio or video) to prevent missed counts
-        const shouldIncrementCount = !countedUsersRef.current.has(userUidStr);
+        // Do not count the screen-share UID as a participant (it's a separate stream from the sharer)
+        // Note: screenShareUid is the LOCAL user's screen share UID from the API
+        // activeScreenShareUid is the UID of whoever is currently sharing (set via RTM)
+        const screenShareUid = getAppStore.getState().screenShareUid;
+        const activeScreenShareUid = getAppStore.getState().activeScreenShareUid;
+        const isScreenShareStream =
+          (screenShareUid != null && userUidStr === screenShareUid) ||
+          (activeScreenShareUid != null && userUidStr === activeScreenShareUid);
+        const shouldIncrementCount =
+          !isScreenShareStream &&
+          !countedUsersRef.current.has(userUidStr);
         if (shouldIncrementCount) {
           countedUsersRef.current.add(userUidStr);
           increaseUserCount();
           console.log("Increased user count for user:", userUidStr, "via", mediaType);
+        }
+
+        // If this is the remote screen share stream, store its video track globally
+        if (activeScreenShareUid && userUidStr === activeScreenShareUid && mediaType === "video" && user.videoTrack) {
+          console.log("[ScreenShare] Storing remote screen share video track for uid:", userUidStr);
+          setRemoteScreenVideoTrack(user.videoTrack);
         }
 
         if (mediaType === "video") {
@@ -180,33 +207,41 @@ export const useAgora = () => {
         console.error("Failed to subscribe to user:", error);
       }
     },
-    [increaseUserCount, updateRemoteParticipant, getAppStore]
+    [increaseUserCount, updateRemoteParticipant, getAppStore, setRemoteScreenVideoTrack]
   );
 
   const handleUserUnpublished = useCallback(
     (user: IAgoraRTCRemoteUser, mediaType: "video" | "audio") => {
       console.log("User unpublished:", user.uid, mediaType);
+      const userUidStr = String(user.uid);
 
       const avatarUid = getAppStore.getState().agentAvatarRtcUid;
-      if (avatarUid && String(user.uid) === avatarUid) {
+      if (avatarUid && userUidStr === avatarUid) {
         if (mediaType === "video") setAvatarVideoTrack(null);
         if (mediaType === "audio") setAvatarAudioTrack(null);
       }
 
+      // If this is the active screen share user unpublishing video, clear remote screen track
+      const activeScreenShareUid = getAppStore.getState().activeScreenShareUid;
+      if (activeScreenShareUid && userUidStr === activeScreenShareUid && mediaType === "video") {
+        console.log("[ScreenShare] Screen share user unpublished video, clearing remote track");
+        setRemoteScreenVideoTrack(null);
+      }
+
       if (mediaType === "video") {
         setRemoteUsers((prev) => {
-          delete remoteUsersRef.current[String(user.uid)];
-          return prev.filter((u) => String(u.uid) !== String(user.uid));
+          delete remoteUsersRef.current[userUidStr];
+          return prev.filter((u) => String(u.uid) !== userUidStr);
         });
       }
 
       updateRemoteParticipant({
-        uid: String(user.uid),
+        uid: userUidStr,
         micMuted: mediaType === "audio" ? true : undefined,
         videoMuted: mediaType === "video" ? true : undefined,
       });
     },
-    [updateRemoteParticipant]
+    [updateRemoteParticipant, setRemoteScreenVideoTrack]
   );
 
   const handleUserLeft = useCallback(
@@ -219,6 +254,15 @@ export const useAgora = () => {
       if (avatarUid && userUidStr === avatarUid) {
         setAvatarVideoTrack(null);
         setAvatarAudioTrack(null);
+      }
+
+      // If this is the active screen share user leaving, clear screen share state
+      const activeScreenShareUid = getAppStore.getState().activeScreenShareUid;
+      if (activeScreenShareUid && userUidStr === activeScreenShareUid) {
+        console.log("[ScreenShare] Screen share user left, clearing screen share state");
+        getAppStore.getState().setActiveScreenShareUid(null);
+        getAppStore.getState().setScreenSharerName(null);
+        setRemoteScreenVideoTrack(null);
       }
 
       // Remove from remote users
@@ -248,7 +292,7 @@ export const useAgora = () => {
         });
       }
     },
-    [decreaseUserCount, removeRemoteParticipant]
+    [decreaseUserCount, removeRemoteParticipant, setRemoteScreenVideoTrack]
   );
 
   const handleRemoteUserAttributesUpdated = useCallback(
@@ -422,6 +466,46 @@ export const useAgora = () => {
                 `Whiteboard stopped by ${data.userName || "another user"}`,
                 "success"
               );
+            }
+            break;
+          }
+
+          case "screen-share-started": {
+            const screenUid = data.screenShareUid;
+            const sharerName = data.userName || "Someone";
+            if (screenUid && String(data.uid) !== String(getAppStore.getState().localUID)) {
+              getAppStore.getState().setActiveScreenShareUid(String(screenUid));
+              getAppStore.getState().setScreenSharerName(sharerName);
+              
+              // Check if the screen share user is already in our remote users (RTC event may have arrived first)
+              const existingScreenUser = getRtcClient().remoteUsers.find(
+                (u) => String(u.uid) === String(screenUid)
+              );
+              if (existingScreenUser?.videoTrack) {
+                console.log("[ScreenShare] RTM arrived after RTC - setting remote screen track from existing user");
+                getAppStore.getState().setRemoteScreenVideoTrack(existingScreenUser.videoTrack);
+              }
+              
+              showToast(
+                `Screen share started by ${sharerName}`,
+                "success"
+              );
+            }
+            break;
+          }
+
+          case "screen-share-stopped": {
+            const currentState3 = getAppStore.getState();
+            if (currentState3.activeScreenShareUid) {
+              currentState3.setActiveScreenShareUid(null);
+              currentState3.setScreenSharerName(null);
+              currentState3.setRemoteScreenVideoTrack(null);
+              if (String(data.uid) !== String(currentState3.localUID)) {
+                showToast(
+                  `Screen share stopped by ${data.userName || "another user"}`,
+                  "info"
+                );
+              }
             }
             break;
           }
@@ -762,6 +846,7 @@ export const useAgora = () => {
 
   const stopScreenshare = useCallback(async () => {
     if (!isScreenSharing) return;
+    const screenUid = currentScreenShareUid;
     if (screenVideoTrack) {
       screenVideoTrack.close();
       screenVideoTrack = null;
@@ -774,9 +859,35 @@ export const useAgora = () => {
       await screenClient.leave();
       screenClient = null;
     }
+    setLocalScreenVideoTrack(null);
+    setActiveScreenShareUid(null);
+    setScreenSharerName(null);
+    if (RTM_CLIENT && currentRtmChannelName && screenUid) {
+      try {
+        await RTM_CLIENT.publish(
+          currentRtmChannelName,
+          JSON.stringify({
+            type: "screen-share-stopped",
+            screenShareUid: screenUid,
+            uid: localUID,
+            userName: localUsername,
+          })
+        );
+      } catch (e) {
+        console.warn("Failed to send screen-share-stopped RTM:", e);
+      }
+    }
     showToast("Screen sharing stopped", "success");
     setScreenShareStatus(false);
-  }, [isScreenSharing, setScreenShareStatus]); // Dependencies for stopScreenshare
+  }, [
+    isScreenSharing,
+    setScreenShareStatus,
+    setActiveScreenShareUid,
+    setLocalScreenVideoTrack,
+    setScreenSharerName,
+    localUID,
+    localUsername,
+  ]);
 
   const startScreenshare = useCallback(
     async (
@@ -789,25 +900,80 @@ export const useAgora = () => {
       if (
         !currentScreenShareToken ||
         !currentChannelId ||
-        !currentScreenShareUid
+        !currentScreenShareUid ||
+        !AGORA_CONFIG.APP_ID
       ) {
-        /* ... */ return false;
+        showToast("Screen share is not available: missing token or channel.", "error");
+        return false;
       }
       screenClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
       try {
-        /* ... */
+        const trackResult = await AgoraRTC.createScreenVideoTrack(
+          { encoderConfig: "1080p_2" },
+          "disable"
+        );
+        const localScreenVideo =
+          Array.isArray(trackResult) ? trackResult[0] : trackResult;
+        screenVideoTrack = localScreenVideo;
+
+        await screenClient.join(
+          AGORA_CONFIG.APP_ID,
+          currentChannelId,
+          currentScreenShareToken,
+          Number(currentScreenShareUid)
+        );
+        await screenClient.publish([localScreenVideo]);
+
+        // Listen for "track-ended" event (user clicks "Stop sharing" in browser)
+        localScreenVideo.on("track-ended", () => {
+          console.log("Screen share track ended by user");
+          stopScreenshare();
+        });
+
+        setLocalScreenVideoTrack(localScreenVideo);
+        setScreenShareStatus(true);
+        setActiveScreenShareUid(currentScreenShareUid);
+        setScreenSharerName(localUsername || "You");
+
+        if (RTM_CLIENT && currentRtmChannelName) {
+          await RTM_CLIENT.publish(
+            currentRtmChannelName,
+            JSON.stringify({
+              type: "screen-share-started",
+              screenShareUid: currentScreenShareUid,
+              uid: localUID,
+              userName: localUsername,
+            })
+          );
+        }
+        showToast("Screen sharing started", "success");
+        return true;
       } catch (error) {
-        /* ... */
+        console.error("Failed to start screen share:", error);
+        showToast("Failed to start screen share. Please try again.", "error");
+        if (screenVideoTrack) {
+          screenVideoTrack.close();
+          screenVideoTrack = null;
+        }
+        if (screenClient && screenClient.connectionState === "CONNECTED") {
+          await screenClient.leave();
+          screenClient = null;
+        }
+        return false;
       }
-      return true; // Return true on success
     },
     [
       isScreenSharing,
       setScreenShareStatus,
+      setActiveScreenShareUid,
+      setLocalScreenVideoTrack,
+      setScreenSharerName,
       AGORA_CONFIG.APP_ID,
+      localUID,
+      localUsername,
       stopScreenshare,
     ]
-  ); // Dependencies: stopScreenshare
+  );
 
   // --- 6. Internal Cleanup Helper (MUST BE DEFINED BEFORE joinMeeting/leaveCall) ---
 
@@ -901,7 +1067,7 @@ export const useAgora = () => {
       userName?: string,
       screenShareRtcToken?: string, // Actual token from MeetingResponse.screenShare.rtc
       screenShareUid?: number, // Actual UID from MeetingResponse.screenShare.uid
-      screenShareRtmToken?: string | null // Actual RTM from MeetingResponse.screenShare.rtm
+      _screenShareRtmToken?: string | null // Reserved for MeetingResponse.screenShare.rtm if needed
     ) => {
       try {
         // Clean up any existing connections before joining

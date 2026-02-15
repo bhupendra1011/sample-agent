@@ -85,6 +85,8 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
   const isWhiteboardActive = useAppStore((state) => state.isWhiteboardActive);
   const toggleWhiteboard = useAppStore((state) => state.toggleWhiteboard);
   const whiteboardRoomUuid = useAppStore((state) => state.whiteboardRoomUuid);
+  const screenShareRtcToken = useAppStore((state) => state.screenShareRtcToken);
+  const screenShareUid = useAppStore((state) => state.screenShareUid);
 
   // Agent state
   const agentId = useAppStore((state) => state.agentId);
@@ -118,14 +120,11 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
     if (isScreenSharing) {
       await stopScreenshare();
     } else {
-      if (localUID && viewerPassphrase) {
-        await startScreenshare(viewerPassphrase, String(Number(localUID) + 1));
-      } else {
-        showToast(
-          "Cannot start screen share: Meeting information is incomplete.",
-          "error",
-        );
+      if (!screenShareRtcToken || !screenShareUid) {
+        showToast("Screen share is not available for this meeting.", "error");
+        return;
       }
+      await startScreenshare(screenShareRtcToken, screenShareUid);
     }
   };
 
