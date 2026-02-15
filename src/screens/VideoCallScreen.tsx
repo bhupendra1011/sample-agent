@@ -459,6 +459,27 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ channelId }) => {
                     </div>
                   );
                 })}
+
+              {/* Agent / avatar tile(s) in sidebar when whiteboard is open */}
+              {isAgentActive && agentRtcUid && (
+                <div className="aspect-video rounded-lg overflow-hidden">
+                  {agentAvatarRtcUid && hookAvatarVideoTrack ? (
+                    <AvatarVideoTile
+                      videoTrack={hookAvatarVideoTrack}
+                      agentName={agentSettings?.name || "AI Agent"}
+                    />
+                  ) : (
+                    <AgentTile
+                      agentUid={agentRtcUid}
+                      agentState={agentState}
+                      agentName={agentSettings?.name || "AI Agent"}
+                      transcriptionMode={transcriptionMode}
+                      videoTrack={null}
+                      avatarWaiting={!!(agentAvatarRtcUid && !hookAvatarVideoTrack)}
+                    />
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
