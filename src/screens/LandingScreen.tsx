@@ -96,10 +96,10 @@ const LandingScreen: React.FC = () => {
           <button
             type="button"
             onClick={handleSignInWithGoogle}
-            className="group flex items-center justify-center gap-3 px-6 py-3.5 rounded-xl bg-white dark:bg-gray-100 text-gray-900 font-semibold shadow-lg shadow-black/20 hover:shadow-xl hover:shadow-black/25 hover:bg-gray-50 dark:hover:bg-white transition-all duration-200 border border-gray-200/50 dark:border-gray-300/50"
+            className="group relative flex items-center justify-center gap-3 px-6 py-3.5 rounded-xl bg-white dark:bg-gray-100 text-gray-900 font-semibold shadow-lg shadow-black/20 hover:shadow-2xl hover:shadow-black/30 hover:scale-[1.02] hover:bg-gray-50 dark:hover:bg-white transition-all duration-300 border border-gray-200/50 dark:border-gray-300/50 cursor-pointer overflow-hidden active:scale-[0.98]"
           >
             <svg
-              className="w-5 h-5"
+              className="w-5 h-5 relative z-10"
               viewBox="0 0 24 24"
               aria-hidden
             >
@@ -120,7 +120,7 @@ const LandingScreen: React.FC = () => {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
               />
             </svg>
-            Sign in with Google
+            <span className="relative z-10">Sign in with Google</span>
           </button>
           <p className="text-gray-500 text-xs sm:text-sm text-center max-w-xs">
             Sign in with Google to create or join meetings.

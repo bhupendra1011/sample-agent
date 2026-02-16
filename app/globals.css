@@ -138,3 +138,16 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
   filter: brightness(0.92);
 }
+
+/* Button shimmer effect - continuous animation */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-50%);
+  }
+  100% {
+    transform: translateX(50%);
+  }
+}
+.animate-shimmer {
+  animation: shimmer 2s ease-in-out infinite;
+}
