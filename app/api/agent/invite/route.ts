@@ -368,25 +368,18 @@ export async function POST(request: NextRequest) {
     // Image modality: default to text + image so agent can receive picture messages
     llmPayload.input_modalities = llm.input_modalities ?? ["text", "image"];
 
-    // Build MCP servers for LLM (tool invocation)
-    if (llm.mcp_servers && llm.mcp_servers.length > 0) {
-      llmPayload.mcp_servers = llm.mcp_servers.map((s) => {
+    // Build MCP servers for LLM (tool invocation) — only include enabled servers
+    const enabledMcpServers = (llm.mcp_servers ?? []).filter((s) => s.enabled !== false);
+    if (enabledMcpServers.length > 0) {
+      llmPayload.mcp_servers = enabledMcpServers.map((s) => {
+        // Merge query params into endpoint URL, then strip UI-only fields
         const endpoint =
           s.queries && Object.keys(s.queries).length > 0
             ? `${s.endpoint.replace(/\?$/, "")}?${new URLSearchParams(s.queries).toString()}`
             : s.endpoint;
-        const entry: Record<string, unknown> = {
-          name: s.name,
-          endpoint,
-          ...(s.timeout_ms != null && { timeout_ms: s.timeout_ms }),
-          ...(s.headers &&
-            Object.keys(s.headers).length > 0 && { headers: s.headers }),
-          ...(s.allowed_tools != null && { allowed_tools: s.allowed_tools }),
-        };
-        if (s.transport === "streamable_http") {
-          entry.transport = "streamable_http";
-        }
-        return entry;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { enabled, queries, endpoint: _ep, ...rest } = s;
+        return { ...rest, endpoint };
       });
     }
 
@@ -609,8 +602,8 @@ export async function POST(request: NextRequest) {
     )[]) ?? ["text", "image"];
     const needsRtmForImage = inputModalities.includes("image");
 
-    // Add advanced features; auto-enable tools when any MCP server is configured
-    const hasMcpServers = llm.mcp_servers && llm.mcp_servers.length > 0;
+    // Add advanced features; auto-enable tools when any enabled MCP server is configured
+    const hasMcpServers = enabledMcpServers.length > 0;
     const enableTools = hasMcpServers || advanced_features?.enable_tools;
     if (advanced_features || hasMcpServers || needsRtmForImage) {
       propertiesPayload.advanced_features = {

@@ -38,6 +38,8 @@ export interface MCPServerConfig {
   timeout_ms?: number;
   /** Tool names the agent is allowed to invoke; omit = all, [] = none */
   allowed_tools?: string[];
+  /** UI-only: whether this server is enabled and included in the payload (default false) */
+  enabled?: boolean;
 }
 
 /** UI-only: tool info from discovery (e.g. Refresh Tools) */

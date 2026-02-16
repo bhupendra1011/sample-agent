@@ -1126,12 +1126,16 @@ const MCPServerTabContent: React.FC<MCPServerTabContentProps> = ({
   const handleAddOrUpdate = React.useCallback(
     (server: MCPServerConfig) => {
       if (editingIndex !== null) {
+        // Preserve the existing enabled state when editing
         setServers((prev) =>
-          prev.map((s, i) => (i === editingIndex ? server : s)),
+          prev.map((s, i) =>
+            i === editingIndex ? { ...server, enabled: s.enabled } : s,
+          ),
         );
         setEditingIndex(null);
       } else {
-        setServers((prev) => [...prev, server]);
+        // New servers default to disabled
+        setServers((prev) => [...prev, { ...server, enabled: false }]);
       }
     },
     [editingIndex],
@@ -1139,6 +1143,7 @@ const MCPServerTabContent: React.FC<MCPServerTabContentProps> = ({
 
   const handleSave = React.useCallback(() => {
     const base = agentSettings ?? getDefaultSettings();
+    const hasEnabledServers = servers.some((s) => s.enabled);
     const next: AgentSettings = {
       ...base,
       name: base.name ?? `agent-${Date.now()}`,
@@ -1152,7 +1157,7 @@ const MCPServerTabContent: React.FC<MCPServerTabContentProps> = ({
       advanced_features: {
         ...base.advanced_features,
         enable_tools:
-          servers.length > 0
+          hasEnabledServers
             ? true
             : (base.advanced_features?.enable_tools ?? false),
       },
@@ -1196,6 +1201,15 @@ const MCPServerTabContent: React.FC<MCPServerTabContentProps> = ({
           if (enabled) return { ...s, allowed_tools: [...current, toolName] };
           return { ...s, allowed_tools: current.filter((t) => t !== toolName) };
         }),
+      );
+    },
+    [],
+  );
+
+  const toggleServerEnabled = React.useCallback(
+    (index: number, enabled: boolean) => {
+      setServers((prev) =>
+        prev.map((s, i) => (i === index ? { ...s, enabled } : s)),
       );
     },
     [],
@@ -1256,11 +1270,36 @@ const MCPServerTabContent: React.FC<MCPServerTabContentProps> = ({
                     <span className="font-medium text-gray-900 dark:text-white">
                       {server.name}
                     </span>
-                    <span className="text-xs text-green-600 dark:text-green-400">
-                      Configured
-                    </span>
+                    {server.enabled ? (
+                      <span className="text-xs text-green-600 dark:text-green-400">
+                        Enabled
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        Disabled
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-1">
+                    {/* Enable / disable toggle */}
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={!!server.enabled}
+                      onClick={() => toggleServerEnabled(index, !server.enabled)}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors mr-1 ${
+                        server.enabled
+                          ? "bg-agora-accent-blue"
+                          : "bg-gray-300 dark:bg-gray-600"
+                      }`}
+                      title={server.enabled ? "Disable MCP Server" : "Enable MCP Server"}
+                    >
+                      <span
+                        className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                          server.enabled ? "translate-x-4" : "translate-x-0.5"
+                        }`}
+                      />
+                    </button>
                     <button
                       type="button"
                       onClick={() => refreshTools(server)}
@@ -1435,6 +1474,10 @@ function buildJoinPayloadPreview(settings: AgentSettings | null): string {
             settings.llm.api_key && settings.llm.api_key.trim()
               ? JOIN_PAYLOAD_MASK
               : "",
+          // Only include enabled MCP servers, strip the UI-only 'enabled' field
+          mcp_servers: (settings.llm.mcp_servers ?? [])
+            .filter((s) => s.enabled)
+            .map(({ enabled: _, ...rest }) => rest),
         }
       : {},
     tts: settings.tts ?? {},
