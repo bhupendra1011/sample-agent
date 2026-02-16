@@ -40,6 +40,14 @@ let currentScreenShareToken: string | null = null;
 let currentScreenShareUid: string | null = null;
 let currentChannelId: string | null = null; // The ID of the currently active Agora channel
 
+// Module-scoped local tracks ref — shared across ALL useAgora() hook instances.
+// Previously this was a useRef inside the hook, meaning each component that called
+// useAgora() got its own empty ref. Only the instance that called joinMeeting had
+// the actual tracks, so toggleLocalAudio/Video from Controls could never close them.
+const localTracksRef: { current: LocalAgoraTracks } = {
+  current: { audioTrack: null, videoTrack: null },
+};
+
 /**
  * Custom React Hook for managing all Agora RTC and RTM client-side logic.
  */
@@ -96,10 +104,7 @@ export const useAgora = () => {
   const [avatarVideoTrack, setAvatarVideoTrack] = useState<import("agora-rtc-sdk-ng").IRemoteVideoTrack | null>(null);
   const [avatarAudioTrack, setAvatarAudioTrack] = useState<import("agora-rtc-sdk-ng").IRemoteAudioTrack | null>(null);
 
-  const localTracksRef = useRef<LocalAgoraTracks>({
-    audioTrack: null,
-    videoTrack: null,
-  });
+  // localTracksRef is now module-scoped (see top of file) so all useAgora() instances share it
 
   // --- 3. Agora RTC/RTM Event Handlers (useCallback) ---
 
@@ -527,7 +532,13 @@ export const useAgora = () => {
                     if (data.mediaType === "audio" || data.mediaType === "both") {
                       const audioTrack = localTracksRef.current.audioTrack;
                       if (audioTrack && !hostMuteState.audioMuted) {
-                        await audioTrack.setMuted(true);
+                        try { await getRtcClient().unpublish(audioTrack); }
+                        catch (e) { console.warn("Host mute unpublish audio:", e); }
+                        try { audioTrack.getMediaStreamTrack()?.stop(); } catch { /* noop */ }
+                        audioTrack.stop();
+                        audioTrack.close();
+                        localTracksRef.current.audioTrack = null;
+                        getAppStore.getState().setLocalTracks(null, getAppStore.getState().localVideoTrack);
                         hostMuteState.toggleAudioMute();
                       }
                     }
@@ -535,7 +546,13 @@ export const useAgora = () => {
                     if (data.mediaType === "video" || data.mediaType === "both") {
                       const videoTrack = localTracksRef.current.videoTrack;
                       if (videoTrack && !hostMuteState.videoMuted) {
-                        await videoTrack.setMuted(true);
+                        try { await getRtcClient().unpublish(videoTrack); }
+                        catch (e) { console.warn("Host mute unpublish video:", e); }
+                        try { videoTrack.getMediaStreamTrack()?.stop(); } catch { /* noop */ }
+                        videoTrack.stop();
+                        videoTrack.close();
+                        localTracksRef.current.videoTrack = null;
+                        getAppStore.getState().setLocalTracks(getAppStore.getState().localAudioTrack, null);
                         hostMuteState.toggleVideoMute();
                       }
                     }
@@ -651,19 +668,27 @@ export const useAgora = () => {
     if (!request) return;
 
     try {
-      // Enable the appropriate track(s) using ref (correct ILocalTrack type)
+      // Create fresh track(s) and publish them (previous tracks were closed on mute)
       if (request.mediaType === "audio" || request.mediaType === "both") {
-        const audioTrack = localTracksRef.current.audioTrack;
-        if (audioTrack && currentState.audioMuted) {
-          await audioTrack.setMuted(false);
+        if (currentState.audioMuted) {
+          const microphoneId = currentState.selectedMicrophoneId;
+          const config = microphoneId ? { microphoneId } : undefined;
+          const newAudioTrack = await AgoraRTC.createMicrophoneAudioTrack(config);
+          localTracksRef.current.audioTrack = newAudioTrack;
+          getAppStore.getState().setLocalTracks(newAudioTrack, getAppStore.getState().localVideoTrack);
+          try { await getRtcClient().publish(newAudioTrack); }
+          catch (e) { console.warn("Accept unmute publish audio:", e); }
           currentState.toggleAudioMute();
         }
       }
 
       if (request.mediaType === "video" || request.mediaType === "both") {
-        const videoTrack = localTracksRef.current.videoTrack;
-        if (videoTrack && currentState.videoMuted) {
-          await videoTrack.setMuted(false);
+        if (currentState.videoMuted) {
+          const newVideoTrack = await AgoraRTC.createCameraVideoTrack();
+          localTracksRef.current.videoTrack = newVideoTrack;
+          getAppStore.getState().setLocalTracks(getAppStore.getState().localAudioTrack, newVideoTrack);
+          try { await getRtcClient().publish(newVideoTrack); }
+          catch (e) { console.warn("Accept unmute publish video:", e); }
           currentState.toggleVideoMute();
         }
       }
@@ -1120,6 +1145,27 @@ export const useAgora = () => {
           throw new Error("Failed to create local tracks.");
         }
 
+        // If the user is joining with audio/video muted, immediately close the
+        // tracks we just created so Chrome fully releases the hardware.
+        // The toggle functions will recreate them when the user unmutes.
+        if (audioMuted) {
+          try { audioTrack.getMediaStreamTrack()?.stop(); } catch { /* noop */ }
+          audioTrack.stop();
+          audioTrack.close();
+          localTracksRef.current.audioTrack = null;
+          getAppStore.getState().setLocalTracks(null, videoMuted ? null : videoTrack);
+        }
+        if (videoMuted) {
+          try { videoTrack.getMediaStreamTrack()?.stop(); } catch { /* noop */ }
+          videoTrack.stop();
+          videoTrack.close();
+          localTracksRef.current.videoTrack = null;
+          getAppStore.getState().setLocalTracks(
+            audioMuted ? null : localTracksRef.current.audioTrack,
+            null
+          );
+        }
+
         await getRtcClient().join(
           AGORA_CONFIG.APP_ID!,
           channelId,
@@ -1134,7 +1180,14 @@ export const useAgora = () => {
           audioMuted,
           videoMuted
         );
-        await getRtcClient().publish([audioTrack, videoTrack]);
+        // Only publish tracks that are not muted. Muted tracks were closed above
+        // and will be recreated + published when the user unmutes.
+        const tracksToPublish: (ILocalAudioTrack | ILocalVideoTrack)[] = [];
+        if (!audioMuted && localTracksRef.current.audioTrack) tracksToPublish.push(localTracksRef.current.audioTrack);
+        if (!videoMuted && localTracksRef.current.videoTrack) tracksToPublish.push(localTracksRef.current.videoTrack);
+        if (tracksToPublish.length > 0) {
+          await getRtcClient().publish(tracksToPublish);
+        }
 
         // Local user count is now set in callStart() - don't double count here
 
@@ -1382,10 +1435,29 @@ export const useAgora = () => {
 
   const toggleLocalAudio = useCallback(async () => {
     try {
-      const track = localTracksRef.current.audioTrack;
       const currentlyMuted = getAppStore.getState().audioMuted;
-      if (track) {
-        await track.setMuted(!currentlyMuted);
+      if (currentlyMuted) {
+        // Unmuting: create a fresh audio track, store it, and publish
+        const microphoneId = getAppStore.getState().selectedMicrophoneId;
+        const config = microphoneId ? { microphoneId } : undefined;
+        const newTrack = await AgoraRTC.createMicrophoneAudioTrack(config);
+        localTracksRef.current.audioTrack = newTrack;
+        getAppStore.getState().setLocalTracks(newTrack, getAppStore.getState().localVideoTrack);
+        try { await getRtcClient().publish(newTrack); }
+        catch (e) { console.warn("Audio publish after unmute:", e); }
+      } else {
+        // Muting: unpublish, then close the track to fully release the mic hardware
+        const track = localTracksRef.current.audioTrack;
+        if (track) {
+          try { await getRtcClient().unpublish(track); }
+          catch (e) { console.warn("Audio unpublish on mute:", e); }
+          // Stop the native browser MediaStreamTrack directly — guaranteed to release mic
+          try { track.getMediaStreamTrack()?.stop(); } catch { /* already stopped */ }
+          track.stop();
+          track.close();
+          localTracksRef.current.audioTrack = null;
+          getAppStore.getState().setLocalTracks(null, getAppStore.getState().localVideoTrack);
+        }
       }
       getAppStore.getState().toggleAudioMute();
     } catch (error) {
@@ -1396,10 +1468,27 @@ export const useAgora = () => {
 
   const toggleLocalVideo = useCallback(async () => {
     try {
-      const track = localTracksRef.current.videoTrack;
       const currentlyMuted = getAppStore.getState().videoMuted;
-      if (track) {
-        await track.setMuted(!currentlyMuted);
+      if (currentlyMuted) {
+        // Unmuting: create a fresh video track, store it, and publish
+        const newTrack = await AgoraRTC.createCameraVideoTrack();
+        localTracksRef.current.videoTrack = newTrack;
+        getAppStore.getState().setLocalTracks(getAppStore.getState().localAudioTrack, newTrack);
+        try { await getRtcClient().publish(newTrack); }
+        catch (e) { console.warn("Video publish after unmute:", e); }
+      } else {
+        // Muting: unpublish, then close the track to fully release the camera hardware
+        const track = localTracksRef.current.videoTrack;
+        if (track) {
+          try { await getRtcClient().unpublish(track); }
+          catch (e) { console.warn("Video unpublish on mute:", e); }
+          // Stop the native browser MediaStreamTrack directly — guaranteed to release camera
+          try { track.getMediaStreamTrack()?.stop(); } catch { /* already stopped */ }
+          track.stop();
+          track.close();
+          localTracksRef.current.videoTrack = null;
+          getAppStore.getState().setLocalTracks(getAppStore.getState().localAudioTrack, null);
+        }
       }
       getAppStore.getState().toggleVideoMute();
     } catch (error) {

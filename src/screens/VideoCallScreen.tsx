@@ -347,7 +347,7 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ channelId }) => {
                       uid={localUID}
                       name={localUsername}
                       isLocal={true}
-                      track={localTracks.videoTrack}
+                      track={videoMuted ? null : localTracks.videoTrack}
                       micMuted={audioMuted}
                       videoMuted={!localTracks.videoTrack || videoMuted}
                     />
@@ -466,7 +466,7 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ channelId }) => {
                     uid={localUID}
                     name={localUsername}
                     isLocal={true}
-                    track={localTracks.videoTrack}
+                    track={videoMuted ? null : localTracks.videoTrack}
                     micMuted={audioMuted}
                     videoMuted={!localTracks.videoTrack || videoMuted}
                   />

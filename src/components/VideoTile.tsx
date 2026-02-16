@@ -24,13 +24,17 @@ const VideoTile: React.FC<VideoTileProps> = ({
   const videoContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (videoContainerRef.current && track) {
-      if (!videoMuted) {
-        track.play(videoContainerRef.current);
-      } else {
+    if (!videoContainerRef.current) return;
+
+    if (track && !videoMuted) {
+      track.play(videoContainerRef.current);
+    }
+
+    return () => {
+      if (track) {
         track.stop();
       }
-    }
+    };
   }, [track, videoMuted]);
 
   return (
