@@ -149,6 +149,14 @@ async function handleCustomPayloadJoin(
     }
   }
 
+  // HeyGen avatars only support TTS at 24,000 Hz; ensure TTS params have sample_rate 24000
+  if (avatar?.enable && avatar?.vendor === "heygen" && properties.tts && typeof properties.tts === "object") {
+    const tts = properties.tts as Record<string, unknown>;
+    if (tts.params && typeof tts.params === "object") {
+      (tts.params as Record<string, unknown>).sample_rate = 24000;
+    }
+  }
+
   const joinPayload = { name: customJoinPayload.name, properties };
   const authHeader = Buffer.from(`${CUSTOMER_ID}:${CUSTOMER_SECRET}`).toString(
     "base64",
@@ -189,6 +197,9 @@ async function handleCustomPayloadJoin(
     "[Agent invite] Custom payload join request:",
     JSON.stringify(sanitized, null, 2),
   );
+  if (process.env.AGORA_LOG_PAYLOAD_VERBOSE === "1" || process.env.AGORA_LOG_PAYLOAD_VERBOSE === "true") {
+    console.log("[Agent invite] [VERBOSE] Full request payload (no masking):", JSON.stringify(joinPayload, null, 2));
+  }
 
   const agoraResponse = await fetch(apiUrl, {
     method: "POST",
@@ -412,6 +423,12 @@ export async function POST(request: NextRequest) {
       vendor: tts.vendor,
       params: ttsParams,
     };
+
+    // HeyGen avatars only support TTS at 24,000 Hz (Agora docs). Force 24k when HeyGen avatar is enabled.
+    if (avatar?.enable && avatar?.vendor === "heygen") {
+      ttsParams.sample_rate = 24000;
+      ttsPayload.params = ttsParams;
+    }
 
     // Build ASR config (optional); inject server key when client does not provide one
     const asrPayload: Record<string, unknown> | undefined = asr
@@ -806,6 +823,11 @@ export async function POST(request: NextRequest) {
       Authorization: "Basic ***MASKED***",
     });
     console.log("Payload:", JSON.stringify(sanitizedPayload, null, 2));
+    // When AGORA_LOG_PAYLOAD_VERBOSE=1, log full payload (no masking) for verification
+    if (process.env.AGORA_LOG_PAYLOAD_VERBOSE === "1" || process.env.AGORA_LOG_PAYLOAD_VERBOSE === "true") {
+      console.log("\n[VERBOSE] Full request payload (no masking):");
+      console.log(JSON.stringify(joinPayload, null, 2));
+    }
     console.log("=====================================================\n");
 
     const agoraResponse = await fetch(apiUrl, {

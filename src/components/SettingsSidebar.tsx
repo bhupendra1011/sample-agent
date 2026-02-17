@@ -374,9 +374,12 @@ const getEnvVar = (key: string, defaultValue: string = ""): string => {
   return ENV_MAP[key] || defaultValue;
 };
 
-/** Never show API keys in the DOM; show placeholder when non-empty so server-injected or user-typed keys are not visible. */
-const maskKeyForDisplay = (key: string | undefined): string =>
-  key && String(key).trim() !== "" ? "••••••••" : "";
+/** Never show API keys in the DOM. Show empty when blank or server-key sentinel (same as LLM); show dots only when user has entered a key. */
+const maskKeyForDisplay = (key: string | undefined): string => {
+  const k = String(key ?? "").trim();
+  if (k === "" || k === "__USE_SERVER__" || k === "***MASKED***") return "";
+  return "••••••••";
+};
 
 /** On change for a masked key field: keep existing key if user did not change, otherwise set to new value. */
 const keyChange = (
@@ -2449,6 +2452,7 @@ const AgentSettingsSidebarContent: React.FC<{
           <FormField
             label="API Key"
             required
+            tooltip="Leave empty to use server-configured key (HEYGEN_API_KEY or AKOOL_API_KEY in .env). If you enter a key here, that key is used instead."
             hint="Leave empty to use server-configured key (HEYGEN_API_KEY / AKOOL_API_KEY in .env)"
           >
             <Input
