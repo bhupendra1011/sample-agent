@@ -4,6 +4,7 @@ import type {
   Participant,
   PendingUnmuteRequest,
   AgentSettings,
+  AgentQueryStatus,
   ITranscriptHelperItem,
 } from "@/types/agora";
 import { EAgentState, ETranscriptRenderMode } from "@/types/agora";
@@ -107,6 +108,10 @@ interface AppState {
   setCurrentInProgressMessage: (message: ITranscriptHelperItem | null) => void;
   setTranscriptionMode: (mode: "rtc" | "rtm") => void;
   setTranscriptRenderMode: (mode: ETranscriptRenderMode) => void;
+
+  // Agent query status (from REST API polling)
+  agentQueryStatus: AgentQueryStatus | null;
+  setAgentQueryStatus: (status: AgentQueryStatus | null) => void;
 
   // Host control actions
   setIsHost: (isHost: boolean) => void;
@@ -249,6 +254,7 @@ const useAppStore = create<AppState>((set, get) => ({
       currentInProgressMessage: null,
       userSentMessages: [],
       transcriptionMode: "rtm",
+      agentQueryStatus: null,
     }),
   setAgentSettings: (settings) => {
     // Derive transcription mode and update both atomically (default RTM unless explicitly disabled)
@@ -261,6 +267,10 @@ const useAppStore = create<AppState>((set, get) => ({
     set({ currentInProgressMessage: message }),
   setTranscriptionMode: (mode) => set({ transcriptionMode: mode }),
   setTranscriptRenderMode: (mode) => set({ transcriptRenderMode: mode }),
+
+  // Agent query status
+  agentQueryStatus: null,
+  setAgentQueryStatus: (status) => set({ agentQueryStatus: status }),
 
   // Host control initial state
   isHost: false,
@@ -371,6 +381,7 @@ const useAppStore = create<AppState>((set, get) => ({
       transcriptItems: [],
       userSentMessages: [],
       transcriptionMode: "rtm",
+      agentQueryStatus: null,
     }),
   clearSessionStartTime: () => set({ sessionStartTime: null }),
   increaseUserCount: () => set((state) => ({ userCount: state.userCount + 1 })),

@@ -1,5 +1,5 @@
 // src/api/agentApi.ts
-import type { AgentSettings } from "@/types/agora";
+import type { AgentSettings, AgentQueryStatus } from "@/types/agora";
 
 export interface CustomJoinPayload {
   name: string;
@@ -70,6 +70,23 @@ export async function updateAgent(
   if (!response.ok) {
     const errorData = await response.json();
     throw new Error(errorData.error || "Failed to update agent");
+  }
+
+  return response.json();
+}
+
+/**
+ * Queries the current operational status of an AI agent.
+ * See: https://docs.agora.io/en/conversational-ai/rest-api/agent/query
+ */
+export async function queryAgent(
+  agentId: string,
+): Promise<AgentQueryStatus> {
+  const response = await fetch(`/api/agent/query?agentId=${encodeURIComponent(agentId)}`);
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || "Failed to query agent status");
   }
 
   return response.json();

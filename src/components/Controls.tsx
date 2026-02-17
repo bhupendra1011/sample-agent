@@ -29,6 +29,7 @@ import Modal from "@/components/common/Modal";
 import CopyButton from "@/components/common/CopyButton";
 import SettingsSidebar from "@/components/SettingsSidebar";
 import TranscriptSidePanel from "@/components/TranscriptSidePanel";
+import AgentStatusBadge from "@/components/AgentStatusBadge";
 import type { AgentSettings } from "@/types/agora";
 
 // Only LLM and MLLM params support auto-update via API. Adv settings = manual restart only.
@@ -453,6 +454,7 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
                         : "Start Agent"}
                 </span>
               </button>
+              {isAgentActive && <AgentStatusBadge />}
               <button
                 onClick={() => setIsSettingsPanelOpen(true)}
                 className="flex items-center justify-center w-10 h-10 rounded-lg text-gray-800 dark:text-white  hover:bg-gray-400 dark:hover:bg-gray-600 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-agora"

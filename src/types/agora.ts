@@ -299,6 +299,24 @@ export interface AvatarConfig {
   params: AvatarAkoolParams | AvatarHeyGenParams;
 }
 
+// --- Agent Query Status (from Agora REST API: GET /agents/{agentId}) ---
+export type AgentOperationalStatus =
+  | "IDLE"
+  | "STARTING"
+  | "RUNNING"
+  | "STOPPING"
+  | "STOPPED"
+  | "RECOVERING"
+  | "FAILED";
+
+export interface AgentQueryStatus {
+  message: string;
+  start_ts: number;
+  stop_ts: number;
+  status: AgentOperationalStatus;
+  agent_id: string;
+}
+
 // --- Agent State Enum (from Agora Conversational AI API) ---
 export enum EAgentState {
   IDLE = "idle",
