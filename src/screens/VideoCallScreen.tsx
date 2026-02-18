@@ -71,17 +71,14 @@ function AvatarVideoTile({
   );
 }
 
-interface VideoCallScreenProps {
-  channelId: string;
-}
-
-const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ channelId }) => {
+const VideoCallScreen: React.FC = () => {
   const router = useRouter();
 
   const {
     localUsername,
     localUID,
     meetingName,
+    channelId,
     audioMuted,
     videoMuted,
     remoteParticipants,

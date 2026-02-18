@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import useAppStore from "@/store/useAppStore";
@@ -13,6 +13,7 @@ import Card from "@/components/common/Card";
 import Button from "@/components/common/Button";
 import InputField from "@/components/common/InputField";
 import MeetingAuthHeader from "@/components/MeetingAuthHeader";
+import MeetingLoadingSkeleton from "@/components/MeetingLoadingSkeleton";
 
 const JoinMeetingScreen: React.FC = () => {
   const callStart = useAppStore((state) => state.callStart);
@@ -22,6 +23,11 @@ const JoinMeetingScreen: React.FC = () => {
   );
   const { joinMeeting: joinAgoraMeeting } = useAgora();
   const router = useRouter();
+
+  // Prefetch VideoCallScreen chunk so it's cached before navigation
+  useEffect(() => {
+    import("@/screens/VideoCallScreen").catch(() => {});
+  }, []);
 
   const [yourName, setYourName] = useState<string>("");
   const [meetingID, setMeetingID] = useState<string>("");
@@ -83,7 +89,7 @@ const JoinMeetingScreen: React.FC = () => {
         );
       }
 
-      router.push(`/call/${meetingInfo.channel}`);
+      router.push("/call");
     } catch (error) {
       console.error("Failed to join meeting:", error);
       showToast(
@@ -91,10 +97,13 @@ const JoinMeetingScreen: React.FC = () => {
         "error",
       );
       callEnd();
-    } finally {
       setIsLoading(false);
     }
   };
+
+  if (isLoading) {
+    return <MeetingLoadingSkeleton />;
+  }
 
   return (
     <div className="relative flex flex-col items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white p-4 font-inter transition-colors duration-300">

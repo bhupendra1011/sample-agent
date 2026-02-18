@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 export default auth((req) => {
   const { pathname } = req.nextUrl;
   const isProtected =
-    pathname === "/join" || pathname.startsWith("/call/");
+    pathname === "/join" || pathname === "/call";
   if (isProtected && !req.auth) {
     const url = new URL("/", req.nextUrl.origin);
     return NextResponse.redirect(url);
@@ -13,5 +13,5 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/join", "/call/:path*"],
+  matcher: ["/join", "/call"],
 };
