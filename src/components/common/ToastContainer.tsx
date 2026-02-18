@@ -21,7 +21,7 @@ const ToastContainer: React.FC = () => {
 
   return createPortal(
     <div
-      className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[60] flex flex-col gap-3 max-w-[calc(100vw-2rem)]"
+      className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[60] flex flex-col-reverse gap-2 max-w-[calc(100vw-2rem)]"
       aria-live="polite"
       aria-label="Notifications"
     >

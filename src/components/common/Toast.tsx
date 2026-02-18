@@ -16,26 +16,33 @@ interface ToastProps {
   onDismiss: (id: string) => void;
 }
 
-const typeConfig = {
+const typeConfig: Record<
+  ToastType,
+  {
+    icon: React.ComponentType<{ className?: string }>;
+    iconClass: string;
+    accentClass: string;
+  }
+> = {
   success: {
     icon: MdCheckCircle,
-    bgClass: "bg-green-600 dark:bg-green-500",
-    borderClass: "border-green-700 dark:border-green-400",
+    iconClass: "text-emerald-600 dark:text-emerald-400",
+    accentClass: "bg-emerald-600 dark:bg-emerald-400",
   },
   error: {
     icon: MdError,
-    bgClass: "bg-red-600 dark:bg-red-500",
-    borderClass: "border-red-700 dark:border-red-400",
+    iconClass: "text-red-500 dark:text-red-400",
+    accentClass: "bg-red-500 dark:bg-red-400",
   },
   warning: {
     icon: MdWarning,
-    bgClass: "bg-yellow-500 dark:bg-yellow-500",
-    borderClass: "border-yellow-600 dark:border-yellow-400",
+    iconClass: "text-amber-500 dark:text-amber-400",
+    accentClass: "bg-amber-500 dark:bg-amber-400",
   },
   info: {
     icon: MdInfo,
-    bgClass: "bg-agora",
-    borderClass: "border-agora",
+    iconClass: "text-blue-500 dark:text-blue-400",
+    accentClass: "bg-blue-500 dark:bg-blue-400",
   },
 };
 
@@ -50,7 +57,7 @@ const Toast: React.FC<ToastProps> = ({ id, message, type, onDismiss }) => {
     setIsExiting(true);
     setTimeout(() => {
       onDismiss(id);
-    }, 300); // Match duration-300 CSS transition
+    }, 250);
   }, [id, onDismiss]);
 
   // Trigger enter animation on mount
@@ -75,24 +82,33 @@ const Toast: React.FC<ToastProps> = ({ id, message, type, onDismiss }) => {
       role="alert"
       onClick={handleDismiss}
       className={`
-        flex items-center gap-3 p-4 rounded-lg shadow-lg border cursor-pointer
-        text-white min-w-[280px] max-w-[360px]
-        transition-all duration-300 ease-out
-        ${config.bgClass} ${config.borderClass}
-        ${isVisible && !isExiting ? "translate-x-0 opacity-100" : "translate-x-full opacity-0"}
+        relative flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer
+        min-w-[300px] max-w-[400px] overflow-hidden
+        bg-white/90 dark:bg-gray-800/90 backdrop-blur-md
+        border border-gray-200/60 dark:border-gray-700/60
+        shadow-[0_4px_24px_rgba(0,0,0,0.08)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.3)]
+        transition-all duration-250 ease-out
+        ${isVisible && !isExiting ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"}
       `}
     >
-      <Icon className="text-2xl flex-shrink-0" />
-      <span className="flex-1 text-sm font-medium">{message}</span>
+      {/* Left accent bar */}
+      <div
+        className={`absolute left-0 top-0 bottom-0 w-[3px] rounded-l-xl ${config.accentClass}`}
+      />
+
+      <Icon className={`text-xl flex-shrink-0 ${config.iconClass}`} />
+      <span className="flex-1 text-sm font-medium text-gray-800 dark:text-gray-100 leading-snug">
+        {message}
+      </span>
       <button
         onClick={(e) => {
           e.stopPropagation();
           handleDismiss();
         }}
-        className="p-1 rounded-full hover:bg-white/20 transition-colors duration-200"
+        className="p-1 rounded-md text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors duration-150"
         aria-label="Dismiss notification"
       >
-        <MdClose className="text-lg" />
+        <MdClose className="text-base" />
       </button>
     </div>
   );

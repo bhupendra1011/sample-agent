@@ -8,14 +8,26 @@ import type { AgentOperationalStatus } from "@/types/agora";
 
 const POLL_INTERVAL_MS = 120_000;
 
-const STATUS_COLORS: Record<AgentOperationalStatus, { dot: string; text: string }> = {
+const STATUS_COLORS: Record<
+  AgentOperationalStatus,
+  { dot: string; text: string }
+> = {
   RUNNING: { dot: "bg-green-500", text: "text-green-600 dark:text-green-400" },
-  STARTING: { dot: "bg-yellow-500 animate-pulse", text: "text-yellow-600 dark:text-yellow-400" },
-  RECOVERING: { dot: "bg-yellow-500 animate-pulse", text: "text-yellow-600 dark:text-yellow-400" },
+  STARTING: {
+    dot: "bg-yellow-500 animate-pulse",
+    text: "text-yellow-600 dark:text-yellow-400",
+  },
+  RECOVERING: {
+    dot: "bg-yellow-500 animate-pulse",
+    text: "text-yellow-600 dark:text-yellow-400",
+  },
   FAILED: { dot: "bg-red-500", text: "text-red-600 dark:text-red-400" },
   STOPPED: { dot: "bg-red-400", text: "text-red-500 dark:text-red-400" },
   IDLE: { dot: "bg-gray-400", text: "text-gray-500 dark:text-gray-400" },
-  STOPPING: { dot: "bg-gray-400 animate-pulse", text: "text-gray-500 dark:text-gray-400" },
+  STOPPING: {
+    dot: "bg-gray-400 animate-pulse",
+    text: "text-gray-500 dark:text-gray-400",
+  },
 };
 
 function formatTimestamp(ts: number): string {
@@ -149,13 +161,17 @@ const AgentStatusBadge: React.FC = () => {
             <div className="flex justify-between">
               <span className="text-gray-500 dark:text-gray-400">Started</span>
               <span className="text-gray-700 dark:text-gray-300">
-                {agentQueryStatus ? formatTimestamp(agentQueryStatus.start_ts) : "—"}
+                {agentQueryStatus
+                  ? formatTimestamp(agentQueryStatus.start_ts)
+                  : "—"}
               </span>
             </div>
 
             {agentQueryStatus?.stop_ts ? (
               <div className="flex justify-between">
-                <span className="text-gray-500 dark:text-gray-400">Stopped</span>
+                <span className="text-gray-500 dark:text-gray-400">
+                  Stopped
+                </span>
                 <span className="text-gray-700 dark:text-gray-300">
                   {formatTimestamp(agentQueryStatus.stop_ts)}
                 </span>
