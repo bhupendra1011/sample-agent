@@ -339,6 +339,7 @@ import {
   SUPPORTED_LANGUAGES,
 } from "@/types/agora";
 import InfoTooltip from "@/components/common/InfoTooltip";
+import ElevenLabsVoicePicker from "@/components/ElevenLabsVoicePicker";
 import {
   MdExpandMore,
   MdExpandLess,
@@ -2272,14 +2273,13 @@ const AgentSettingsSidebarContent: React.FC<{
                 />
               </FormField>
               <FormField
-                label="Voice ID"
+                label="Voice"
                 required
                 hint="From ElevenLabs voice library"
               >
-                <Input
+                <ElevenLabsVoicePicker
                   value={getTTSParam("voice_id")}
-                  onChange={(e) => setTTSParam("voice_id", e.target.value)}
-                  placeholder="pNInz6obpgDQGcFmaJgB"
+                  onChange={(id) => setTTSParam("voice_id", id)}
                 />
               </FormField>
               <div className="grid grid-cols-2 gap-4">

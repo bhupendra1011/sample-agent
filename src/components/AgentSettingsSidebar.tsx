@@ -45,6 +45,7 @@ import {
   ANAM_AVATAR_OPTIONS,
   ANAM_DEFAULT_AVATAR_ID,
 } from "@/constants/anamAvatars";
+import ElevenLabsVoicePicker from "@/components/ElevenLabsVoicePicker";
 
 interface AgentSettingsSidebarProps {
   isOpen: boolean;
@@ -1169,14 +1170,13 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
                   />
                 </FormField>
                 <FormField
-                  label="Voice ID"
+                  label="Voice"
                   required
                   hint="From ElevenLabs voice library"
                 >
-                  <Input
+                  <ElevenLabsVoicePicker
                     value={getTTSParam("voice_id")}
-                    onChange={(e) => setTTSParam("voice_id", e.target.value)}
-                    placeholder="pNInz6obpgDQGcFmaJgB"
+                    onChange={(id) => setTTSParam("voice_id", id)}
                   />
                 </FormField>
                 <div className="grid grid-cols-2 gap-4">
