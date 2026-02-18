@@ -146,11 +146,44 @@ async function handleCustomPayloadJoin(
         tokenExpiration,
         privilegeExpiration,
       );
+    } else if (vendor === "anam") {
+      const keyToInject =
+        (params.api_key as string) ?? (params.anam_api_key as string);
+      if (shouldInjectServerKey(keyToInject)) {
+        const injected =
+          (
+            process.env.ANAM_API_KEY ||
+            process.env.NEXT_PUBLIC_ANAM_API_KEY ||
+            ""
+          ).trim();
+        params.api_key = injected;
+        params.anam_api_key = injected;
+      }
+      params.anam_avatar_id =
+        (params.anam_avatar_id as string) ?? (params.avatar_id as string);
+      params.anam_base_url = "https://api.anam.ai/v1";
+      avatarRtcUidReturn = "999999";
+      const avatarUid = 999999;
+      params.agora_uid = String(avatarUid);
+      params.agora_token = RtcTokenBuilder.buildTokenWithUid(
+        APP_ID,
+        APP_CERTIFICATE,
+        channelName,
+        avatarUid,
+        RtcRole.PUBLISHER,
+        tokenExpiration,
+        privilegeExpiration,
+      );
     }
   }
 
-  // HeyGen avatars only support TTS at 24,000 Hz; ensure TTS params have sample_rate 24000
-  if (avatar?.enable && avatar?.vendor === "heygen" && properties.tts && typeof properties.tts === "object") {
+  // HeyGen and Anam avatars support TTS at 24,000 Hz; ensure TTS params have sample_rate 24000
+  if (
+    avatar?.enable &&
+    (avatar?.vendor === "heygen" || avatar?.vendor === "anam") &&
+    properties.tts &&
+    typeof properties.tts === "object"
+  ) {
     const tts = properties.tts as Record<string, unknown>;
     if (tts.params && typeof tts.params === "object") {
       (tts.params as Record<string, unknown>).sample_rate = 24000;
@@ -189,6 +222,7 @@ async function handleCustomPayloadJoin(
         unknown
       >;
       ap.api_key = "***MASKED***";
+      if (ap.anam_api_key) ap.anam_api_key = "***MASKED***";
       if (ap.agora_token)
         ap.agora_token = String(ap.agora_token).substring(0, 20) + "...";
     }
@@ -424,8 +458,11 @@ export async function POST(request: NextRequest) {
       params: ttsParams,
     };
 
-    // HeyGen avatars only support TTS at 24,000 Hz (Agora docs). Force 24k when HeyGen avatar is enabled.
-    if (avatar?.enable && avatar?.vendor === "heygen") {
+    // HeyGen and Anam avatars support TTS at 24,000 Hz (Agora docs). Force 24k when enabled.
+    if (
+      avatar?.enable &&
+      (avatar?.vendor === "heygen" || avatar?.vendor === "anam")
+    ) {
       ttsParams.sample_rate = 24000;
       ttsPayload.params = ttsParams;
     }
@@ -774,6 +811,55 @@ export async function POST(request: NextRequest) {
         avatarParams.activity_idle_timeout =
           heygenParams.activity_idle_timeout ?? 60;
         // HeyGen avatars only support TTS at 24,000 Hz. Ensure TTS is configured for 24k when using HeyGen.
+      } else if (avatar.vendor === "anam") {
+        const anamParams = avatar.params as {
+          api_key?: string;
+          anam_api_key?: string;
+          avatar_id?: string;
+          anam_avatar_id?: string;
+        };
+        const anamApiKey =
+          (shouldInjectServerKey(anamParams.api_key ?? anamParams.anam_api_key)
+            ? ""
+            : (anamParams.anam_api_key ?? anamParams.api_key ?? "").trim()) ||
+          (
+            process.env.ANAM_API_KEY ||
+            process.env.NEXT_PUBLIC_ANAM_API_KEY ||
+            ""
+          ).trim();
+        const anamAvatarId = (
+          anamParams.anam_avatar_id ??
+          anamParams.avatar_id ??
+          process.env.NEXT_PUBLIC_ANAM_AVATAR_ID ??
+          ""
+        ).trim();
+        if (!anamApiKey) {
+          console.warn(
+            "[Agent invite] Anam avatar enabled but api_key is missing. Set ANAM_API_KEY or pass avatar.params.api_key.",
+          );
+          return NextResponse.json(
+            {
+              error:
+                "Anam avatar requires api_key. Set ANAM_API_KEY or configure avatar.params.api_key.",
+            },
+            { status: 400 },
+          );
+        }
+        if (!anamAvatarId) {
+          console.warn(
+            "[Agent invite] Anam avatar enabled but avatar_id is missing. Set NEXT_PUBLIC_ANAM_AVATAR_ID or pass avatar.params.avatar_id.",
+          );
+          return NextResponse.json(
+            {
+              error:
+                "Anam avatar requires avatar_id. Set NEXT_PUBLIC_ANAM_AVATAR_ID or select an avatar in settings.",
+            },
+            { status: 400 },
+          );
+        }
+        avatarParams.anam_api_key = anamApiKey;
+        avatarParams.anam_avatar_id = anamAvatarId;
+        avatarParams.anam_base_url = "https://api.anam.ai/v1";
       }
 
       propertiesPayload.avatar = {
@@ -808,6 +894,9 @@ export async function POST(request: NextRequest) {
     }
     if (sanitizedPayload.properties?.avatar?.params?.api_key) {
       sanitizedPayload.properties.avatar.params.api_key = "***MASKED***";
+    }
+    if (sanitizedPayload.properties?.avatar?.params?.anam_api_key) {
+      sanitizedPayload.properties.avatar.params.anam_api_key = "***MASKED***";
     }
     if (sanitizedPayload.properties?.avatar?.params?.agora_token) {
       sanitizedPayload.properties.avatar.params.agora_token =

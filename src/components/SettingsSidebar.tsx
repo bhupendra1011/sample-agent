@@ -27,6 +27,10 @@ import {
   HEYGEN_AVATAR_GROUPS,
   HEYGEN_DEFAULT_AVATAR_ID,
 } from "@/constants/heygenAvatars";
+import {
+  ANAM_AVATAR_OPTIONS,
+  ANAM_DEFAULT_AVATAR_ID,
+} from "@/constants/anamAvatars";
 
 type SettingsTab = "ai-agent" | "voice" | "mcp-server";
 
@@ -328,6 +332,7 @@ import {
   AvatarConfig,
   AvatarAkoolParams,
   AvatarHeyGenParams,
+  AvatarAnamParams,
   LLM_PRESETS,
   TTS_PRESETS,
   ASR_PRESETS,
@@ -368,6 +373,7 @@ const ENV_MAP: Record<string, string | undefined> = {
   AKOOL_AVATAR_ID: process.env.NEXT_PUBLIC_AKOOL_AVATAR_ID,
   HEYGEN_AVATAR_ID: process.env.NEXT_PUBLIC_HEYGEN_AVATAR_ID,
   HEYGEN_QUALITY: process.env.NEXT_PUBLIC_HEYGEN_QUALITY,
+  ANAM_AVATAR_ID: process.env.NEXT_PUBLIC_ANAM_AVATAR_ID,
 };
 
 const getEnvVar = (key: string, defaultValue: string = ""): string => {
@@ -480,11 +486,12 @@ const getDefaultASRConfig = (vendor: ASRVendor): ASRConfig => {
 const AVATAR_PRESETS: Record<AvatarVendor, { label: string; value: string }> = {
   akool: { label: "Akool (Beta)", value: "akool" },
   heygen: { label: "HeyGen (Beta)", value: "heygen" },
+  anam: { label: "Anam", value: "anam" },
 };
 
 const getDefaultAvatarParams = (
   vendor: AvatarVendor,
-): AvatarAkoolParams | AvatarHeyGenParams => {
+): AvatarAkoolParams | AvatarHeyGenParams | AvatarAnamParams => {
   // API keys are never read client-side; server injects from env when key is empty
   switch (vendor) {
     case "akool":
@@ -504,6 +511,12 @@ const getDefaultAvatarParams = (
         avatar_id: HEYGEN_DEFAULT_AVATAR_ID,
         disable_idle_timeout: false,
         activity_idle_timeout: 60,
+      };
+    case "anam":
+      return {
+        api_key: "",
+        agora_uid: "",
+        avatar_id: getEnvVar("ANAM_AVATAR_ID") || ANAM_DEFAULT_AVATAR_ID,
       };
   }
 };
@@ -585,8 +598,8 @@ const getDefaultSettings = (): AgentSettingsType => {
     },
     avatar: {
       enable: false,
-      vendor: "heygen",
-      params: getDefaultAvatarParams("heygen"),
+      vendor: "anam",
+      params: getDefaultAvatarParams("anam"),
     },
   };
 };
@@ -1734,7 +1747,7 @@ const AgentSettingsSidebarContent: React.FC<{
     getDefaultASRVendor(),
   );
   const [selectedAvatarVendor, setSelectedAvatarVendor] =
-    React.useState<AvatarVendor>("heygen");
+    React.useState<AvatarVendor>("anam");
 
   // Track whether form is initialized from store (to prevent infinite sync loop)
   const isFormInitialized = React.useRef(false);
@@ -1793,8 +1806,8 @@ const AgentSettingsSidebarContent: React.FC<{
       ...prev,
       avatar: {
         enable: false,
-        vendor: "heygen",
-        params: getDefaultAvatarParams("heygen"),
+        vendor: "anam",
+        params: getDefaultAvatarParams("anam"),
         ...prev.avatar,
         ...updates,
       } as AvatarConfig,
@@ -1957,7 +1970,8 @@ const AgentSettingsSidebarContent: React.FC<{
           ...prev.avatar,
           params: newParams as unknown as
             | AvatarAkoolParams
-            | AvatarHeyGenParams,
+            | AvatarHeyGenParams
+            | AvatarAnamParams,
         },
       };
     });
@@ -2445,15 +2459,17 @@ const AgentSettingsSidebarContent: React.FC<{
               <strong>Important:</strong>{" "}
               {selectedAvatarVendor === "akool"
                 ? "Akool requires TTS with 16kHz sample rate (e.g., Microsoft Azure TTS)"
-                : "HeyGen requires TTS with 24kHz sample rate (e.g., ElevenLabs or OpenAI TTS)"}
+                : selectedAvatarVendor === "anam"
+                  ? "Anam requires TTS with 24kHz sample rate (e.g., ElevenLabs or OpenAI TTS)"
+                  : "HeyGen requires TTS with 24kHz sample rate (e.g., ElevenLabs or OpenAI TTS)"}
             </p>
           </div>
 
           <FormField
             label="API Key"
             required
-            tooltip="Leave empty to use server-configured key (HEYGEN_API_KEY or AKOOL_API_KEY in .env). If you enter a key here, that key is used instead."
-            hint="Leave empty to use server-configured key (HEYGEN_API_KEY / AKOOL_API_KEY in .env)"
+            tooltip="Leave empty to use server-configured key (HEYGEN_API_KEY, AKOOL_API_KEY, or ANAM_API_KEY in .env). If you enter a key here, that key is used instead."
+            hint="Leave empty to use server-configured key (HEYGEN_API_KEY / AKOOL_API_KEY / ANAM_API_KEY in .env)"
           >
             <Input
               type="password"
@@ -2466,7 +2482,9 @@ const AgentSettingsSidebarContent: React.FC<{
               placeholder={
                 selectedAvatarVendor === "akool"
                   ? "Leave empty for server key, or enter Akool API key"
-                  : "Leave empty for server key, or enter HeyGen API key"
+                  : selectedAvatarVendor === "anam"
+                    ? "Leave empty for server key, or enter Anam API key"
+                    : "Leave empty for server key, or enter HeyGen API key"
               }
             />
           </FormField>
@@ -2482,6 +2500,24 @@ const AgentSettingsSidebarContent: React.FC<{
                 value={getAvatarParam("avatar_id")}
                 onChange={(e) => setAvatarParam("avatar_id", e.target.value)}
                 placeholder="Akool avatar ID"
+              />
+            </FormField>
+          )}
+
+          {selectedAvatarVendor === "anam" && (
+            <FormField
+              label="Avatar"
+              required
+              hint="Choose an Anam avatar character"
+              tooltip="Select one of the available Anam stock avatars."
+            >
+              <CustomSelect
+                value={getAvatarParam("avatar_id") || ANAM_DEFAULT_AVATAR_ID}
+                onChange={(v) => setAvatarParam("avatar_id", v)}
+                options={ANAM_AVATAR_OPTIONS.map((opt) => ({
+                  value: opt.value,
+                  label: opt.label,
+                }))}
               />
             </FormField>
           )}

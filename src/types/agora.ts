@@ -274,7 +274,7 @@ export interface AgentParametersConfig {
 }
 
 // --- Avatar Vendors ---
-export type AvatarVendor = "akool" | "heygen";
+export type AvatarVendor = "akool" | "heygen" | "anam";
 
 export interface AvatarAkoolParams {
   api_key: string;
@@ -293,10 +293,17 @@ export interface AvatarHeyGenParams {
   activity_idle_timeout?: number;
 }
 
+export interface AvatarAnamParams {
+  api_key: string;
+  agora_uid: string;
+  agora_token?: string;
+  avatar_id: string;
+}
+
 export interface AvatarConfig {
   enable: boolean;
   vendor: AvatarVendor;
-  params: AvatarAkoolParams | AvatarHeyGenParams;
+  params: AvatarAkoolParams | AvatarHeyGenParams | AvatarAnamParams;
 }
 
 // --- Agent Query Status (from Agora REST API: GET /agents/{agentId}) ---
