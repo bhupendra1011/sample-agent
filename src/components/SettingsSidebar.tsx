@@ -522,7 +522,7 @@ const getDefaultAvatarParams = (
   }
 };
 
-const getDefaultSettings = (): AgentSettingsType => {
+export const getDefaultSettings = (): AgentSettingsType => {
   const ttsVendor = getDefaultTTSVendor();
   const asrVendor = getDefaultASRVendor();
 
