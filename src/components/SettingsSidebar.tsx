@@ -244,7 +244,9 @@ const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
               {useCustomPayload && (
                 <div className="mx-6 mt-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
                   <p className="text-sm text-amber-800 dark:text-amber-200">
-                    <strong>Custom settings are enabled.</strong> These settings are read-only. Disable custom settings to edit agent settings here.
+                    <strong>Custom settings are enabled.</strong> These settings
+                    are read-only. Disable custom settings to edit agent
+                    settings here.
                   </p>
                   <button
                     type="button"
@@ -265,7 +267,11 @@ const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
                   </div>
                 </div>
               )}
-              <div className={useCustomPayload ? "pointer-events-none opacity-50" : ""}>
+              <div
+                className={
+                  useCustomPayload ? "pointer-events-none opacity-50" : ""
+                }
+              >
                 {activeTab === "ai-agent" ? (
                   <AgentSettingsContent
                     onSave={handleSaveAgentSettingsWithSync}
@@ -664,11 +670,18 @@ const CustomSelect: React.FC<{
           ${className}`}
       >
         <span>{selectedLabel}</span>
-        <MdExpandMore className={`transition-transform ${isOpen ? "rotate-180" : ""}`} size={20} />
+        <MdExpandMore
+          className={`transition-transform ${isOpen ? "rotate-180" : ""}`}
+          size={20}
+        />
       </button>
       {isOpen && (
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} aria-hidden />
+          <div
+            className="fixed inset-0 z-10"
+            onClick={() => setIsOpen(false)}
+            aria-hidden
+          />
           <div className="absolute z-20 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-auto">
             {options.map((opt) => (
               <button
@@ -747,8 +760,14 @@ const Toggle: React.FC<{
 }> = ({ label, checked, onChange, hint }) => (
   <div className="flex items-start justify-between gap-4 py-2">
     <div className="min-w-0 w-[13rem] flex-shrink-0">
-      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{label}</span>
-      {hint && <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{hint}</p>}
+      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+        {label}
+      </span>
+      {hint && (
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+          {hint}
+        </p>
+      )}
     </div>
     <button
       onClick={() => onChange(!checked)}
@@ -789,9 +808,15 @@ const CollapsibleSubSection: React.FC<{
         )}
       </div>
       {isOpen ? (
-        <MdExpandLess className="text-gray-500 dark:text-gray-400 flex-shrink-0 ml-2" size={18} />
+        <MdExpandLess
+          className="text-gray-500 dark:text-gray-400 flex-shrink-0 ml-2"
+          size={18}
+        />
       ) : (
-        <MdExpandMore className="text-gray-500 dark:text-gray-400 flex-shrink-0 ml-2" size={18} />
+        <MdExpandMore
+          className="text-gray-500 dark:text-gray-400 flex-shrink-0 ml-2"
+          size={18}
+        />
       )}
     </button>
     {isOpen && (
@@ -1173,10 +1198,9 @@ const MCPServerTabContent: React.FC<MCPServerTabContentProps> = ({
       tts: base.tts ?? ({} as AgentSettings["tts"]),
       advanced_features: {
         ...base.advanced_features,
-        enable_tools:
-          hasEnabledServers
-            ? true
-            : (base.advanced_features?.enable_tools ?? false),
+        enable_tools: hasEnabledServers
+          ? true
+          : (base.advanced_features?.enable_tools ?? false),
       },
     };
     onSave(next);
@@ -1303,13 +1327,19 @@ const MCPServerTabContent: React.FC<MCPServerTabContentProps> = ({
                       type="button"
                       role="switch"
                       aria-checked={!!server.enabled}
-                      onClick={() => toggleServerEnabled(index, !server.enabled)}
+                      onClick={() =>
+                        toggleServerEnabled(index, !server.enabled)
+                      }
                       className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors mr-1 ${
                         server.enabled
                           ? "bg-agora-accent-blue"
                           : "bg-gray-300 dark:bg-gray-600"
                       }`}
-                      title={server.enabled ? "Disable MCP Server" : "Enable MCP Server"}
+                      title={
+                        server.enabled
+                          ? "Disable MCP Server"
+                          : "Enable MCP Server"
+                      }
                     >
                       <span
                         className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
@@ -1499,8 +1529,9 @@ function buildJoinPayloadPreview(settings: AgentSettings | null): string {
       : {},
     tts: settings.tts ?? {},
     asr: settings.asr ?? undefined,
-    turn_detection:
-      settings.enable_turn_detection ? (settings.turn_detection ?? undefined) : undefined,
+    turn_detection: settings.enable_turn_detection
+      ? (settings.turn_detection ?? undefined)
+      : undefined,
     filler_words: settings.filler_words ?? undefined,
     advanced_features: settings.advanced_features ?? undefined,
     parameters: settings.parameters ?? undefined,
@@ -1604,7 +1635,8 @@ const CustomSettingsTabContent: React.FC<CustomSettingsTabContentProps> = ({
       m.getCustomAgentSettings(),
     );
     setCustomPayloadJson(
-      stored?.customPayloadJson?.trim() ?? buildJoinPayloadPreview(agentSettings),
+      stored?.customPayloadJson?.trim() ??
+        buildJoinPayloadPreview(agentSettings),
     );
     showToast("Restored from saved settings.", "success");
   }, [agentSettings]);
@@ -1622,7 +1654,9 @@ const CustomSettingsTabContent: React.FC<CustomSettingsTabContentProps> = ({
       {useCustomPayload ? (
         <div className="mb-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 flex-shrink-0">
           <p className="text-sm text-amber-800 dark:text-amber-200">
-            <strong>Custom settings are active.</strong> Normal agent settings are disabled. Turn off custom settings below to use the AI Agent, Voice, and MCP tabs again.
+            <strong>Custom settings are active.</strong> Normal agent settings
+            are disabled. Turn off custom settings below to use the AI Agent,
+            Voice, and MCP tabs again.
           </p>
         </div>
       ) : (
@@ -1656,12 +1690,16 @@ const CustomSettingsTabContent: React.FC<CustomSettingsTabContentProps> = ({
           Reset
         </button>
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Enable custom settings</span>
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Enable custom settings
+          </span>
           <button
             type="button"
             onClick={() => handleEnableToggle(!useCustomPayload)}
             className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
-              useCustomPayload ? "bg-agora-accent-blue" : "bg-gray-300 dark:bg-gray-600"
+              useCustomPayload
+                ? "bg-agora-accent-blue"
+                : "bg-gray-300 dark:bg-gray-600"
             }`}
           >
             <span
@@ -1706,7 +1744,12 @@ const AgentSettingsSidebarContent: React.FC<{
   onClose: () => void;
   isAgentActive?: boolean;
   isDisabled?: boolean;
-}> = ({ onSave: _onSave, onClose, isAgentActive = false, isDisabled = false }) => {
+}> = ({
+  onSave: _onSave,
+  onClose,
+  isAgentActive = false,
+  isDisabled = false,
+}) => {
   const existingSettings = useAppStore((state) => state.agentSettings);
   const setAgentSettings = useAppStore((state) => state.setAgentSettings);
   const [settings, setSettings] = React.useState<AgentSettingsType>(
@@ -1722,10 +1765,11 @@ const AgentSettingsSidebarContent: React.FC<{
     advanced: false,
   });
   // Turn detection subsection collapse states
-  const [turnDetectionSubsections, setTurnDetectionSubsections] = React.useState({
-    startOfSpeech: false,
-    endOfSpeech: false,
-  });
+  const [turnDetectionSubsections, setTurnDetectionSubsections] =
+    React.useState({
+      startOfSpeech: false,
+      endOfSpeech: false,
+    });
   // Advanced section sub-panels (Turn detection, Filler words, Features)
   const [advancedSubsections, setAdvancedSubsections] = React.useState({
     turnDetection: false,
@@ -1735,7 +1779,9 @@ const AgentSettingsSidebarContent: React.FC<{
   const toggleAdvancedSubsection = (key: keyof typeof advancedSubsections) => {
     setAdvancedSubsections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
-  const toggleTurnDetectionSubsection = (key: "startOfSpeech" | "endOfSpeech") => {
+  const toggleTurnDetectionSubsection = (
+    key: "startOfSpeech" | "endOfSpeech",
+  ) => {
     setTurnDetectionSubsections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
   const [selectedLLMVendor, setSelectedLLMVendor] = React.useState<LLMVendor>(
@@ -2072,10 +2118,12 @@ const AgentSettingsSidebarContent: React.FC<{
                     params: { ...settings.llm.params, model: v },
                   })
                 }
-                options={LLM_PRESETS[selectedLLMVendor].models!.map((model) => ({
-                  value: model,
-                  label: model,
-                }))}
+                options={LLM_PRESETS[selectedLLMVendor].models!.map(
+                  (model) => ({
+                    value: model,
+                    label: model,
+                  }),
+                )}
               />
             ) : (
               <Input
@@ -2221,7 +2269,10 @@ const AgentSettingsSidebarContent: React.FC<{
                   value={getTTSParam("voice_name")}
                   onChange={(v) => setTTSParam("voice_name", v)}
                   options={[
-                    ...(TTS_PRESETS.microsoft.voices?.map((voice) => ({ value: voice, label: voice })) ?? []),
+                    ...(TTS_PRESETS.microsoft.voices?.map((voice) => ({
+                      value: voice,
+                      label: voice,
+                    })) ?? []),
                     { value: "", label: "Custom..." },
                   ]}
                 />
@@ -2269,7 +2320,9 @@ const AgentSettingsSidebarContent: React.FC<{
                 <CustomSelect
                   value={getTTSParam("model_id")}
                   onChange={(v) => setTTSParam("model_id", v)}
-                  options={(TTS_PRESETS.elevenlabs.models ?? []).map((model) => ({ value: model, label: model }))}
+                  options={(TTS_PRESETS.elevenlabs.models ?? []).map(
+                    (model) => ({ value: model, label: model }),
+                  )}
                 />
               </FormField>
               <FormField
@@ -2318,14 +2371,20 @@ const AgentSettingsSidebarContent: React.FC<{
                 <CustomSelect
                   value={getTTSParam("model")}
                   onChange={(v) => setTTSParam("model", v)}
-                  options={(TTS_PRESETS.openai.models ?? []).map((model) => ({ value: model, label: model }))}
+                  options={(TTS_PRESETS.openai.models ?? []).map((model) => ({
+                    value: model,
+                    label: model,
+                  }))}
                 />
               </FormField>
               <FormField label="Voice" required>
                 <CustomSelect
                   value={getTTSParam("voice")}
                   onChange={(v) => setTTSParam("voice", v)}
-                  options={(TTS_PRESETS.openai.voices ?? []).map((voice) => ({ value: voice, label: voice }))}
+                  options={(TTS_PRESETS.openai.voices ?? []).map((voice) => ({
+                    value: voice,
+                    label: voice,
+                  }))}
                 />
               </FormField>
             </>
@@ -2399,7 +2458,10 @@ const AgentSettingsSidebarContent: React.FC<{
                 <CustomSelect
                   value={getASRParam("model") || "nova-3"}
                   onChange={(v) => setASRParam("model", v)}
-                  options={(ASR_PRESETS.deepgram.models ?? []).map((model) => ({ value: model, label: model }))}
+                  options={(ASR_PRESETS.deepgram.models ?? []).map((model) => ({
+                    value: model,
+                    label: model,
+                  }))}
                 />
               </FormField>
             </>
@@ -2546,10 +2608,15 @@ const AgentSettingsSidebarContent: React.FC<{
                 hint="Choose a HeyGen avatar character"
               >
                 <CustomSelect
-                  value={getAvatarParam("avatar_id") || HEYGEN_DEFAULT_AVATAR_ID}
+                  value={
+                    getAvatarParam("avatar_id") || HEYGEN_DEFAULT_AVATAR_ID
+                  }
                   onChange={(v) => setAvatarParam("avatar_id", v)}
                   options={HEYGEN_AVATAR_GROUPS.flatMap((group) =>
-                    group.options.map((opt) => ({ value: opt.value, label: opt.label }))
+                    group.options.map((opt) => ({
+                      value: opt.value,
+                      label: opt.label,
+                    })),
                   )}
                 />
               </FormField>
@@ -2659,10 +2726,12 @@ const AgentSettingsSidebarContent: React.FC<{
                         speech_threshold: parseFloat(e.target.value) || 0.5,
                         start_of_speech:
                           settings.turn_detection?.config?.start_of_speech ??
-                          getDefaultSettings().turn_detection!.config!.start_of_speech,
+                          getDefaultSettings().turn_detection!.config!
+                            .start_of_speech,
                         end_of_speech:
                           settings.turn_detection?.config?.end_of_speech ??
-                          getDefaultSettings().turn_detection!.config!.end_of_speech,
+                          getDefaultSettings().turn_detection!.config!
+                            .end_of_speech,
                       },
                     },
                   })
@@ -2683,10 +2752,14 @@ const AgentSettingsSidebarContent: React.FC<{
                 tooltip="Start-of-speech detection mode."
               >
                 <CustomSelect
-                  value={settings.turn_detection?.config?.start_of_speech?.mode ?? "vad"}
+                  value={
+                    settings.turn_detection?.config?.start_of_speech?.mode ??
+                    "vad"
+                  }
                   onChange={(v) => {
                     const mode = v as "vad" | "keywords" | "disabled";
-                    const defaults = getDefaultSettings().turn_detection!.config!;
+                    const defaults =
+                      getDefaultSettings().turn_detection!.config!;
                     setSettings({
                       ...settings,
                       turn_detection: {
@@ -2697,24 +2770,32 @@ const AgentSettingsSidebarContent: React.FC<{
                           start_of_speech: {
                             mode,
                             ...(mode === "vad" && {
-                              vad_config: settings.turn_detection?.config?.start_of_speech?.vad_config ?? defaults.start_of_speech?.vad_config ?? {
-                                interrupt_duration_ms: 160,
-                                speaking_interrupt_duration_ms: 160,
-                                prefix_padding_ms: 800,
-                              },
+                              vad_config: settings.turn_detection?.config
+                                ?.start_of_speech?.vad_config ??
+                                defaults.start_of_speech?.vad_config ?? {
+                                  interrupt_duration_ms: 160,
+                                  speaking_interrupt_duration_ms: 160,
+                                  prefix_padding_ms: 800,
+                                },
                             }),
                             ...(mode === "keywords" && {
-                              keywords_config: settings.turn_detection?.config?.start_of_speech?.keywords_config ?? {
+                              keywords_config: settings.turn_detection?.config
+                                ?.start_of_speech?.keywords_config ?? {
                                 interrupt_duration_ms: 160,
                                 prefix_padding_ms: 800,
                                 triggered_keywords: [],
                               },
                             }),
                             ...(mode === "disabled" && {
-                              disabled_config: settings.turn_detection?.config?.start_of_speech?.disabled_config ?? { strategy: "append" },
+                              disabled_config: settings.turn_detection?.config
+                                ?.start_of_speech?.disabled_config ?? {
+                                strategy: "append",
+                              },
                             }),
                           },
-                          end_of_speech: settings.turn_detection?.config?.end_of_speech ?? defaults.end_of_speech,
+                          end_of_speech:
+                            settings.turn_detection?.config?.end_of_speech ??
+                            defaults.end_of_speech,
                         },
                       },
                     });
@@ -2728,9 +2809,12 @@ const AgentSettingsSidebarContent: React.FC<{
               </FormField>
 
               {/* VAD mode config */}
-              {(settings.turn_detection?.config?.start_of_speech?.mode ?? "vad") === "vad" && (
+              {(settings.turn_detection?.config?.start_of_speech?.mode ??
+                "vad") === "vad" && (
                 <div className="grid grid-cols-1 gap-2 mt-3 pl-3 border-l-2 border-agora-accent-blue/30">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium">vad_config</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium">
+                    vad_config
+                  </p>
                   <FormField
                     label="Interrupt duration (ms)"
                     hint="How long voice must exceed VAD threshold before speech start is detected. Default 160."
@@ -2739,7 +2823,8 @@ const AgentSettingsSidebarContent: React.FC<{
                       type="number"
                       min={0}
                       value={
-                        settings.turn_detection?.config?.start_of_speech?.vad_config?.interrupt_duration_ms ?? 160
+                        settings.turn_detection?.config?.start_of_speech
+                          ?.vad_config?.interrupt_duration_ms ?? 160
                       }
                       onChange={(e) =>
                         setSettings({
@@ -2750,15 +2835,22 @@ const AgentSettingsSidebarContent: React.FC<{
                             config: {
                               ...settings.turn_detection?.config,
                               start_of_speech: {
-                                ...settings.turn_detection?.config?.start_of_speech,
+                                ...settings.turn_detection?.config
+                                  ?.start_of_speech,
                                 mode: "vad",
                                 vad_config: {
-                                  ...settings.turn_detection?.config?.start_of_speech?.vad_config,
-                                  interrupt_duration_ms: parseInt(e.target.value, 10) || 160,
+                                  ...settings.turn_detection?.config
+                                    ?.start_of_speech?.vad_config,
+                                  interrupt_duration_ms:
+                                    parseInt(e.target.value, 10) || 160,
                                   speaking_interrupt_duration_ms:
-                                    settings.turn_detection?.config?.start_of_speech?.vad_config?.speaking_interrupt_duration_ms ?? 160,
+                                    settings.turn_detection?.config
+                                      ?.start_of_speech?.vad_config
+                                      ?.speaking_interrupt_duration_ms ?? 160,
                                   prefix_padding_ms:
-                                    settings.turn_detection?.config?.start_of_speech?.vad_config?.prefix_padding_ms ?? 800,
+                                    settings.turn_detection?.config
+                                      ?.start_of_speech?.vad_config
+                                      ?.prefix_padding_ms ?? 800,
                                 },
                               },
                             },
@@ -2775,7 +2867,8 @@ const AgentSettingsSidebarContent: React.FC<{
                       type="number"
                       min={0}
                       value={
-                        settings.turn_detection?.config?.start_of_speech?.vad_config?.speaking_interrupt_duration_ms ?? 160
+                        settings.turn_detection?.config?.start_of_speech
+                          ?.vad_config?.speaking_interrupt_duration_ms ?? 160
                       }
                       onChange={(e) =>
                         setSettings({
@@ -2786,15 +2879,22 @@ const AgentSettingsSidebarContent: React.FC<{
                             config: {
                               ...settings.turn_detection?.config,
                               start_of_speech: {
-                                ...settings.turn_detection?.config?.start_of_speech,
+                                ...settings.turn_detection?.config
+                                  ?.start_of_speech,
                                 mode: "vad",
                                 vad_config: {
-                                  ...settings.turn_detection?.config?.start_of_speech?.vad_config,
+                                  ...settings.turn_detection?.config
+                                    ?.start_of_speech?.vad_config,
                                   interrupt_duration_ms:
-                                    settings.turn_detection?.config?.start_of_speech?.vad_config?.interrupt_duration_ms ?? 160,
-                                  speaking_interrupt_duration_ms: parseInt(e.target.value, 10) || 160,
+                                    settings.turn_detection?.config
+                                      ?.start_of_speech?.vad_config
+                                      ?.interrupt_duration_ms ?? 160,
+                                  speaking_interrupt_duration_ms:
+                                    parseInt(e.target.value, 10) || 160,
                                   prefix_padding_ms:
-                                    settings.turn_detection?.config?.start_of_speech?.vad_config?.prefix_padding_ms ?? 800,
+                                    settings.turn_detection?.config
+                                      ?.start_of_speech?.vad_config
+                                      ?.prefix_padding_ms ?? 800,
                                 },
                               },
                             },
@@ -2811,7 +2911,8 @@ const AgentSettingsSidebarContent: React.FC<{
                       type="number"
                       min={0}
                       value={
-                        settings.turn_detection?.config?.start_of_speech?.vad_config?.prefix_padding_ms ?? 800
+                        settings.turn_detection?.config?.start_of_speech
+                          ?.vad_config?.prefix_padding_ms ?? 800
                       }
                       onChange={(e) =>
                         setSettings({
@@ -2822,15 +2923,22 @@ const AgentSettingsSidebarContent: React.FC<{
                             config: {
                               ...settings.turn_detection?.config,
                               start_of_speech: {
-                                ...settings.turn_detection?.config?.start_of_speech,
+                                ...settings.turn_detection?.config
+                                  ?.start_of_speech,
                                 mode: "vad",
                                 vad_config: {
-                                  ...settings.turn_detection?.config?.start_of_speech?.vad_config,
+                                  ...settings.turn_detection?.config
+                                    ?.start_of_speech?.vad_config,
                                   interrupt_duration_ms:
-                                    settings.turn_detection?.config?.start_of_speech?.vad_config?.interrupt_duration_ms ?? 160,
+                                    settings.turn_detection?.config
+                                      ?.start_of_speech?.vad_config
+                                      ?.interrupt_duration_ms ?? 160,
                                   speaking_interrupt_duration_ms:
-                                    settings.turn_detection?.config?.start_of_speech?.vad_config?.speaking_interrupt_duration_ms ?? 160,
-                                  prefix_padding_ms: parseInt(e.target.value, 10) || 800,
+                                    settings.turn_detection?.config
+                                      ?.start_of_speech?.vad_config
+                                      ?.speaking_interrupt_duration_ms ?? 160,
+                                  prefix_padding_ms:
+                                    parseInt(e.target.value, 10) || 800,
                                 },
                               },
                             },
@@ -2843,17 +2951,21 @@ const AgentSettingsSidebarContent: React.FC<{
               )}
 
               {/* Keywords mode config */}
-              {(settings.turn_detection?.config?.start_of_speech?.mode ?? "vad") === "keywords" && (
+              {(settings.turn_detection?.config?.start_of_speech?.mode ??
+                "vad") === "keywords" && (
                 <div className="mt-3 pl-3 border-l-2 border-agora-accent-blue/30">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-medium">keywords_config</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-medium">
+                    keywords_config
+                  </p>
                   <FormField
                     label="Triggered keywords"
                     hint="Phrases that start a turn when detected. Comma-separated."
                   >
                     <Input
-                      value={
-                        (settings.turn_detection?.config?.start_of_speech?.keywords_config?.triggered_keywords ?? []).join(", ")
-                      }
+                      value={(
+                        settings.turn_detection?.config?.start_of_speech
+                          ?.keywords_config?.triggered_keywords ?? []
+                      ).join(", ")}
                       onChange={(e) =>
                         setSettings({
                           ...settings,
@@ -2863,18 +2975,24 @@ const AgentSettingsSidebarContent: React.FC<{
                             config: {
                               ...settings.turn_detection?.config,
                               start_of_speech: {
-                                ...settings.turn_detection?.config?.start_of_speech,
+                                ...settings.turn_detection?.config
+                                  ?.start_of_speech,
                                 mode: "keywords",
                                 keywords_config: {
-                                  ...settings.turn_detection?.config?.start_of_speech?.keywords_config,
+                                  ...settings.turn_detection?.config
+                                    ?.start_of_speech?.keywords_config,
                                   triggered_keywords: e.target.value
                                     .split(",")
                                     .map((s) => s.trim())
                                     .filter(Boolean),
                                   interrupt_duration_ms:
-                                    settings.turn_detection?.config?.start_of_speech?.keywords_config?.interrupt_duration_ms ?? 160,
+                                    settings.turn_detection?.config
+                                      ?.start_of_speech?.keywords_config
+                                      ?.interrupt_duration_ms ?? 160,
                                   prefix_padding_ms:
-                                    settings.turn_detection?.config?.start_of_speech?.keywords_config?.prefix_padding_ms ?? 800,
+                                    settings.turn_detection?.config
+                                      ?.start_of_speech?.keywords_config
+                                      ?.prefix_padding_ms ?? 800,
                                 },
                               },
                             },
@@ -2888,16 +3006,20 @@ const AgentSettingsSidebarContent: React.FC<{
               )}
 
               {/* Disabled mode config */}
-              {(settings.turn_detection?.config?.start_of_speech?.mode ?? "vad") === "disabled" && (
+              {(settings.turn_detection?.config?.start_of_speech?.mode ??
+                "vad") === "disabled" && (
                 <div className="mt-3 pl-3 border-l-2 border-agora-accent-blue/30">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-medium">disabled_config</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-medium">
+                    disabled_config
+                  </p>
                   <FormField
                     label="Strategy"
                     hint="Append = queue user speech; Ignored = discard input while agent is active."
                   >
                     <CustomSelect
                       value={
-                        settings.turn_detection?.config?.start_of_speech?.disabled_config?.strategy ?? "append"
+                        settings.turn_detection?.config?.start_of_speech
+                          ?.disabled_config?.strategy ?? "append"
                       }
                       onChange={(v) =>
                         setSettings({
@@ -2908,9 +3030,12 @@ const AgentSettingsSidebarContent: React.FC<{
                             config: {
                               ...settings.turn_detection?.config,
                               start_of_speech: {
-                                ...settings.turn_detection?.config?.start_of_speech,
+                                ...settings.turn_detection?.config
+                                  ?.start_of_speech,
                                 mode: "disabled",
-                                disabled_config: { strategy: v as "append" | "ignored" },
+                                disabled_config: {
+                                  strategy: v as "append" | "ignored",
+                                },
                               },
                             },
                           },
@@ -2939,14 +3064,17 @@ const AgentSettingsSidebarContent: React.FC<{
                 tooltip="End-of-speech detection mode."
               >
                 <CustomSelect
-                  value={settings.turn_detection?.config?.end_of_speech?.mode ?? "vad"}
+                  value={
+                    settings.turn_detection?.config?.end_of_speech?.mode ??
+                    "vad"
+                  }
                   onChange={(v) => {
                     const mode = v as "vad" | "semantic";
                     const end = settings.turn_detection?.config?.end_of_speech;
                     const currentSilence =
                       end?.mode === "semantic"
-                        ? end?.semantic_config?.silence_duration_ms ?? 320
-                        : end?.vad_config?.silence_duration_ms ?? 640;
+                        ? (end?.semantic_config?.silence_duration_ms ?? 320)
+                        : (end?.vad_config?.silence_duration_ms ?? 640);
                     setSettings({
                       ...settings,
                       turn_detection: {
@@ -2956,8 +3084,19 @@ const AgentSettingsSidebarContent: React.FC<{
                           ...settings.turn_detection?.config,
                           end_of_speech:
                             mode === "vad"
-                              ? { mode: "vad", vad_config: { silence_duration_ms: currentSilence } }
-                              : { mode: "semantic", semantic_config: { silence_duration_ms: 320, max_wait_ms: 3000 } },
+                              ? {
+                                  mode: "vad",
+                                  vad_config: {
+                                    silence_duration_ms: currentSilence,
+                                  },
+                                }
+                              : {
+                                  mode: "semantic",
+                                  semantic_config: {
+                                    silence_duration_ms: 320,
+                                    max_wait_ms: 3000,
+                                  },
+                                },
                         },
                       },
                     });
@@ -2970,9 +3109,12 @@ const AgentSettingsSidebarContent: React.FC<{
               </FormField>
 
               {/* VAD mode config */}
-              {(settings.turn_detection?.config?.end_of_speech?.mode ?? "vad") === "vad" && (
+              {(settings.turn_detection?.config?.end_of_speech?.mode ??
+                "vad") === "vad" && (
                 <div className="mt-3 pl-3 border-l-2 border-agora-accent-blue/30">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-medium">vad_config</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-medium">
+                    vad_config
+                  </p>
                   <FormField
                     label="Silence duration (ms)"
                     hint="Ms of silence after speech to treat as end of turn. Default 640."
@@ -2981,7 +3123,10 @@ const AgentSettingsSidebarContent: React.FC<{
                       type="number"
                       min={0}
                       max={2000}
-                      value={settings.turn_detection?.config?.end_of_speech?.vad_config?.silence_duration_ms ?? 640}
+                      value={
+                        settings.turn_detection?.config?.end_of_speech
+                          ?.vad_config?.silence_duration_ms ?? 640
+                      }
                       onChange={(e) =>
                         setSettings({
                           ...settings,
@@ -2992,7 +3137,10 @@ const AgentSettingsSidebarContent: React.FC<{
                               ...settings.turn_detection?.config,
                               end_of_speech: {
                                 mode: "vad",
-                                vad_config: { silence_duration_ms: parseInt(e.target.value, 10) || 640 },
+                                vad_config: {
+                                  silence_duration_ms:
+                                    parseInt(e.target.value, 10) || 640,
+                                },
                               },
                             },
                           },
@@ -3004,9 +3152,12 @@ const AgentSettingsSidebarContent: React.FC<{
               )}
 
               {/* Semantic mode config */}
-              {(settings.turn_detection?.config?.end_of_speech?.mode ?? "vad") === "semantic" && (
+              {(settings.turn_detection?.config?.end_of_speech?.mode ??
+                "vad") === "semantic" && (
                 <div className="mt-3 pl-3 border-l-2 border-agora-accent-blue/30">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-medium">semantic_config</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-medium">
+                    semantic_config
+                  </p>
                   <FormField
                     label="Silence duration (ms)"
                     hint="Minimum silence at end of segment. Default 320."
@@ -3015,7 +3166,10 @@ const AgentSettingsSidebarContent: React.FC<{
                       type="number"
                       min={0}
                       max={2000}
-                      value={settings.turn_detection?.config?.end_of_speech?.semantic_config?.silence_duration_ms ?? 320}
+                      value={
+                        settings.turn_detection?.config?.end_of_speech
+                          ?.semantic_config?.silence_duration_ms ?? 320
+                      }
                       onChange={(e) =>
                         setSettings({
                           ...settings,
@@ -3027,8 +3181,12 @@ const AgentSettingsSidebarContent: React.FC<{
                               end_of_speech: {
                                 mode: "semantic",
                                 semantic_config: {
-                                  silence_duration_ms: parseInt(e.target.value, 10) || 320,
-                                  max_wait_ms: settings.turn_detection?.config?.end_of_speech?.semantic_config?.max_wait_ms ?? 3000,
+                                  silence_duration_ms:
+                                    parseInt(e.target.value, 10) || 320,
+                                  max_wait_ms:
+                                    settings.turn_detection?.config
+                                      ?.end_of_speech?.semantic_config
+                                      ?.max_wait_ms ?? 3000,
                                 },
                               },
                             },
@@ -3045,7 +3203,10 @@ const AgentSettingsSidebarContent: React.FC<{
                       type="number"
                       min={0}
                       max={10000}
-                      value={settings.turn_detection?.config?.end_of_speech?.semantic_config?.max_wait_ms ?? 3000}
+                      value={
+                        settings.turn_detection?.config?.end_of_speech
+                          ?.semantic_config?.max_wait_ms ?? 3000
+                      }
                       onChange={(e) =>
                         setSettings({
                           ...settings,
@@ -3057,8 +3218,12 @@ const AgentSettingsSidebarContent: React.FC<{
                               end_of_speech: {
                                 mode: "semantic",
                                 semantic_config: {
-                                  silence_duration_ms: settings.turn_detection?.config?.end_of_speech?.semantic_config?.silence_duration_ms ?? 320,
-                                  max_wait_ms: parseInt(e.target.value, 10) || 3000,
+                                  silence_duration_ms:
+                                    settings.turn_detection?.config
+                                      ?.end_of_speech?.semantic_config
+                                      ?.silence_duration_ms ?? 320,
+                                  max_wait_ms:
+                                    parseInt(e.target.value, 10) || 3000,
                                 },
                               },
                             },
@@ -3088,10 +3253,16 @@ const AgentSettingsSidebarContent: React.FC<{
                   filler_words: {
                     ...settings.filler_words,
                     enable: checked,
-                    trigger: settings.filler_words?.trigger ?? { mode: "fixed_time", fixed_time_config: { response_wait_ms: 1500 } },
+                    trigger: settings.filler_words?.trigger ?? {
+                      mode: "fixed_time",
+                      fixed_time_config: { response_wait_ms: 1500 },
+                    },
                     content: settings.filler_words?.content ?? {
                       mode: "static",
-                      static_config: { phrases: ["Please wait.", "Okay.", "Uh-huh."], selection_rule: "shuffle" },
+                      static_config: {
+                        phrases: ["Please wait.", "Okay.", "Uh-huh."],
+                        selection_rule: "shuffle",
+                      },
                     },
                   },
                 })
@@ -3100,18 +3271,30 @@ const AgentSettingsSidebarContent: React.FC<{
             />
             {(settings.filler_words?.enable ?? false) && (
               <>
-                <FormField label="Response wait (ms)" hint="100–10000; default 1500">
+                <FormField
+                  label="Response wait (ms)"
+                  hint="100–10000; default 1500"
+                >
                   <Input
                     type="number"
                     min={100}
                     max={10000}
-                    value={settings.filler_words?.trigger?.fixed_time_config?.response_wait_ms ?? 1500}
+                    value={
+                      settings.filler_words?.trigger?.fixed_time_config
+                        ?.response_wait_ms ?? 1500
+                    }
                     onChange={(e) =>
                       setSettings({
                         ...settings,
                         filler_words: {
                           ...settings.filler_words,
-                          trigger: { mode: "fixed_time", fixed_time_config: { response_wait_ms: parseInt(e.target.value, 10) || 1500 } },
+                          trigger: {
+                            mode: "fixed_time",
+                            fixed_time_config: {
+                              response_wait_ms:
+                                parseInt(e.target.value, 10) || 1500,
+                            },
+                          },
                         },
                       })
                     }
@@ -3120,7 +3303,10 @@ const AgentSettingsSidebarContent: React.FC<{
                 <FormField label="Phrases" hint="One per line; max 100">
                   <Textarea
                     rows={3}
-                    value={(settings.filler_words?.content?.static_config?.phrases ?? []).join("\n")}
+                    value={(
+                      settings.filler_words?.content?.static_config?.phrases ??
+                      []
+                    ).join("\n")}
                     onChange={(e) =>
                       setSettings({
                         ...settings,
@@ -3130,19 +3316,27 @@ const AgentSettingsSidebarContent: React.FC<{
                             mode: "static",
                             static_config: {
                               ...settings.filler_words?.content?.static_config,
-                              phrases: e.target.value.split("\n").map((s) => s.trim()).filter(Boolean),
-                              selection_rule: settings.filler_words?.content?.static_config?.selection_rule ?? "shuffle",
+                              phrases: e.target.value
+                                .split("\n")
+                                .map((s) => s.trim())
+                                .filter(Boolean),
+                              selection_rule:
+                                settings.filler_words?.content?.static_config
+                                  ?.selection_rule ?? "shuffle",
                             },
                           },
                         },
                       })
                     }
-                    placeholder={'Please wait.\nOkay.\nUh-huh.'}
+                    placeholder={"Please wait.\nOkay.\nUh-huh."}
                   />
                 </FormField>
                 <FormField label="Selection rule">
                   <CustomSelect
-                    value={settings.filler_words?.content?.static_config?.selection_rule ?? "shuffle"}
+                    value={
+                      settings.filler_words?.content?.static_config
+                        ?.selection_rule ?? "shuffle"
+                    }
                     onChange={(v) =>
                       setSettings({
                         ...settings,
@@ -3212,27 +3406,53 @@ const AgentSettingsSidebarContent: React.FC<{
                     ]}
                   />
                 </FormField>
-                <FormField label="Voiceprint name (optional)" hint="e.g. speaker1; must not be 'unknown'">
+                <FormField
+                  label="Voiceprint name (optional)"
+                  hint="e.g. speaker1; must not be 'unknown'"
+                >
                   <Input
-                    value={Object.keys(settings.sal?.sample_urls ?? {})[0] ?? ""}
+                    value={
+                      Object.keys(settings.sal?.sample_urls ?? {})[0] ?? ""
+                    }
                     onChange={(e) => {
                       const name = e.target.value.trim();
                       const urls = settings.sal?.sample_urls ?? {};
                       const currentUrl = Object.values(urls)[0] ?? "";
-                      const next = name && name !== "unknown" ? { [name]: currentUrl } : {};
-                      setSettings({ ...settings, sal: { ...settings.sal, sample_urls: next } });
+                      const next =
+                        name && name !== "unknown"
+                          ? { [name]: currentUrl }
+                          : {};
+                      setSettings({
+                        ...settings,
+                        sal: { ...settings.sal, sample_urls: next },
+                      });
                     }}
                     placeholder="speaker1"
                   />
                 </FormField>
-                <FormField label="Voiceprint URL (optional)" hint="16kHz 16-bit mono PCM .pcm, 10–15s, max 2MB">
+                <FormField
+                  label="Voiceprint URL (optional)"
+                  hint="16kHz 16-bit mono PCM .pcm, 10–15s, max 2MB"
+                >
                   <Input
-                    value={Object.values(settings.sal?.sample_urls ?? {})[0] ?? ""}
+                    value={
+                      Object.values(settings.sal?.sample_urls ?? {})[0] ?? ""
+                    }
                     onChange={(e) => {
                       const url = e.target.value.trim();
-                      const name = Object.keys(settings.sal?.sample_urls ?? {})[0] ?? "speaker1";
-                      const next = name && name !== "unknown" ? { [name]: url } : url ? { speaker1: url } : {};
-                      setSettings({ ...settings, sal: { ...settings.sal, sample_urls: next } });
+                      const name =
+                        Object.keys(settings.sal?.sample_urls ?? {})[0] ??
+                        "speaker1";
+                      const next =
+                        name && name !== "unknown"
+                          ? { [name]: url }
+                          : url
+                            ? { speaker1: url }
+                            : {};
+                      setSettings({
+                        ...settings,
+                        sal: { ...settings.sal, sample_urls: next },
+                      });
                     }}
                     placeholder="https://example.com/speaker1.pcm"
                   />
