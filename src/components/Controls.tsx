@@ -331,8 +331,17 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
   return (
     <React.Fragment>
       <div className="flex justify-center items-center h-20 bg-gray-200 dark:bg-gray-800 px-4 shadow-lg transition-colors duration-300">
-        {/* Left spacer for balance */}
-        <div className="flex-1" />
+        {/* Left: version link */}
+        <div className="flex-1 flex items-center">
+          <a
+            href="https://docs.agora.io/en/conversational-ai/overview/release-notes#v24"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs [color:var(--agora-accent-blue)] hover:opacity-80 transition-opacity underline underline-offset-2"
+          >
+            Convo Engine v2.4
+          </a>
+        </div>
 
         {/* Center controls */}
         <div className="flex items-center space-x-6">

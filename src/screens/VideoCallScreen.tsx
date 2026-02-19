@@ -211,7 +211,6 @@ const VideoCallScreen: React.FC = () => {
         <span data-tour="tour-meeting-name" className="font-bold text-xl font-syne">
           Meeting: {meetingName || channelId}
         </span>
-
         <div className="flex items-center gap-3 ml-auto">
           {/* Transmission Badge - shown when agent is active */}
           {isAgentActive && (

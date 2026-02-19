@@ -170,3 +170,82 @@ body {
 .animate-skeleton-shimmer {
   animation: skeleton-shimmer 1.8s ease-in-out infinite;
 }
+
+/* ----- Landing: subtle, classy animations (respect reduced motion) ----- */
+@keyframes landing-bg-float {
+  0%, 100% {
+    opacity: 0.12;
+    transform: scale(1) translate(0, 0);
+  }
+  50% {
+    opacity: 0.18;
+    transform: scale(1.03) translate(2%, 1%);
+  }
+}
+@keyframes landing-bg-float-secondary {
+  0%, 100% {
+    opacity: 0.08;
+    transform: scale(1) translate(0, 0);
+  }
+  50% {
+    opacity: 0.12;
+    transform: scale(1.02) translate(-1%, -1%);
+  }
+}
+.animate-landing-bg-float {
+  animation: landing-bg-float 12s ease-in-out infinite;
+}
+.animate-landing-bg-float-secondary {
+  animation: landing-bg-float-secondary 14s ease-in-out infinite;
+}
+
+@keyframes landing-gradient-shimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+.animate-landing-gradient-shimmer {
+  background-size: 200% auto;
+  animation: landing-gradient-shimmer 8s ease-in-out infinite;
+}
+
+@keyframes landing-button-glow {
+  0%, 100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.animate-landing-button-glow {
+  position: relative;
+  border-radius: 0.75rem; /* match button rounded-xl */
+}
+.animate-landing-button-glow::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 32px 6px rgba(0, 194, 255, 0.25);
+  animation: landing-button-glow 2.25s ease-in-out infinite;
+  z-index: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-landing-bg-float,
+  .animate-landing-bg-float-secondary,
+  .animate-landing-gradient-shimmer {
+    animation: none;
+  }
+  .animate-landing-button-glow::after {
+    animation: none;
+    opacity: 0;
+  }
+}

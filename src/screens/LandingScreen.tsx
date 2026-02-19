@@ -14,13 +14,10 @@ const LandingScreen: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-950 text-gray-100 overflow-hidden">
-      {/* Background: gradient mesh + subtle grain */}
-      <div
-        className="fixed inset-0 pointer-events-none"
-        aria-hidden
-      >
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_0%,rgba(0,194,255,0.12),transparent_50%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_80%_80%,rgba(0,194,255,0.08),transparent_45%)]" />
+      {/* Background: gradient mesh + subtle grain (slow float for depth) */}
+      <div className="fixed inset-0 pointer-events-none" aria-hidden>
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_0%,rgba(0,194,255,0.12),transparent_50%)] animate-landing-bg-float origin-center" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_80%_80%,rgba(0,194,255,0.08),transparent_45%)] animate-landing-bg-float-secondary origin-center" />
         <div
           className="absolute inset-0 opacity-[0.02] dark:opacity-[0.03]"
           style={{
@@ -43,7 +40,7 @@ const LandingScreen: React.FC = () => {
           >
             Experience
             <br />
-            <span className="bg-[linear-gradient(to_right,var(--agora-accent-blue),#33d1ff)] bg-clip-text text-transparent">
+            <span className="bg-[linear-gradient(to_right,var(--agora-accent-blue),#33d1ff)] bg-clip-text text-transparent animate-landing-gradient-shimmer inline-block">
               Conversational AI
             </span>
           </h1>
@@ -54,8 +51,8 @@ const LandingScreen: React.FC = () => {
               animationFillMode: "backwards",
             }}
           >
-            Real-time voice agents that understand and respond naturally—powered
-            by Agora.
+            Real-time voice / video calling agents that understand and respond
+            naturally—powered by Agora.
           </p>
           <Link
             href={AGORA_CONVO_AI_URL}
@@ -93,11 +90,12 @@ const LandingScreen: React.FC = () => {
             animationFillMode: "backwards",
           }}
         >
-          <button
-            type="button"
-            onClick={handleSignInWithGoogle}
-            className="group relative flex items-center justify-center gap-3 px-6 py-3.5 rounded-xl bg-white dark:bg-gray-100 text-gray-900 font-semibold shadow-lg shadow-black/20 hover:shadow-2xl hover:shadow-black/30 hover:scale-[1.02] hover:bg-gray-50 dark:hover:bg-white transition-all duration-300 border border-gray-200/50 dark:border-gray-300/50 cursor-pointer overflow-hidden active:scale-[0.98]"
-          >
+          <div className="relative rounded-xl animate-landing-button-glow">
+            <button
+              type="button"
+              onClick={handleSignInWithGoogle}
+              className="group relative flex items-center justify-center gap-3 px-6 py-3.5 rounded-xl bg-white dark:bg-gray-100 text-gray-900 font-semibold shadow-lg shadow-black/20 hover:shadow-2xl hover:shadow-black/30 hover:scale-[1.02] hover:bg-gray-50 dark:hover:bg-white transition-all duration-300 border border-gray-200/50 dark:border-gray-300/50 cursor-pointer overflow-hidden active:scale-[0.98]"
+            >
             <svg
               className="w-5 h-5 relative z-10"
               viewBox="0 0 24 24"
@@ -121,7 +119,8 @@ const LandingScreen: React.FC = () => {
               />
             </svg>
             <span className="relative z-10">Sign in with Google</span>
-          </button>
+            </button>
+          </div>
           <p className="text-gray-500 text-xs sm:text-sm text-center max-w-xs">
             Sign in with Google to create or join meetings.
           </p>
