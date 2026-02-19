@@ -337,6 +337,7 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
         {/* Center controls */}
         <div className="flex items-center space-x-6">
           <button
+            data-tour="tour-mic-toggle"
             onClick={toggleLocalAudio}
             className={controlButtonClass}
             title={audioMuted ? "Unmute Mic" : "Mute Mic"}
@@ -345,6 +346,7 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
           </button>
 
           <button
+            data-tour="tour-video-toggle"
             onClick={toggleLocalVideo}
             className={controlButtonClass}
             title={videoMuted ? "Turn Video On" : "Turn Video Off"}
@@ -353,6 +355,7 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
           </button>
 
           <button
+            data-tour="tour-screen-share"
             onClick={handleToggleScreenShare}
             className={controlButtonClass}
             title={isScreenSharing ? "Stop Screen Share" : "Start Screen Share"}
@@ -361,6 +364,7 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
           </button>
 
           <button
+            data-tour="tour-whiteboard"
             onClick={handleToggleWhiteboard}
             className={`flex items-center justify-center w-14 h-14 text-3xl rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-agora focus:ring-opacity-75 ${
               isWhiteboardActive
@@ -373,6 +377,7 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
           </button>
 
           <button
+            data-tour="tour-share-meeting"
             onClick={handleShareMeeting}
             className={controlButtonClass}
             title="Share Meeting Info"
@@ -381,6 +386,7 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
           </button>
 
           <button
+            data-tour="tour-end-call"
             onClick={handleCallEnd}
             className="flex items-center justify-center w-16 h-16 bg-red-600 dark:bg-red-500 text-white text-4xl rounded-full hover:bg-red-700 dark:hover:bg-red-600 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-red-500 dark:focus:ring-red-400 shadow-lg"
             title="End Call"
@@ -395,6 +401,7 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
             <div className="flex items-center space-x-2">
               {transcriptionMode === "rtm" && (
                 <button
+                  data-tour="tour-transcript"
                   onClick={() => setIsTranscriptPanelOpen(true)}
                   className="flex items-center justify-center w-10 h-10 rounded-lg text-gray-800 dark:text-white transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-agora hover:bg-gray-400 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                   title={
@@ -408,6 +415,7 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
                 </button>
               )}
               <button
+                data-tour="tour-agent-toggle"
                 onClick={handleToggleAgent}
                 disabled={isAgentLoading || isAgentUpdating}
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-agora focus:ring-opacity-75 ${
@@ -456,6 +464,7 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
               </button>
               {isAgentActive && <AgentStatusBadge />}
               <button
+                data-tour="tour-agent-settings"
                 onClick={() => setIsSettingsPanelOpen(true)}
                 className="flex items-center justify-center w-10 h-10 rounded-lg text-gray-800 dark:text-white  hover:bg-gray-400 dark:hover:bg-gray-600 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-agora"
                 title="Agent Settings"

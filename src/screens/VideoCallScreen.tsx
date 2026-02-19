@@ -15,7 +15,9 @@ import MeetingAuthHeader from "@/components/MeetingAuthHeader";
 import { useAgora } from "@/hooks/useAgora";
 import { useConversationalAI } from "@/hooks/useConversationalAI";
 import type { IAgoraRTCRemoteUser, IRemoteVideoTrack } from "agora-rtc-sdk-ng";
-import { MdWbSunny, MdDarkMode, MdTimer } from "react-icons/md";
+import { MdWbSunny, MdDarkMode, MdTimer, MdHelpOutline } from "react-icons/md";
+import { useTour } from "@/hooks/useTour";
+import { TourOverlay } from "@/components/FeatureTour";
 
 const SESSION_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
@@ -162,6 +164,8 @@ const VideoCallScreen: React.FC = () => {
 
   const useSidebarLayout = isWhiteboardActive || !!activeScreenShareUid;
 
+  const tour = useTour();
+
   // Initialize conversational AI hook for transcript handling
   const { sendChatMessage } = useConversationalAI({
     rtcClient,
@@ -204,7 +208,7 @@ const VideoCallScreen: React.FC = () => {
     <div className="flex flex-col h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-300">
       {/* Top Bar */}
       <div className="flex items-center bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white p-4 text-lg shadow-md transition-colors duration-300">
-        <span className="font-bold text-xl font-syne">
+        <span data-tour="tour-meeting-name" className="font-bold text-xl font-syne">
           Meeting: {meetingName || channelId}
         </span>
 
@@ -224,6 +228,7 @@ const VideoCallScreen: React.FC = () => {
 
           {sessionStartTime != null && (
             <span
+              data-tour="tour-session-timer"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-sm font-medium tabular-nums"
               title="Session ends in 15 minutes; you will be logged out when time runs out."
             >
@@ -235,6 +240,15 @@ const VideoCallScreen: React.FC = () => {
           <MeetingAuthHeader inline />
 
           <button
+            onClick={tour.startTour}
+            className="p-2 rounded-full bg-gray-300 dark:bg-gray-700 hover:bg-gray-400 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-[var(--agora-accent-blue)] transition-all text-gray-800 dark:text-white"
+            title="Take a tour of the controls"
+          >
+            <MdHelpOutline size={22} />
+          </button>
+
+          <button
+            data-tour="tour-theme-toggle"
             onClick={toggleTheme}
             className="p-2 rounded-full bg-gray-300 dark:bg-gray-700 hover:bg-gray-400 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-[var(--agora-accent-blue)] transition-all text-gray-800 dark:text-white"
             title={
@@ -531,6 +545,8 @@ const VideoCallScreen: React.FC = () => {
       </div>
 
       <Controls sendChatMessage={sendChatMessage} />
+
+      <TourOverlay {...tour} />
 
       <Modal
         isOpen={!!pendingUnmuteRequest}

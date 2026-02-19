@@ -103,6 +103,12 @@ body {
   animation: fade-in-up 0.6s ease-out forwards;
 }
 
+/* Feature tour: spotlight glow pulse */
+@keyframes tour-glow {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
 /* Agent tile: animate icon only (no tile zoom) - subtle pulse */
 @keyframes agent-icon-pulse {
   0%, 100% { opacity: 0.9; transform: scale(1); }
