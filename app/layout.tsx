@@ -10,8 +10,12 @@ const syne = Syne({
 });
 
 export const metadata: Metadata = {
-  title: "My Agora App",
-  description: "Video conferencing with Agora",
+  title: "My Agora AI App",
+  description:
+    "Real-time video calling with Conversational AI agents, avatars, and collaboration tools — powered by Agora",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({
