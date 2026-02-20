@@ -18,6 +18,7 @@ import type { IAgoraRTCRemoteUser, IRemoteVideoTrack } from "agora-rtc-sdk-ng";
 import { MdWbSunny, MdDarkMode, MdTimer, MdHelpOutline } from "react-icons/md";
 import { useTour } from "@/hooks/useTour";
 import { TourOverlay } from "@/components/FeatureTour";
+import useWhiteboardCommands from "@/hooks/useWhiteboardCommands";
 
 const SESSION_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
@@ -165,6 +166,9 @@ const VideoCallScreen: React.FC = () => {
   const useSidebarLayout = isWhiteboardActive || !!activeScreenShareUid;
 
   const tour = useTour();
+
+  // Poll for AI whiteboard commands when both whiteboard and agent are active
+  useWhiteboardCommands();
 
   // Initialize conversational AI hook for transcript handling
   const { sendChatMessage } = useConversationalAI({
