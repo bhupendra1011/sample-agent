@@ -10,170 +10,53 @@ const REDIS_KEY_PREFIX = "wb:";
 const REDIS_TTL_SECONDS = 300; // 5 minutes auto-cleanup
 
 // MCP Tool definitions exposed to the Agora Conversational AI agent
+// Keep descriptions concise to reduce token usage and avoid agent timeouts
 const TOOLS = [
   {
     name: "open_whiteboard",
     description:
-      "Open the shared whiteboard for all participants. Call this BEFORE any drawing command if the whiteboard is not already open. The whiteboard will automatically open when you use drawing tools, but calling this explicitly gives users a visual cue that you're about to draw.",
-    inputSchema: {
-      type: "object",
-      properties: {},
-    },
+      "Open the shared whiteboard so all participants can see it. Always call this before using draw_diagram, insert_text, or clear_board. The whiteboard must be open for drawing tools to work.",
+    inputSchema: { type: "object", properties: {} },
   },
   {
     name: "close_whiteboard",
     description:
-      "Close the shared whiteboard and return to the default video call view. Call this when you're done explaining on the whiteboard or when the user asks to close/hide the whiteboard.",
-    inputSchema: {
-      type: "object",
-      properties: {},
-    },
+      "Close the whiteboard and return to the normal video call view. Call this when done explaining on the whiteboard or when the user asks to close it.",
+    inputSchema: { type: "object", properties: {} },
   },
   {
     name: "draw_diagram",
     description:
-      "Draw a Mermaid diagram on the shared whiteboard. The whiteboard will automatically open if not already visible. Use standard Mermaid syntax: flowchart TD for top-down flows, sequenceDiagram for interactions, classDiagram for structures, mindmap for concept maps, graph LR for left-right flows. The diagram will be rendered as an image and placed on the whiteboard visible to all participants.",
+      "Draw a diagram on the whiteboard using Mermaid syntax. Renders as an image. Use for flowcharts, sequences, mind maps, class diagrams, shapes, and any visual explanation.",
     inputSchema: {
       type: "object",
       properties: {
         mermaidCode: {
           type: "string",
-          description: "Valid Mermaid diagram syntax",
+          description: "Mermaid diagram syntax (e.g. flowchart TD, sequenceDiagram, mindmap)",
         },
-        title: {
-          type: "string",
-          description: "Optional title for the diagram",
-        },
+        title: { type: "string", description: "Optional title" },
       },
       required: ["mermaidCode"],
     },
   },
   {
     name: "insert_text",
-    description:
-      "Add a text annotation on the whiteboard at a specific position.",
+    description: "Add text on the whiteboard at a position.",
     inputSchema: {
       type: "object",
       properties: {
-        x: { type: "number", description: "X position on the whiteboard" },
-        y: { type: "number", description: "Y position on the whiteboard" },
-        text: { type: "string", description: "Text content to display" },
-        fontSize: {
-          type: "number",
-          description: "Font size in pixels (default: 16)",
-        },
+        x: { type: "number", description: "X position" },
+        y: { type: "number", description: "Y position" },
+        text: { type: "string", description: "Text to display" },
       },
       required: ["x", "y", "text"],
     },
   },
   {
     name: "clear_board",
-    description: "Clear the current whiteboard scene.",
-    inputSchema: {
-      type: "object",
-      properties: {},
-    },
-  },
-  {
-    name: "undo",
-    description: "Undo the last whiteboard action.",
-    inputSchema: {
-      type: "object",
-      properties: {},
-    },
-  },
-  {
-    name: "redo",
-    description: "Redo the last undone whiteboard action.",
-    inputSchema: {
-      type: "object",
-      properties: {},
-    },
-  },
-  {
-    name: "draw_shape",
-    description:
-      "Draw a shape on the whiteboard. Supported shapes: rectangle, ellipse, triangle, rhombus, star. The shape will be drawn at the specified position with the given size and color. Use this for visual explanations — draw boxes for concepts, circles for highlights, etc.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        shape: {
-          type: "string",
-          enum: ["rectangle", "ellipse", "triangle", "rhombus", "star"],
-          description: "Type of shape to draw",
-        },
-        x: { type: "number", description: "X position (center)" },
-        y: { type: "number", description: "Y position (center)" },
-        width: { type: "number", description: "Width in pixels (default: 200)" },
-        height: { type: "number", description: "Height in pixels (default: 150)" },
-        color: {
-          type: "array",
-          items: { type: "number" },
-          description: "RGB color as [r, g, b], e.g. [255, 0, 0] for red. Default: [51, 102, 255] (blue)",
-        },
-        strokeWidth: {
-          type: "number",
-          description: "Stroke width in pixels (default: 2)",
-        },
-      },
-      required: ["shape", "x", "y"],
-    },
-  },
-  {
-    name: "draw_line",
-    description:
-      "Draw a straight line or arrow on the whiteboard between two points. Use arrows to show relationships, flows, or connections between concepts. Use lines for underlines, separators, or pointers.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        x1: { type: "number", description: "Start X position" },
-        y1: { type: "number", description: "Start Y position" },
-        x2: { type: "number", description: "End X position" },
-        y2: { type: "number", description: "End Y position" },
-        arrow: {
-          type: "boolean",
-          description: "If true, draws an arrow instead of a plain line (default: false)",
-        },
-        color: {
-          type: "array",
-          items: { type: "number" },
-          description: "RGB color as [r, g, b]. Default: [0, 0, 0] (black)",
-        },
-        strokeWidth: {
-          type: "number",
-          description: "Stroke width in pixels (default: 2)",
-        },
-      },
-      required: ["x1", "y1", "x2", "y2"],
-    },
-  },
-  {
-    name: "draw_pencil",
-    description:
-      "Draw a freehand pencil path on the whiteboard. Provide an array of [x, y] coordinate points that form the path. Use this for handwritten-style annotations, underlining, circling items, or sketching. Keep paths simple (10-30 points) for best results.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        points: {
-          type: "array",
-          items: {
-            type: "array",
-            items: { type: "number" },
-          },
-          description: "Array of [x, y] points forming the pencil path, e.g. [[100,100],[150,120],[200,100]]",
-        },
-        color: {
-          type: "array",
-          items: { type: "number" },
-          description: "RGB color as [r, g, b]. Default: [255, 0, 0] (red)",
-        },
-        strokeWidth: {
-          type: "number",
-          description: "Stroke width in pixels (default: 4)",
-        },
-      },
-      required: ["points"],
-    },
+    description: "Clear the whiteboard.",
+    inputSchema: { type: "object", properties: {} },
   },
 ];
 
@@ -229,7 +112,7 @@ async function handleToolCall(
         action: "open_whiteboard",
         params: {},
       });
-      resultText = "The whiteboard is now open and visible to all participants.";
+      resultText = "Whiteboard opened.";
       break;
     }
     case "close_whiteboard": {
@@ -237,7 +120,7 @@ async function handleToolCall(
         action: "close_whiteboard",
         params: {},
       });
-      resultText = "The whiteboard has been closed. Participants are back to the default video view.";
+      resultText = "Whiteboard closed.";
       break;
     }
     case "draw_diagram": {
@@ -251,7 +134,7 @@ async function handleToolCall(
         action: "insert_image",
         params: { url: imageUrl, title, width: 800, height: 600 },
       });
-      resultText = `Diagram "${title}" has been drawn on the whiteboard.`;
+      resultText = `Diagram drawn on whiteboard.`;
       break;
     }
     case "insert_text": {
@@ -266,7 +149,7 @@ async function handleToolCall(
         action: "insert_text",
         params: { x, y, text, fontSize },
       });
-      resultText = `Text "${text}" has been added to the whiteboard at position (${x}, ${y}).`;
+      resultText = `Text added to whiteboard.`;
       break;
     }
     case "clear_board": {
@@ -274,64 +157,7 @@ async function handleToolCall(
         action: "clear_board",
         params: {},
       });
-      resultText = "The whiteboard has been cleared.";
-      break;
-    }
-    case "undo": {
-      await storeCommand(channelName, { action: "undo", params: {} });
-      resultText = "Last whiteboard action has been undone.";
-      break;
-    }
-    case "redo": {
-      await storeCommand(channelName, { action: "redo", params: {} });
-      resultText = "Last undone whiteboard action has been redone.";
-      break;
-    }
-    case "draw_shape": {
-      const shape = args.shape as string;
-      const x = (args.x as number) ?? 0;
-      const y = (args.y as number) ?? 0;
-      const width = (args.width as number) ?? 200;
-      const height = (args.height as number) ?? 150;
-      const color = (args.color as number[]) ?? [51, 102, 255];
-      const strokeWidth = (args.strokeWidth as number) ?? 2;
-      if (!shape) {
-        return jsonRpcError(id, -32602, "shape is required");
-      }
-      await storeCommand(channelName, {
-        action: "draw_shape",
-        params: { shape, x, y, width, height, color, strokeWidth },
-      });
-      resultText = `Drew a ${shape} on the whiteboard at (${x}, ${y}) with size ${width}x${height}.`;
-      break;
-    }
-    case "draw_line": {
-      const x1 = (args.x1 as number) ?? 0;
-      const y1 = (args.y1 as number) ?? 0;
-      const x2 = (args.x2 as number) ?? 100;
-      const y2 = (args.y2 as number) ?? 100;
-      const arrow = (args.arrow as boolean) ?? false;
-      const lineColor = (args.color as number[]) ?? [0, 0, 0];
-      const lineStroke = (args.strokeWidth as number) ?? 2;
-      await storeCommand(channelName, {
-        action: "draw_line",
-        params: { x1, y1, x2, y2, arrow, color: lineColor, strokeWidth: lineStroke },
-      });
-      resultText = `Drew ${arrow ? "an arrow" : "a line"} from (${x1}, ${y1}) to (${x2}, ${y2}).`;
-      break;
-    }
-    case "draw_pencil": {
-      const points = args.points as number[][];
-      const pencilColor = (args.color as number[]) ?? [255, 0, 0];
-      const pencilStroke = (args.strokeWidth as number) ?? 4;
-      if (!points || points.length < 2) {
-        return jsonRpcError(id, -32602, "points array with at least 2 points is required");
-      }
-      await storeCommand(channelName, {
-        action: "draw_pencil",
-        params: { points, color: pencilColor, strokeWidth: pencilStroke },
-      });
-      resultText = `Drew a freehand path with ${points.length} points on the whiteboard.`;
+      resultText = "Whiteboard cleared.";
       break;
     }
     default:
