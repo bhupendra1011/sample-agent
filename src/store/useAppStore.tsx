@@ -73,6 +73,7 @@ interface AppState {
   whiteboardRegion: string;
   isWhiteboardActive: boolean;
   toggleWhiteboard: () => void;
+  setWhiteboardActive: (active: boolean) => void;
   setWhiteboardCredentials: (
     token: string,
     uuid: string,
@@ -305,6 +306,7 @@ const useAppStore = create<AppState>((set, get) => ({
   isWhiteboardActive: false,
   toggleWhiteboard: () =>
     set((state) => ({ isWhiteboardActive: !state.isWhiteboardActive })),
+  setWhiteboardActive: (active) => set({ isWhiteboardActive: active }),
   setWhiteboardCredentials: (token, uuid, appIdentifier, region) =>
     set({
       whiteboardRoomToken: token,

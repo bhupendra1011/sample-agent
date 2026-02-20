@@ -12,9 +12,27 @@ const REDIS_TTL_SECONDS = 300; // 5 minutes auto-cleanup
 // MCP Tool definitions exposed to the Agora Conversational AI agent
 const TOOLS = [
   {
+    name: "open_whiteboard",
+    description:
+      "Open the shared whiteboard for all participants. Call this BEFORE any drawing command if the whiteboard is not already open. The whiteboard will automatically open when you use drawing tools, but calling this explicitly gives users a visual cue that you're about to draw.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+    },
+  },
+  {
+    name: "close_whiteboard",
+    description:
+      "Close the shared whiteboard and return to the default video call view. Call this when you're done explaining on the whiteboard or when the user asks to close/hide the whiteboard.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+    },
+  },
+  {
     name: "draw_diagram",
     description:
-      "Draw a Mermaid diagram on the shared whiteboard. Use standard Mermaid syntax: flowchart TD for top-down flows, sequenceDiagram for interactions, classDiagram for structures, mindmap for concept maps, graph LR for left-right flows. The diagram will be rendered as an image and placed on the whiteboard visible to all participants.",
+      "Draw a Mermaid diagram on the shared whiteboard. The whiteboard will automatically open if not already visible. Use standard Mermaid syntax: flowchart TD for top-down flows, sequenceDiagram for interactions, classDiagram for structures, mindmap for concept maps, graph LR for left-right flows. The diagram will be rendered as an image and placed on the whiteboard visible to all participants.",
     inputSchema: {
       type: "object",
       properties: {
@@ -206,6 +224,22 @@ async function handleToolCall(
   let resultText: string;
 
   switch (toolName) {
+    case "open_whiteboard": {
+      await storeCommand(channelName, {
+        action: "open_whiteboard",
+        params: {},
+      });
+      resultText = "The whiteboard is now open and visible to all participants.";
+      break;
+    }
+    case "close_whiteboard": {
+      await storeCommand(channelName, {
+        action: "close_whiteboard",
+        params: {},
+      });
+      resultText = "The whiteboard has been closed. Participants are back to the default video view.";
+      break;
+    }
     case "draw_diagram": {
       const mermaidCode = args.mermaidCode as string;
       const title = (args.title as string) || "Diagram";
