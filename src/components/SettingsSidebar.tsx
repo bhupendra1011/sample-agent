@@ -561,6 +561,13 @@ export const getDefaultSettings = (): AgentSettingsType => {
           timeout_ms: 10000,
           enabled: false,
         },
+        {
+          name: "whiteboard",
+          endpoint: `${typeof window !== "undefined" ? window.location.origin : ""}/api/mcp/whiteboard`,
+          transport: "http",
+          timeout_ms: 15000,
+          enabled: false,
+        },
       ],
     },
     tts: {

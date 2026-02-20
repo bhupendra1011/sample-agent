@@ -264,7 +264,22 @@ const getDefaultSettings = (): AgentSettings => {
       params: {
         model: getEnvVar("LLM_MODEL", "gpt-4o-mini"),
       },
-      mcp_servers: [],
+      mcp_servers: [
+        {
+          name: "Weather",
+          endpoint: "https://mcp-weather-server-5jkm.onrender.com/mcp",
+          transport: "http",
+          timeout_ms: 10000,
+          enabled: false,
+        },
+        {
+          name: "whiteboard",
+          endpoint: `${typeof window !== "undefined" ? window.location.origin : ""}/api/mcp/whiteboard`,
+          transport: "http",
+          timeout_ms: 15000,
+          enabled: false,
+        },
+      ],
     },
     tts: {
       vendor: ttsVendor,
