@@ -438,6 +438,12 @@ export async function POST(request: NextRequest) {
           mergedHeaders["Authorization"] = `Bearer ${mcpSecret}`;
         }
 
+        // Vercel Deployment Protection bypass
+        const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+        if (bypassSecret && isWhiteboardMcp) {
+          mergedHeaders["x-vercel-protection-bypass"] = bypassSecret;
+        }
+
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { enabled, queries, endpoint: _ep, headers: _h, ...rest } = s;
         return {
