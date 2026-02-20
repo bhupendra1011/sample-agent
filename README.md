@@ -1,259 +1,283 @@
-# My Agora AI App
+<p align="center">
+  <img src="public/favicon.svg" alt="My Agora App" width="80" />
+</p>
 
-A Next.js application combining **Agora App Builder RTC** with **Conversational AI** — featuring video calling, AI agents, avatars, and real-time collaboration tools.
+<h1 align="center">🎙️ My Agora AI App</h1>
 
-## Overview
+<p align="center">
+  <b>A real-time communication app built with Next.js, TypeScript & Agora SDKs</b><br/>
+  Video calls · Voice calls · Real-time messaging · Whiteboard · AI Conversational Agent
+</p>
 
-This app delivers a production-ready **real-time communication experience** powered by Agora's Managed Service. Users can create or join video meetings with screen sharing, an interactive whiteboard, host controls, and real-time messaging.
+<p align="center">
+  <img src="https://img.shields.io/badge/Next.js-15-black?logo=next.js" alt="Next.js" />
+  <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react" alt="React" />
+  <img src="https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/TailwindCSS-4-06B6D4?logo=tailwindcss" alt="TailwindCSS" />
+  <img src="https://img.shields.io/badge/Agora-RTC%204.23%20%7C%20RTM%202.2%20%7C%20ConvoAI%202.4-099DFD?logo=agora" alt="Agora" />
+</p>
 
-On top of the RTC foundation, the app integrates **Agora Conversational AI** — letting you invite an AI agent into any call. The agent uses configurable LLM, TTS, and ASR providers, supports AI avatars (HeyGen, Akool, Anam), and can call external tools via MCP (Model Context Protocol) servers.
+---
 
-All secrets stay on the server. Next.js API routes generate Agora tokens, inject API keys, and proxy requests to the Agora Conversational AI v2 API — so nothing sensitive reaches the browser.
+## 📖 Overview
 
-## Features
+This app delivers a **production-ready real-time communication experience** powered by Agora's Managed Service. Users can create or join video meetings with screen sharing, an interactive whiteboard, host controls, and real-time messaging.
 
-### RTC & Collaboration
-- **Video & voice calling** — HD audio/video with dynamic grid layout (1-7 participants)
-- **Screen sharing** — share your screen with automatic layout switching
-- **Interactive whiteboard** — real-time collaborative drawing (Netless Fastboard)
-- **Chat messaging** — real-time messaging via Agora RTM
-- **Host controls** — mute/unmute remote participants with accept/decline requests
-- **Session timer** — 15-minute auto-expiry with countdown display
+On top of the RTC foundation, the app integrates **Agora Conversational AI** — letting you invite an AI agent into any call. The agent uses configurable LLM, TTS, and ASR providers, supports AI avatars (HeyGen, Akool, Anam), and can call external tools via **MCP (Model Context Protocol)** servers.
 
-### Conversational AI
-- **AI agent lifecycle** — invite, update, query, and stop agents from the UI
-- **Multi-vendor LLM** — OpenAI, Azure OpenAI, Anthropic, Gemini, Groq, Coze, Dify, MiniMax, or custom
-- **Multi-vendor TTS** — Microsoft, ElevenLabs, OpenAI, MiniMax, Cartesia, Fish Audio, Google, Polly
-- **Multi-vendor ASR** — Agora ARES (built-in), Deepgram, Microsoft
-- **Real-time transcription** — dual mode (RTM for agent state + RTC for audio-only)
-- **ElevenLabs voice picker** — browse and preview voices with audio samples
-- **MCP tool integration** — connect external MCP servers for function calling
-- **Advanced settings** — VAD turn detection, filler words, SAL (Selective Attention Locking), custom JSON payloads
-- **Image modality** — send pictures to the AI agent (MLLM support)
+All secret keys stay on the server. Next.js API routes generate Agora tokens, inject API keys, and proxy requests to the [Agora Conversational AI v2 API](https://docs.agora.io/en/conversational-ai/overview/product-overview).
 
-### AI Avatars
-- **HeyGen** — 30+ streaming avatars across categories (characters, doctors, fitness, lawyers, etc.)
-- **Akool** — custom avatar support
-- **Anam** — 7 stock avatars (Gabriel, Layla, Cara, Mila, Liv, Kevin, Leo)
+---
 
-### App Experience
-- **Google OAuth** — sign-in via NextAuth.js v5
-- **Dark mode** — system-aware with manual toggle
-- **Feature tour** — guided onboarding for new users
-- **Responsive design** — mobile-first with adaptive layouts
+## ✨ Features
 
-## Architecture
+| Feature                        | Description                                            |
+| ------------------------------ | ------------------------------------------------------ |
+| 🎥 **Video & Voice Calling**   | HD video/voice calls powered by Agora RTC SDK          |
+| 🖥️ **Screen Sharing**          | Share your screen with participants in real time       |
+| 💬 **Real-time Messaging**     | Instant chat using Agora RTM SDK v2                    |
+| 🎨 **Interactive Whiteboard**  | Collaborate visually with Netless Fastboard            |
+| 🤖 **AI Conversational Agent** | Talk to an AI agent with LLM, TTS & ASR support        |
+| 🖼️ **AI Avatars**              | Optional avatar integration (HeyGen, Akool, Anam)      |
+| 🔐 **Google Auth**             | Sign in with Google via NextAuth.js                    |
+| 🌙 **Dark Mode**               | Full dark mode support with Tailwind                   |
+| 🔌 **MCP Tools**               | Model Context Protocol server for AI-powered tooling   |
+| ⚡ **Modern Stack**            | Next.js 15, React 19, TypeScript, Zustand, React Query |
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer          | Technologies                                                                                                           |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| **Framework**  | Next.js 15 · React 19 · TypeScript 5.8                                                                                 |
+| **Styling**    | TailwindCSS 4 · Dark mode (class strategy)                                                                             |
+| **State**      | Zustand 5 · TanStack React Query                                                                                       |
+| **Auth**       | NextAuth.js (Google OAuth)                                                                                             |
+| **Agora SDKs** | `agora-rtc-sdk-ng` · `agora-rtm-sdk` v2 · `@netless/fastboard-react`                                                   |
+| **AI**         | Conversational AI · LLM (OpenAI/Anthropic/Gemini) · TTS (ElevenLabs/Microsoft/OpenAI) · ASR (Deepgram/Microsoft/Agora) |
+
+---
+
+## 🏗️ Architecture
 
 ```mermaid
 sequenceDiagram
-    participant User
-    participant Client as Next.js Client
-    participant MgdSvc as Agora Managed Service
-    participant RTC as Agora RTC
-    participant API as Next.js API Routes
-    participant ConvAI as Conversational AI Engine
-    participant LLM as LLM Provider
-    participant TTS as TTS Provider
+    participant U as 👤 User
+    participant C as 🖥️ Next.js Client
+    participant MS as ☁️ Agora Managed<br/>Service
+    participant RTC as 📡 Agora RTC
+    participant API as ⚙️ Next.js API<br/>Routes
+    participant AI as 🧠 Conversational<br/>AI Engine
+    participant LLM as 🤖 LLM Provider
 
-    User->>Client: Create / Join meeting
-    Client->>MgdSvc: Login + channel join request
-    MgdSvc-->>Client: RTC/RTM tokens, channel info
-    Client->>RTC: Join channel with tokens
-    RTC-->>Client: Connected (audio/video streaming)
+    Note over U,LLM: 🔵 Meeting Flow
 
-    User->>Client: Click "Invite AI Agent"
-    Client->>API: POST /api/agent/invite
-    API->>API: Generate agent token, inject API keys
-    API->>ConvAI: POST /v2/projects/{appId}/join
-    ConvAI->>RTC: Agent joins channel
+    U->>C: Create / Join meeting
+    C->>MS: Login + channel join request
+    MS-->>C: RTC/RTM tokens, channel info
+    C->>RTC: Join channel with tokens
+    RTC-->>C: Connected (audio/video streaming)
 
-    Note over Client: User speaks into microphone
+    Note over U,LLM: 🟣 AI Agent Flow
 
-    ConvAI->>ConvAI: Voice Activity Detection + ASR
-    ConvAI->>LLM: Send transcribed text
-    LLM-->>ConvAI: AI response
-    ConvAI->>TTS: Convert to speech
-    TTS-->>ConvAI: Audio stream
-    ConvAI->>RTC: Publish agent audio
-    RTC-->>Client: Stream agent response
-    Client-->>User: Play AI audio + show transcript
+    U->>C: Click "Invite AI Agent"
+    C->>API: POST /api/agent/invite
+    API->>API: Generate agent token,<br/>inject API keys
+    API->>AI: POST /v2/projects/{appId}/join
+    AI-->>RTC: Agent joins channel
 
-    User->>Client: Click "Stop Agent"
-    Client->>API: POST /api/agent/stop
-    API->>ConvAI: Agent leaves channel
+    Note over U,LLM: 🟡 Conversation Flow
+
+    U->>RTC: 🎤 Speaks into microphone
+    RTC->>AI: Audio stream
+    AI->>AI: Voice Activity Detection<br/>+ ASR (Speech → Text)
+    AI->>LLM: Send transcribed text
+    LLM-->>AI: AI response
+    AI->>AI: TTS (Text → Speech)
+    AI->>RTC: Publish agent audio
+    RTC-->>C: Stream agent response
+    C-->>U: 🔊 Play AI audio +<br/>show transcript
+
+    Note over U,LLM: 🔴 Teardown
+
+    U->>C: Click "Stop Agent"
+    C->>API: POST /api/agent/stop
+    API->>AI: Stop agent
+    AI-->>RTC: Agent leaves channel
 ```
 
-## Tech Stack
+> 💡 **How it works:** The project is created via [Agora App Builder](https://appbuilder.agora.io/), which provisions the Managed Service backend. The Next.js client communicates with the Managed Service for authentication and channel management. For AI features, Next.js API routes act as a secure proxy — generating tokens server-side and forwarding requests to Agora's Conversational AI Engine.
 
-| Category | Technology |
-|----------|-----------|
-| Framework | Next.js 15 (App Router), React 19, TypeScript 5.8 |
-| Styling | TailwindCSS 4, dark mode (class strategy) |
-| State | Zustand 5, TanStack React Query |
-| Auth | NextAuth.js v5 (Google OAuth) |
-| Video/Audio | agora-rtc-sdk-ng |
-| Messaging | agora-rtm-sdk v2 |
-| Whiteboard | @netless/fastboard-react |
-| Token Generation | agora-token (server-side) |
+---
 
-## Getting Started
+## 📋 Prerequisites
 
-### Prerequisites
-- Node.js 18+
-- An [Agora account](https://console.agora.io/) with App ID, App Certificate, and Customer ID/Secret
-- [Google OAuth credentials](https://console.cloud.google.com/) (APIs & Services > Credentials > OAuth 2.0 Client ID)
+Before getting started, make sure you have:
 
-### Setup
+- ✅ **Node.js** v18 or higher
+- ✅ **npm** or **yarn**
+- ✅ **Google Cloud** credentials (for OAuth sign-in)
+
+### 🔑 Agora Account Setup
+
+Follow these steps **in order** to set up your Agora project:
+
+#### Step 1 — Create a project via App Builder
+
+1. Go to 👉 [**Agora App Builder**](https://appbuilder.agora.io/)
+2. Sign up or log in to your Agora account
+3. Create a new project — this generates your **App ID** and **Project ID**
+
+#### Step 2 — Enable RTM & Conversational AI
+
+1. Go to 👉 [**Agora Console**](https://console.agora.io/)
+2. Navigate to your project settings
+3. ✅ **Enable Real-Time Messaging (RTM)** — required for chat functionality
+4. ✅ **Enable Conversational AI** — required for the AI agent feature
+5. 📜 Copy your **App Certificate** from Project Management → Security
+
+#### Step 3 — Get RESTful API Credentials
+
+1. Go to 👉 [**Agora RESTful API**](https://console.agora.io/restful-api)
+2. Generate or copy the following:
+   - 🆔 **Customer ID**
+   - 🔐 **Customer Secret (Certificate)**
+3. These are needed for server-side token generation and Conversational AI API calls
+
+> 💡 **Tip:** The project is created via **App Builder**, but feature enablement (RTM, Conversational AI), the **App Certificate**, and **RESTful API credentials** are all managed in the **Agora Console**.
+
+---
+
+## 🚀 Getting Started
+
+### 1️⃣ Clone the repository
 
 ```bash
-# 1. Clone the repo
-git clone <repo-url>
+git clone <repository-url>
 cd my-agora-app
+```
 
-# 2. Install dependencies
+### 2️⃣ Install dependencies
+
+```bash
 npm install
+```
 
-# 3. Configure environment
+### 3️⃣ Configure environment variables
+
+```bash
 cp .env.example .env
-# Fill in your credentials (see Environment Variables below)
+```
 
-# 4. Start dev server
+Edit `.env` with your credentials:
+
+<details>
+<summary>🔧 <b>Core Agora & Auth Variables</b></summary>
+
+```env
+# Google Auth (NextAuth.js)
+AUTH_SECRET="generated-secret"          # Run: openssl rand -base64 32
+GOOGLE_CLIENT_ID="your-google-client-id"
+GOOGLE_CLIENT_SECRET="your-google-client-secret"
+
+# Agora Core
+NEXT_PUBLIC_AGORA_APP_ID="your-app-id"
+NEXT_PUBLIC_AGORA_PROJECT_ID="your-project-id"
+NEXT_PUBLIC_AGORA_MANAGED_SERVICE_URL="https://managedservices-prod.rteappbuilder.com/v1"
+
+# Agora Server-only (token gen & Conversational AI)
+AGORA_APP_CERTIFICATE="your-app-certificate"   # From Agora Console → Project → Security
+AGORA_CUSTOMER_ID="your-customer-id"
+AGORA_CUSTOMER_SECRET="your-customer-secret"
+
+# Whiteboard
+NEXT_PUBLIC_AGORA_WHITEBOARD_APPIDENTIFIER="your-whiteboard-app-id"
+NEXT_PUBLIC_AGORA_WHITEBOARD_REGION="us-sv"
+```
+
+</details>
+
+<details>
+<summary>🤖 <b>AI Agent Variables (Optional)</b></summary>
+
+```env
+# LLM
+NEXT_PUBLIC_LLM_VENDOR="openai"
+NEXT_PUBLIC_LLM_MODEL="gpt-4o-mini"
+LLM_API_KEY="your-llm-api-key"
+
+# TTS
+NEXT_PUBLIC_TTS_VENDOR="elevenlabs"
+ELEVENLABS_API_KEY="your-elevenlabs-key"
+
+# ASR
+NEXT_PUBLIC_ASR_VENDOR="ares"
+
+# Avatars (pick one, all optional)
+HEYGEN_API_KEY="your-heygen-key"
+AKOOL_API_KEY="your-akool-key"
+ANAM_API_KEY="your-anam-key"
+```
+
+</details>
+
+<details>
+<summary>📍 <b>Where to find each value</b></summary>
+
+| Variable                         | Where to get it                                                                           |
+| -------------------------------- | ----------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_AGORA_APP_ID`       | [Agora Console](https://console.agora.io/) → Project Management                           |
+| `NEXT_PUBLIC_AGORA_PROJECT_ID`   | [Agora App Builder](https://appbuilder.agora.io/) → Your Project                          |
+| `AGORA_APP_CERTIFICATE`          | [Agora Console](https://console.agora.io/) → Project Management → Security                |
+| `AGORA_CUSTOMER_ID` / `SECRET`   | [Agora RESTful API](https://console.agora.io/restful-api)                                 |
+| `NEXT_PUBLIC_AGORA_WHITEBOARD_*` | [Agora Console](https://console.agora.io/) → Whiteboard → Config                          |
+| `GOOGLE_CLIENT_ID` / `SECRET`    | [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Credentials |
+
+</details>
+
+### 4️⃣ Start the development server
+
+```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000), sign in with Google, and create or join a meeting.
+### 5️⃣ Open your browser
 
-## Environment Variables
+Navigate to 👉 `http://localhost:3000`
 
-Copy `.env.example` to `.env` and fill in the values. Variables prefixed with `NEXT_PUBLIC_` are visible to the browser. Variables **without** the prefix are server-only and never reach the client.
+---
 
-### Auth (NextAuth.js)
+## 📜 Available Scripts
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `AUTH_SECRET` | NextAuth secret — generate with `openssl rand -base64 32` | Yes |
-| `GOOGLE_CLIENT_ID` | Google OAuth Client ID | Yes |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth Client Secret | Yes |
+| Command         | Description                 |
+| --------------- | --------------------------- |
+| `npm run dev`   | 🔄 Start development server |
+| `npm run build` | 📦 Build for production     |
+| `npm run start` | 🚀 Start production server  |
+| `npm run lint`  | 🔍 Run ESLint               |
 
-### Agora Core
+---
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `NEXT_PUBLIC_AGORA_APP_ID` | Agora App ID | Yes |
-| `NEXT_PUBLIC_AGORA_API_KEY` | Agora API Key | Yes |
-| `NEXT_PUBLIC_AGORA_MANAGED_SERVICE_URL` | Managed Service URL (default provided) | Yes |
-| `NEXT_PUBLIC_AGORA_PROJECT_ID` | App Builder Project ID — create at [appbuilder.agora.io](https://appbuilder.agora.io/) | Yes |
-| `AGORA_APP_CERTIFICATE` | App Certificate — server-only, for token generation | Yes |
-| `AGORA_CUSTOMER_ID` | RESTful API Customer ID — server-only | For AI agent |
-| `AGORA_CUSTOMER_SECRET` | RESTful API Customer Secret — server-only | For AI agent |
-
-### Whiteboard
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `NEXT_PUBLIC_AGORA_WHITEBOARD_APPIDENTIFIER` | Whiteboard App Identifier | For whiteboard |
-| `NEXT_PUBLIC_AGORA_WHITEBOARD_REGION` | Region: `us-sv`, `sg`, `cn-hz`, `in-mum`, `eu` | For whiteboard |
-
-### LLM (AI Agent)
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `NEXT_PUBLIC_LLM_VENDOR` | Provider: `openai`, `azure`, `anthropic`, `gemini`, `groq`, `custom` | No (default: openai) |
-| `NEXT_PUBLIC_LLM_URL` | LLM API endpoint URL | No |
-| `NEXT_PUBLIC_LLM_MODEL` | Model name (e.g. `gpt-4o-mini`) | No |
-| `LLM_API_KEY` | LLM API key — server-only | For AI agent |
-
-### TTS (Text-to-Speech)
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `NEXT_PUBLIC_TTS_VENDOR` | Provider: `microsoft`, `elevenlabs`, `openai` | No (default: elevenlabs) |
-| `NEXT_PUBLIC_ELEVENLABS_VOICE_ID` | ElevenLabs voice ID | For ElevenLabs |
-| `NEXT_PUBLIC_ELEVENLABS_MODEL_ID` | ElevenLabs model | No |
-| `NEXT_PUBLIC_ELEVENLABS_SAMPLE_RATE` | Sample rate in Hz | No (default: 24000) |
-| `ELEVENLABS_API_KEY` | ElevenLabs API key — server-only | For ElevenLabs |
-| `MICROSOFT_TTS_KEY` | Microsoft TTS key — server-only | For Microsoft |
-| `OPENAI_TTS_KEY` | OpenAI TTS key — server-only | For OpenAI |
-
-### ASR (Speech Recognition)
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `NEXT_PUBLIC_ASR_VENDOR` | Provider: `ares`, `deepgram`, `microsoft` | No (default: ares) |
-| `NEXT_PUBLIC_ASR_LANGUAGE` | Language code (e.g. `en-US`) | No |
-| `DEEPGRAM_API_KEY` | Deepgram API key — server-only | For Deepgram |
-| `MICROSOFT_ASR_KEY` | Microsoft ASR key — server-only | For Microsoft |
-
-### AI Avatars (Optional)
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `NEXT_PUBLIC_HEYGEN_AVATAR_ID` | HeyGen streaming avatar ID | For HeyGen |
-| `NEXT_PUBLIC_HEYGEN_QUALITY` | Quality: `medium`, `high` | No (default: medium) |
-| `HEYGEN_API_KEY` | HeyGen API key — server-only | For HeyGen |
-| `NEXT_PUBLIC_AKOOL_AVATAR_ID` | Akool avatar ID | For Akool |
-| `AKOOL_API_KEY` | Akool API key — server-only | For Akool |
-| `NEXT_PUBLIC_ANAM_AVATAR_ID` | Anam avatar UUID | For Anam |
-| `ANAM_API_KEY` | Anam API key — server-only | For Anam |
-
-## Project Structure
+## 📁 Project Structure
 
 ```
 my-agora-app/
-├── app/                           # Next.js App Router
-│   ├── api/
-│   │   ├── agent/                 # AI agent endpoints
-│   │   │   ├── invite/            #   POST — invite agent to call
-│   │   │   ├── stop/              #   POST — remove agent
-│   │   │   ├── update/            #   POST — update agent config
-│   │   │   └── query/             #   GET  — check agent status
-│   │   ├── auth/[...nextauth]/    # Google OAuth handlers
-│   │   ├── mcp/tools/             # MCP tool discovery proxy
-│   │   ├── tts/elevenlabs-voices/ # ElevenLabs voice list
-│   │   └── upload/                # Image upload for AI vision
-│   ├── call/                      # Video call page
-│   ├── join/                      # Join meeting page
-│   └── page.tsx                   # Landing / create meeting
 ├── src/
-│   ├── api/
-│   │   ├── agoraApi.ts            # Managed Service client (create/join)
-│   │   └── agentApi.ts            # Agent lifecycle client
-│   ├── components/
-│   │   ├── common/                # Button, Modal, Card, InputField, etc.
-│   │   ├── Controls.tsx           # Call control bar
-│   │   ├── VideoTile.tsx          # Participant video
-│   │   ├── AgentTile.tsx          # AI agent status display
-│   │   ├── SettingsSidebar.tsx    # Agent settings panel
-│   │   ├── TranscriptSidePanel.tsx# Live transcript + chat
-│   │   ├── Whiteboard.tsx         # Fastboard integration
-│   │   └── FeatureTour/           # Guided onboarding
-│   ├── hooks/
-│   │   ├── useAgora.ts            # RTC/RTM client management
-│   │   └── useConversationalAI.ts # Transcript handling
-│   ├── screens/                   # Page-level components
-│   │   ├── LandingScreen.tsx
-│   │   ├── CreateMeetingScreen.tsx
-│   │   ├── JoinMeetingScreen.tsx
-│   │   └── VideoCallScreen.tsx
-│   ├── store/useAppStore.tsx      # Zustand global store
-│   ├── types/agora.ts             # TypeScript definitions
-│   └── services/uiService.ts     # Toast notifications
-├── .env.example                   # Environment template
-├── next.config.ts
-├── tailwind.config.js
-├── tsconfig.json
+│   ├── app/           # Next.js App Router pages & API routes
+│   ├── components/    # React components
+│   │   └── common/    # Reusable UI (Button, Card, Modal, InputField)
+│   ├── hooks/         # Custom React hooks (useAgora)
+│   ├── services/      # Utility services (uiService)
+│   ├── store/         # Zustand stores
+│   └── types/         # TypeScript definitions
+├── public/            # Static assets
+├── .env.example       # Environment variable template
 └── package.json
 ```
 
-## Scripts
+---
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start development server |
-| `npm run build` | Build for production |
-| `npm run start` | Start production server |
-| `npm run lint` | Run ESLint |
-
-## License
+## 📄 License
 
 MIT

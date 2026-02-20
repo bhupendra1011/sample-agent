@@ -553,7 +553,15 @@ export const getDefaultSettings = (): AgentSettingsType => {
       params: {
         model: getEnvVar("LLM_MODEL", "gpt-4o-mini"),
       },
-      mcp_servers: [],
+      mcp_servers: [
+        {
+          name: "Weather",
+          endpoint: "https://mcp-weather-server-5jkm.onrender.com/mcp",
+          transport: "http",
+          timeout_ms: 10000,
+          enabled: false,
+        },
+      ],
     },
     tts: {
       vendor: ttsVendor,
@@ -1803,8 +1811,13 @@ const AgentSettingsSidebarContent: React.FC<{
   React.useEffect(() => {
     if (existingSettings && !isFormInitialized.current) {
       const defaults = getDefaultSettings();
+      const mcpServers =
+        existingSettings.llm?.mcp_servers?.length
+          ? existingSettings.llm.mcp_servers
+          : defaults.llm.mcp_servers;
       setSettings({
         ...existingSettings,
+        llm: { ...existingSettings.llm, mcp_servers: mcpServers },
         filler_words: existingSettings.filler_words ?? defaults.filler_words,
         sal: existingSettings.sal ?? defaults.sal,
       });
