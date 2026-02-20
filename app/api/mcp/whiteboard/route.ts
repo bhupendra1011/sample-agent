@@ -333,6 +333,19 @@ function jsonRpcError(
  * channelName is extracted from URL query params (auto-injected by invite route).
  */
 export async function POST(request: NextRequest) {
+  // Custom API key auth — protects the endpoint without Vercel Deployment Protection
+  const mcpSecret = process.env.WHITEBOARD_MCP_SECRET;
+  if (mcpSecret) {
+    const authHeader = request.headers.get("authorization") ?? "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    if (token !== mcpSecret) {
+      return NextResponse.json(
+        { jsonrpc: "2.0", id: null, error: { code: -32000, message: "Unauthorized" } },
+        { status: 401 }
+      );
+    }
+  }
+
   try {
     const body = (await request.json()) as JsonRpcRequest;
     const { jsonrpc, id, method, params } = body;
