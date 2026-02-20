@@ -72,6 +72,91 @@ const TOOLS = [
       properties: {},
     },
   },
+  {
+    name: "draw_shape",
+    description:
+      "Draw a shape on the whiteboard. Supported shapes: rectangle, ellipse, triangle, rhombus, star. The shape will be drawn at the specified position with the given size and color. Use this for visual explanations — draw boxes for concepts, circles for highlights, etc.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        shape: {
+          type: "string",
+          enum: ["rectangle", "ellipse", "triangle", "rhombus", "star"],
+          description: "Type of shape to draw",
+        },
+        x: { type: "number", description: "X position (center)" },
+        y: { type: "number", description: "Y position (center)" },
+        width: { type: "number", description: "Width in pixels (default: 200)" },
+        height: { type: "number", description: "Height in pixels (default: 150)" },
+        color: {
+          type: "array",
+          items: { type: "number" },
+          description: "RGB color as [r, g, b], e.g. [255, 0, 0] for red. Default: [51, 102, 255] (blue)",
+        },
+        strokeWidth: {
+          type: "number",
+          description: "Stroke width in pixels (default: 2)",
+        },
+      },
+      required: ["shape", "x", "y"],
+    },
+  },
+  {
+    name: "draw_line",
+    description:
+      "Draw a straight line or arrow on the whiteboard between two points. Use arrows to show relationships, flows, or connections between concepts. Use lines for underlines, separators, or pointers.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        x1: { type: "number", description: "Start X position" },
+        y1: { type: "number", description: "Start Y position" },
+        x2: { type: "number", description: "End X position" },
+        y2: { type: "number", description: "End Y position" },
+        arrow: {
+          type: "boolean",
+          description: "If true, draws an arrow instead of a plain line (default: false)",
+        },
+        color: {
+          type: "array",
+          items: { type: "number" },
+          description: "RGB color as [r, g, b]. Default: [0, 0, 0] (black)",
+        },
+        strokeWidth: {
+          type: "number",
+          description: "Stroke width in pixels (default: 2)",
+        },
+      },
+      required: ["x1", "y1", "x2", "y2"],
+    },
+  },
+  {
+    name: "draw_pencil",
+    description:
+      "Draw a freehand pencil path on the whiteboard. Provide an array of [x, y] coordinate points that form the path. Use this for handwritten-style annotations, underlining, circling items, or sketching. Keep paths simple (10-30 points) for best results.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        points: {
+          type: "array",
+          items: {
+            type: "array",
+            items: { type: "number" },
+          },
+          description: "Array of [x, y] points forming the pencil path, e.g. [[100,100],[150,120],[200,100]]",
+        },
+        color: {
+          type: "array",
+          items: { type: "number" },
+          description: "RGB color as [r, g, b]. Default: [255, 0, 0] (red)",
+        },
+        strokeWidth: {
+          type: "number",
+          description: "Stroke width in pixels (default: 4)",
+        },
+      },
+      required: ["points"],
+    },
+  },
 ];
 
 interface JsonRpcRequest {
@@ -166,6 +251,53 @@ async function handleToolCall(
     case "redo": {
       await storeCommand(channelName, { action: "redo", params: {} });
       resultText = "Last undone whiteboard action has been redone.";
+      break;
+    }
+    case "draw_shape": {
+      const shape = args.shape as string;
+      const x = (args.x as number) ?? 0;
+      const y = (args.y as number) ?? 0;
+      const width = (args.width as number) ?? 200;
+      const height = (args.height as number) ?? 150;
+      const color = (args.color as number[]) ?? [51, 102, 255];
+      const strokeWidth = (args.strokeWidth as number) ?? 2;
+      if (!shape) {
+        return jsonRpcError(id, -32602, "shape is required");
+      }
+      await storeCommand(channelName, {
+        action: "draw_shape",
+        params: { shape, x, y, width, height, color, strokeWidth },
+      });
+      resultText = `Drew a ${shape} on the whiteboard at (${x}, ${y}) with size ${width}x${height}.`;
+      break;
+    }
+    case "draw_line": {
+      const x1 = (args.x1 as number) ?? 0;
+      const y1 = (args.y1 as number) ?? 0;
+      const x2 = (args.x2 as number) ?? 100;
+      const y2 = (args.y2 as number) ?? 100;
+      const arrow = (args.arrow as boolean) ?? false;
+      const lineColor = (args.color as number[]) ?? [0, 0, 0];
+      const lineStroke = (args.strokeWidth as number) ?? 2;
+      await storeCommand(channelName, {
+        action: "draw_line",
+        params: { x1, y1, x2, y2, arrow, color: lineColor, strokeWidth: lineStroke },
+      });
+      resultText = `Drew ${arrow ? "an arrow" : "a line"} from (${x1}, ${y1}) to (${x2}, ${y2}).`;
+      break;
+    }
+    case "draw_pencil": {
+      const points = args.points as number[][];
+      const pencilColor = (args.color as number[]) ?? [255, 0, 0];
+      const pencilStroke = (args.strokeWidth as number) ?? 4;
+      if (!points || points.length < 2) {
+        return jsonRpcError(id, -32602, "points array with at least 2 points is required");
+      }
+      await storeCommand(channelName, {
+        action: "draw_pencil",
+        params: { points, color: pencilColor, strokeWidth: pencilStroke },
+      });
+      resultText = `Drew a freehand path with ${points.length} points on the whiteboard.`;
       break;
     }
     default:

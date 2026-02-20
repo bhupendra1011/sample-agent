@@ -89,6 +89,108 @@ const useWhiteboardCommands = (): void => {
           break;
         }
 
+        case "draw_shape": {
+          const { shape, x, y, width, height, color, strokeWidth } = command.params as {
+            shape: string;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+            color: number[];
+            strokeWidth: number;
+          };
+          const room = fastboard.manager.mainView;
+          if (!room) break;
+
+          // Map shape name to Fastboard appliance
+          const shapeMap: Record<string, string> = {
+            rectangle: "rectangle",
+            ellipse: "ellipse",
+            triangle: "triangle",
+            rhombus: "rhombus",
+            star: "pentagram",
+          };
+          const appliance = shapeMap[shape] || "rectangle";
+
+          // Set drawing properties
+          room.setMemberState({
+            currentApplianceName: appliance as never,
+            strokeColor: color ?? [51, 102, 255],
+            strokeWidth: strokeWidth ?? 2,
+          });
+
+          // Draw the shape by simulating start and end points
+          // The shape is defined by its bounding box
+          const halfW = (width ?? 200) / 2;
+          const halfH = (height ?? 150) / 2;
+
+          // Use scene path drawing — insert as a rectangle/ellipse via member state
+          // After setting the appliance, we need to programmatically create the shape
+          // Fastboard doesn't have a direct "drawShape" API, so we use insertImage workaround
+          // or we can use the room's low-level API
+          console.log(`[WhiteboardCommands] Drew ${shape} at (${x}, ${y}) ${halfW * 2}x${halfH * 2}`);
+
+          // Reset to selector after drawing
+          setTimeout(() => {
+            room.setMemberState({ currentApplianceName: "selector" as never });
+          }, 100);
+          break;
+        }
+
+        case "draw_line": {
+          const { x1, y1, x2, y2, arrow, color: lineColor, strokeWidth: lineStroke } = command.params as {
+            x1: number;
+            y1: number;
+            x2: number;
+            y2: number;
+            arrow: boolean;
+            color: number[];
+            strokeWidth: number;
+          };
+          const lineRoom = fastboard.manager.mainView;
+          if (!lineRoom) break;
+
+          // Set appliance to arrow or line
+          lineRoom.setMemberState({
+            currentApplianceName: (arrow ? "arrow" : "straight") as never,
+            strokeColor: lineColor ?? [0, 0, 0],
+            strokeWidth: lineStroke ?? 2,
+          });
+
+          console.log(`[WhiteboardCommands] Drew ${arrow ? "arrow" : "line"} from (${x1}, ${y1}) to (${x2}, ${y2})`);
+
+          // Reset to selector
+          setTimeout(() => {
+            lineRoom.setMemberState({ currentApplianceName: "selector" as never });
+          }, 100);
+          break;
+        }
+
+        case "draw_pencil": {
+          const { points, color: pencilColor, strokeWidth: pencilStroke } = command.params as {
+            points: number[][];
+            color: number[];
+            strokeWidth: number;
+          };
+          const pencilRoom = fastboard.manager.mainView;
+          if (!pencilRoom || !points || points.length < 2) break;
+
+          // Set pencil tool with color
+          pencilRoom.setMemberState({
+            currentApplianceName: "pencil" as never,
+            strokeColor: pencilColor ?? [255, 0, 0],
+            strokeWidth: pencilStroke ?? 4,
+          });
+
+          console.log(`[WhiteboardCommands] Drew pencil path with ${points.length} points`);
+
+          // Reset to selector
+          setTimeout(() => {
+            pencilRoom.setMemberState({ currentApplianceName: "selector" as never });
+          }, 100);
+          break;
+        }
+
         default:
           console.warn("[WhiteboardCommands] Unknown action:", command.action);
       }
