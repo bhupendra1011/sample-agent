@@ -19,12 +19,22 @@
 
 ---
 
+## 📖 Overview
+
+This app delivers a **production-ready real-time communication experience** powered by Agora's Managed Service. Users can create or join video meetings with screen sharing, an interactive whiteboard, host controls, and real-time messaging.
+
+On top of the RTC foundation, the app integrates **Agora Conversational AI** — letting you invite an AI agent into any call. The agent uses configurable LLM, TTS, and ASR providers, supports AI avatars (HeyGen, Akool, Anam), and can call external tools via **MCP (Model Context Protocol)** servers.
+
+All secret keys stay on the server. Next.js API routes generate Agora tokens, inject API keys, and proxy requests to the [Agora Conversational AI v2 API](https://docs.agora.io/en/conversational-ai/overview/product-overview).
+
+---
+
 ## ✨ Features
 
-| Feature                       | Description                                            |
-| ----------------------------- | ------------------------------------------------------ |
+| Feature                        | Description                                            |
+| ------------------------------ | ------------------------------------------------------ |
 | 🎥 **Video & Voice Calling**   | HD video/voice calls powered by Agora RTC SDK          |
-| 🖥️ **Screen Sharing**          | Share your screen with participants in real time        |
+| 🖥️ **Screen Sharing**          | Share your screen with participants in real time       |
 | 💬 **Real-time Messaging**     | Instant chat using Agora RTM SDK v2                    |
 | 🎨 **Interactive Whiteboard**  | Collaborate visually with Netless Fastboard            |
 | 🤖 **AI Conversational Agent** | Talk to an AI agent with LLM, TTS & ASR support        |
