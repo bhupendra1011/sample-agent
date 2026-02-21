@@ -152,7 +152,7 @@ const VideoCallScreen: React.FC = () => {
               className={`text-xs px-2 py-1 rounded-full font-medium ${
                 displayTransmissionMode === "rtm"
                   ? "bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400"
-                  : "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
+                  : "bg-blue-100 dark:bg-agora-accent-blue/20 text-blue-600 dark:text-blue-400"
               }`}
             >
               Transmission: {displayTransmissionMode.toUpperCase()}

@@ -1,7 +1,13 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { MdClose, MdSend, MdImage, MdTextFields, MdViewHeadline } from "react-icons/md";
+import {
+  MdClose,
+  MdSend,
+  MdImage,
+  MdTextFields,
+  MdViewHeadline,
+} from "react-icons/md";
 import useAppStore from "@/store/useAppStore";
 import type { ITranscriptHelperItem } from "@/types/agora";
 import { ETurnStatus, ETranscriptRenderMode } from "@/types/agora";
@@ -23,13 +29,15 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
   const transcriptItems = useAppStore((state) => state.transcriptItems);
   const userSentMessages = useAppStore((state) => state.userSentMessages);
   const currentInProgressMessage = useAppStore(
-    (state) => state.currentInProgressMessage
+    (state) => state.currentInProgressMessage,
   );
   const transcriptionMode = useAppStore((state) => state.transcriptionMode);
   const agentSettings = useAppStore((state) => state.agentSettings);
-  const transcriptRenderMode = useAppStore((state) => state.transcriptRenderMode);
+  const transcriptRenderMode = useAppStore(
+    (state) => state.transcriptRenderMode,
+  );
   const setTranscriptRenderMode = useAppStore(
-    (state) => state.setTranscriptRenderMode
+    (state) => state.setTranscriptRenderMode,
   );
   const agentRtcUid = useAppStore((state) => state.agentRtcUid);
   // Transmission label matches advanced settings (no flip on agent start)
@@ -77,7 +85,12 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
 
     prevMessageLengthRef.current = displayCount;
     prevInProgressTextRef.current = currentInProgressMessage?.text || "";
-  }, [displayCount, currentInProgressMessage, shouldAutoScroll, scrollToBottom]);
+  }, [
+    displayCount,
+    currentInProgressMessage,
+    shouldAutoScroll,
+    scrollToBottom,
+  ]);
 
   const handleSendMessage = () => {
     if (!messageText.trim() && !imageFile) return;
@@ -105,7 +118,7 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
       case ETurnStatus.IN_PROGRESS:
         return (
           <span className="inline-flex items-center gap-1 text-xs text-blue-500">
-            <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
+            <span className="w-1.5 h-1.5 bg-agora-accent-blue rounded-full animate-pulse" />
             Speaking...
           </span>
         );
@@ -131,21 +144,29 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
     | { type: "userMessage"; text?: string; imageUrl?: string; _time: number };
   const DEDUPE_MS = 15000; // same "You" text within 15s = treat as same message
   const localTranscriptItems = transcriptItems.filter(
-    (item) => item.uid === String(localUID)
+    (item) => item.uid === String(localUID),
   );
   const agentOrOtherTranscriptItems = transcriptItems.filter(
-    (item) => item.uid !== String(localUID)
+    (item) => item.uid !== String(localUID),
   );
   const userSentSet = new Set(
-    userSentMessages.map((m) => `${(m._time / DEDUPE_MS) | 0}-${(m.text ?? "").trim()}`)
+    userSentMessages.map(
+      (m) => `${(m._time / DEDUPE_MS) | 0}-${(m.text ?? "").trim()}`,
+    ),
   );
   const localTranscriptDisplay = localTranscriptItems.filter((item) => {
     const key = `${(item._time / DEDUPE_MS) | 0}-${(item.text ?? "").trim()}`;
     return !userSentSet.has(key);
   });
   const displayItems: DisplayItem[] = [
-    ...agentOrOtherTranscriptItems.map((item) => ({ type: "transcript" as const, item })),
-    ...localTranscriptDisplay.map((item) => ({ type: "transcript" as const, item })),
+    ...agentOrOtherTranscriptItems.map((item) => ({
+      type: "transcript" as const,
+      item,
+    })),
+    ...localTranscriptDisplay.map((item) => ({
+      type: "transcript" as const,
+      item,
+    })),
     ...userSentMessages.map((msg) => ({
       type: "userMessage" as const,
       text: msg.text,
@@ -159,7 +180,9 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
   });
 
   const header = (
-    <div className={`flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 shrink-0 ${inline ? "pr-4" : "px-6"}`}>
+    <div
+      className={`flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 shrink-0 ${inline ? "pr-4" : "px-6"}`}
+    >
       <div className="flex items-center gap-3">
         <div>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -170,13 +193,16 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
               className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                 displayTransmissionMode === "rtm"
                   ? "bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400"
-                  : "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
+                  : "bg-blue-100 dark:bg-agora-accent-blue/20 text-blue-600 dark:text-blue-400"
               }`}
             >
               Transmission: {displayTransmissionMode.toUpperCase()}
             </span>
             {displayTransmissionMode === "rtc" && (
-              <span className="text-xs text-gray-500 dark:text-gray-400" title="Chat is only available in RTM mode">
+              <span
+                className="text-xs text-gray-500 dark:text-gray-400"
+                title="Chat is only available in RTM mode"
+              >
                 Transcript only
               </span>
             )}
@@ -199,244 +225,251 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
       {header}
 
       {/* Render Mode Toggle */}
-      <div className={`py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between shrink-0 ${inline ? "px-4" : "px-6"}`}>
-          <span className="text-xs text-gray-600 dark:text-gray-400">
-            Render Mode:
-          </span>
-          <div className="flex gap-1">
-            <button
-              onClick={() => setTranscriptRenderMode(ETranscriptRenderMode.TEXT)}
-              className={`px-2 py-1 text-xs rounded transition-colors ${
-                transcriptRenderMode === ETranscriptRenderMode.TEXT
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
-              }`}
-              title="Text mode: Show full text at once"
-            >
-              <MdTextFields size={14} />
-            </button>
-            <button
-              onClick={() => setTranscriptRenderMode(ETranscriptRenderMode.WORD)}
-              className={`px-2 py-1 text-xs rounded transition-colors ${
-                transcriptRenderMode === ETranscriptRenderMode.WORD
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
-              }`}
-              title="Word mode: Animate word-by-word"
-            >
-              <MdViewHeadline size={14} />
-            </button>
-            <button
-              onClick={() => setTranscriptRenderMode(ETranscriptRenderMode.AUTO)}
-              className={`px-2 py-1 text-xs rounded transition-colors ${
-                transcriptRenderMode === ETranscriptRenderMode.AUTO
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
-              }`}
-              title="Auto mode: Detect automatically"
-            >
-              Auto
-            </button>
-          </div>
+      <div
+        className={`py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between shrink-0 ${inline ? "px-4" : "px-6"}`}
+      >
+        <span className="text-xs text-gray-600 dark:text-gray-400">
+          Render Mode:
+        </span>
+        <div className="flex gap-1">
+          <button
+            onClick={() => setTranscriptRenderMode(ETranscriptRenderMode.TEXT)}
+            className={`px-2 py-1 text-xs rounded transition-colors ${
+              transcriptRenderMode === ETranscriptRenderMode.TEXT
+                ? "bg-agora-accent-blue text-white"
+                : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+            }`}
+            title="Text mode: Show full text at once"
+          >
+            <MdTextFields size={14} />
+          </button>
+          <button
+            onClick={() => setTranscriptRenderMode(ETranscriptRenderMode.WORD)}
+            className={`px-2 py-1 text-xs rounded transition-colors ${
+              transcriptRenderMode === ETranscriptRenderMode.WORD
+                ? "bg-agora-accent-blue text-white"
+                : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+            }`}
+            title="Word mode: Animate word-by-word"
+          >
+            <MdViewHeadline size={14} />
+          </button>
+          <button
+            onClick={() => setTranscriptRenderMode(ETranscriptRenderMode.AUTO)}
+            className={`px-2 py-1 text-xs rounded transition-colors ${
+              transcriptRenderMode === ETranscriptRenderMode.AUTO
+                ? "bg-agora-accent-blue text-white"
+                : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+            }`}
+            title="Auto mode: Detect automatically"
+          >
+            Auto
+          </button>
         </div>
+      </div>
 
       {/* Transcript Content */}
       <div
         ref={scrollRef}
         onScroll={handleScroll}
         className={`flex-1 min-w-0 max-w-full overflow-x-hidden overflow-y-auto py-4 space-y-4 bg-gray-50 dark:bg-gray-900/50 scroll-smooth ${inline ? "px-4" : "px-6"}`}
-        style={{ width: '100%' }}
+        style={{ width: "100%" }}
       >
-          {displayItems.length === 0 && !currentInProgressMessage ? (
-            <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500">
-              <p className="text-sm">No transcript available yet.</p>
-              <p className="text-xs mt-2">
-                {isRTMMode
-                  ? "Waiting for conversation to start..."
-                  : "Transcript will appear here when the agent speaks."}
-              </p>
-            </div>
-          ) : (
-            <>
-              {/* Render completed messages and user-sent images */}
-              {displayItems.map((entry, index) => {
-                if (entry.type === "userMessage") {
-                  return (
-                    <div
-                      key={`user-${entry._time}-${index}`}
-                      className="flex justify-end min-w-0 max-w-full"
-                    >
-                      <div className="min-w-0 max-w-[90%] rounded-lg overflow-hidden bg-blue-500 dark:bg-blue-600 text-white px-3 py-2">
-                        <div className="flex items-center gap-2 mb-1 min-w-0">
-                          <span className="text-xs font-medium opacity-80 shrink-0">
-                            You
-                          </span>
-                          <span className="text-xs opacity-60 shrink-0">
-                            {formatTime(entry._time)}
-                          </span>
-                        </div>
-                        {entry.text ? (
-                          <p className="text-sm whitespace-pre-wrap break-words mb-2 min-w-0">
-                            {entry.text}
-                          </p>
-                        ) : null}
-                        {entry.imageUrl ? (
-                          <img
-                            src={entry.imageUrl}
-                            alt="Sent"
-                            className="max-h-48 max-w-full w-auto rounded object-contain bg-black/20"
-                          />
-                        ) : null}
-                      </div>
-                    </div>
-                  );
-                }
-                const item = entry.item;
-                const isAgent = item.uid === agentRtcUid || item.uid === "0";
-                const isUser = item.uid === String(localUID);
-
+        {displayItems.length === 0 && !currentInProgressMessage ? (
+          <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500">
+            <p className="text-sm">No transcript available yet.</p>
+            <p className="text-xs mt-2">
+              {isRTMMode
+                ? "Waiting for conversation to start..."
+                : "Transcript will appear here when the agent speaks."}
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Render completed messages and user-sent images */}
+            {displayItems.map((entry, index) => {
+              if (entry.type === "userMessage") {
                 return (
                   <div
-                    key={`${item.turn_id}-${item.stream_id}-${index}`}
-                    className={`flex min-w-0 max-w-full ${isUser ? "justify-end" : "justify-start"}`}
+                    key={`user-${entry._time}-${index}`}
+                    className="flex justify-end min-w-0 max-w-full"
                   >
-                    <div
-                      className={`min-w-0 max-w-[90%] rounded-lg px-3 py-2 overflow-hidden ${
-                        isUser
-                          ? "bg-blue-500 dark:bg-blue-600 text-white"
-                          : isAgent
-                          ? "bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white"
-                          : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
-                      }`}
-                    >
+                    <div className="min-w-0 max-w-[90%] rounded-lg overflow-hidden bg-agora-accent-blue dark:bg-blue-600 text-white px-3 py-2">
                       <div className="flex items-center gap-2 mb-1 min-w-0">
                         <span className="text-xs font-medium opacity-80 shrink-0">
-                          {isUser
-                            ? "You"
-                            : isAgent
-                            ? "AI Agent"
-                            : `User ${item.uid}`}
+                          You
                         </span>
                         <span className="text-xs opacity-60 shrink-0">
-                          {formatTime(item._time)}
+                          {formatTime(entry._time)}
                         </span>
                       </div>
-                      <p className="text-sm whitespace-pre-wrap break-words min-w-0">
-                        {item.text}
-                      </p>
-                      {getStatusIndicator(item.status)}
+                      {entry.text ? (
+                        <p className="text-sm whitespace-pre-wrap break-words mb-2 min-w-0">
+                          {entry.text}
+                        </p>
+                      ) : null}
+                      {entry.imageUrl ? (
+                        <img
+                          src={entry.imageUrl}
+                          alt="Sent"
+                          className="max-h-48 max-w-full w-auto rounded object-contain bg-black/20"
+                        />
+                      ) : null}
                     </div>
                   </div>
                 );
-              })}
+              }
+              const item = entry.item;
+              const isAgent = item.uid === agentRtcUid || item.uid === "0";
+              const isUser = item.uid === String(localUID);
 
-              {/* Render in-progress message separately with animation */}
-              {currentInProgressMessage && (
+              return (
                 <div
-                  className={`flex min-w-0 max-w-full ${
-                    currentInProgressMessage.uid === String(localUID)
-                      ? "justify-end"
-                      : "justify-start"
-                  }`}
+                  key={`${item.turn_id}-${item.stream_id}-${index}`}
+                  className={`flex min-w-0 max-w-full ${isUser ? "justify-end" : "justify-start"}`}
                 >
                   <div
                     className={`min-w-0 max-w-[90%] rounded-lg px-3 py-2 overflow-hidden ${
-                      currentInProgressMessage.uid === String(localUID)
-                        ? "bg-blue-500 dark:bg-blue-600 text-white"
-                        : "bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white"
-                    } ${
-                      transcriptRenderMode === ETranscriptRenderMode.WORD
-                        ? "animate-pulse"
-                        : ""
+                      isUser
+                        ? "bg-agora-accent-blue dark:bg-blue-600 text-white"
+                        : isAgent
+                          ? "bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white"
+                          : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
                     }`}
                   >
                     <div className="flex items-center gap-2 mb-1 min-w-0">
                       <span className="text-xs font-medium opacity-80 shrink-0">
-                        {currentInProgressMessage.uid === String(localUID)
+                        {isUser
                           ? "You"
-                          : currentInProgressMessage.uid === agentRtcUid ||
-                            currentInProgressMessage.uid === "0"
-                          ? "AI Agent"
-                          : `User ${currentInProgressMessage.uid}`}
+                          : isAgent
+                            ? "AI Agent"
+                            : `User ${item.uid}`}
                       </span>
                       <span className="text-xs opacity-60 shrink-0">
-                        {formatTime(currentInProgressMessage._time)}
+                        {formatTime(item._time)}
                       </span>
                     </div>
                     <p className="text-sm whitespace-pre-wrap break-words min-w-0">
-                      {currentInProgressMessage.text}
-                      {transcriptRenderMode === ETranscriptRenderMode.WORD && (
-                        <span className="inline-block w-2 h-4 ml-1 bg-current animate-pulse" />
-                      )}
+                      {item.text}
                     </p>
-                    {getStatusIndicator(currentInProgressMessage.status)}
+                    {getStatusIndicator(item.status)}
                   </div>
                 </div>
-              )}
-            </>
-          )}
-        </div>
+              );
+            })}
+
+            {/* Render in-progress message separately with animation */}
+            {currentInProgressMessage && (
+              <div
+                className={`flex min-w-0 max-w-full ${
+                  currentInProgressMessage.uid === String(localUID)
+                    ? "justify-end"
+                    : "justify-start"
+                }`}
+              >
+                <div
+                  className={`min-w-0 max-w-[90%] rounded-lg px-3 py-2 overflow-hidden ${
+                    currentInProgressMessage.uid === String(localUID)
+                      ? "bg-agora-accent-blue dark:bg-blue-600 text-white"
+                      : "bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white"
+                  } ${
+                    transcriptRenderMode === ETranscriptRenderMode.WORD
+                      ? "animate-pulse"
+                      : ""
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1 min-w-0">
+                    <span className="text-xs font-medium opacity-80 shrink-0">
+                      {currentInProgressMessage.uid === String(localUID)
+                        ? "You"
+                        : currentInProgressMessage.uid === agentRtcUid ||
+                            currentInProgressMessage.uid === "0"
+                          ? "AI Agent"
+                          : `User ${currentInProgressMessage.uid}`}
+                    </span>
+                    <span className="text-xs opacity-60 shrink-0">
+                      {formatTime(currentInProgressMessage._time)}
+                    </span>
+                  </div>
+                  <p className="text-sm whitespace-pre-wrap break-words min-w-0">
+                    {currentInProgressMessage.text}
+                    {transcriptRenderMode === ETranscriptRenderMode.WORD && (
+                      <span className="inline-block w-2 h-4 ml-1 bg-current animate-pulse" />
+                    )}
+                  </p>
+                  {getStatusIndicator(currentInProgressMessage.status)}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       {/* RTM Mode: Message Input */}
       {canSendMessages && (
-        <div className={`py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shrink-0 ${inline ? "px-4" : "px-6"}`}>
-            <div className="space-y-3">
-              {imageFile && (
-                <div className="flex items-center gap-2 p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                  <MdImage size={20} className="text-gray-500" />
-                  <span className="text-sm text-gray-700 dark:text-gray-300 flex-1 truncate">
-                    {imageFile.name}
-                  </span>
-                  <button
-                    onClick={() => setImageFile(null)}
-                    className="text-xs text-red-500 hover:text-red-700"
-                  >
-                    Remove
-                  </button>
-                </div>
-              )}
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={messageText}
-                  onChange={(e) => setMessageText(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSendMessage();
-                    }
-                  }}
-                  placeholder="Type a message..."
-                  className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                />
-                <label className="flex items-center justify-center w-10 h-10 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg cursor-pointer transition-colors">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageSelect}
-                    className="hidden"
-                  />
-                  <MdImage className="text-gray-600 dark:text-gray-300" size={20} />
-                </label>
+        <div
+          className={`py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shrink-0 ${inline ? "px-4" : "px-6"}`}
+        >
+          <div className="space-y-3">
+            {imageFile && (
+              <div className="flex items-center gap-2 p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                <MdImage size={20} className="text-gray-500" />
+                <span className="text-sm text-gray-700 dark:text-gray-300 flex-1 truncate">
+                  {imageFile.name}
+                </span>
                 <button
-                  onClick={handleSendMessage}
-                  disabled={!messageText.trim() && !imageFile}
-                  className="px-4 py-2 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  onClick={() => setImageFile(null)}
+                  className="text-xs text-red-500 hover:text-red-700"
                 >
-                  <MdSend size={18} />
+                  Remove
                 </button>
               </div>
+            )}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={messageText}
+                onChange={(e) => setMessageText(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+                placeholder="Type a message..."
+                className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              />
+              <label className="flex items-center justify-center w-10 h-10 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg cursor-pointer transition-colors">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageSelect}
+                  className="hidden"
+                />
+                <MdImage
+                  className="text-gray-600 dark:text-gray-300"
+                  size={20}
+                />
+              </label>
+              <button
+                onClick={handleSendMessage}
+                disabled={!messageText.trim() && !imageFile}
+                className="px-4 py-2 bg-agora-accent-blue hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                <MdSend size={18} />
+              </button>
             </div>
           </div>
-        )}
+        </div>
+      )}
     </>
   );
 
   if (inline) {
     return (
-      <div 
+      <div
         className="flex flex-col h-full overflow-hidden bg-white dark:bg-gray-900 transition-colors duration-300"
-        style={{ width: '100%', maxWidth: '100%' }}
+        style={{ width: "100%", maxWidth: "100%" }}
       >
         {content}
       </div>

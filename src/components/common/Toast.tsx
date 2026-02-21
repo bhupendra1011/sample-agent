@@ -42,7 +42,7 @@ const typeConfig: Record<
   info: {
     icon: MdInfo,
     iconClass: "text-blue-500 dark:text-blue-400",
-    accentClass: "bg-blue-500 dark:bg-blue-400",
+    accentClass: "bg-agora-accent-blue dark:bg-blue-400",
   },
 };
 
