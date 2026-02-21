@@ -101,6 +101,20 @@ export class ConversationalAIAPI extends EventHelper {
   }
 
   /**
+   * Set render mode at runtime (e.g. when user changes TEXT/WORD/AUTO in transcript panel).
+   * Affects subsequent transcript processing. No need to re-subscribe.
+   */
+  public setRenderMode(mode: ETranscriptHelperMode): void {
+    this.renderMode = mode;
+    if (this.subRenderController) {
+      this.subRenderController.setRenderMode(mode);
+    }
+    if (this.enableLog) {
+      console.log(`[${TAG}] setRenderMode=${mode}`);
+    }
+  }
+
+  /**
    * Send chat messages to the conversational agent (text or image by URL).
    * For IMAGE: sends a small RTM payload { uuid, url }; the engine fetches the image from the URL.
    * For TEXT: sends user.transcription format.

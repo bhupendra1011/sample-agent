@@ -13,12 +13,7 @@ export interface VoiceSettingsPayload {
   selectedMicrophoneId: string | null;
 }
 
-type SettingsId = "agent" | "voice" | "customAgent";
-
-export interface CustomAgentSettingsPayload {
-  useCustomPayload: boolean;
-  customPayloadJson: string;
-}
+type SettingsId = "agent" | "voice";
 
 function isBrowser(): boolean {
   return typeof indexedDB !== "undefined";
@@ -171,61 +166,5 @@ export async function setVoiceSettings(
     });
   } catch (err) {
     console.error("[settingsDb] setVoiceSettings failed:", err);
-  }
-}
-
-/**
- * Get stored custom agent settings (toggle + masked JSON). Never contains real API keys.
- */
-export async function getCustomAgentSettings(): Promise<CustomAgentSettingsPayload | null> {
-  if (!isBrowser()) return null;
-  try {
-    const db = await openDb();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, "readonly");
-      const store = tx.objectStore(STORE_NAME);
-      const request = store.get("customAgent" as unknown as IDBValidKey);
-      request.onerror = () => {
-        db.close();
-        reject(request.error);
-      };
-      request.onsuccess = () => {
-        db.close();
-        const row = request.result as
-          | { id: SettingsId; value: CustomAgentSettingsPayload }
-          | undefined;
-        resolve(row?.value ?? null);
-      };
-    });
-  } catch (err) {
-    console.error("[settingsDb] getCustomAgentSettings failed:", err);
-    return null;
-  }
-}
-
-/**
- * Persist custom agent settings. customPayloadJson must already be masked (no real keys).
- */
-export async function setCustomAgentSettings(
-  payload: CustomAgentSettingsPayload,
-): Promise<void> {
-  if (!isBrowser()) return;
-  try {
-    const db = await openDb();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, "readwrite");
-      const store = tx.objectStore(STORE_NAME);
-      const request = store.put({ id: "customAgent", value: payload });
-      request.onerror = () => {
-        db.close();
-        reject(request.error);
-      };
-      request.onsuccess = () => {
-        db.close();
-        resolve();
-      };
-    });
-  } catch (err) {
-    console.error("[settingsDb] setCustomAgentSettings failed:", err);
   }
 }

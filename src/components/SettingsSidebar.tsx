@@ -11,7 +11,6 @@ import {
   MdDelete,
   MdRefresh,
   MdBuild,
-  MdCode,
 } from "react-icons/md";
 import VoiceSettings from "./VoiceSettings";
 import useAppStore from "@/store/useAppStore";
@@ -70,59 +69,7 @@ const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
   isAgentActive = false,
 }) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>("ai-agent");
-  const [useCustomPayload, setUseCustomPayload] = useState(false);
-  const [viewCustomSettingsOpen, setViewCustomSettingsOpen] = useState(false);
   const localAudioTrack = useAppStore((state) => state.localAudioTrack);
-
-  React.useEffect(() => {
-    if (!isOpen) return;
-    let cancelled = false;
-    import("@/services/settingsDb")
-      .then((m) => m.getCustomAgentSettings())
-      .then((stored) => {
-        if (!cancelled && stored)
-          setUseCustomPayload(!!stored.useCustomPayload);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [isOpen]);
-
-  React.useEffect(() => {
-    if (!isOpen) setViewCustomSettingsOpen(false);
-  }, [isOpen]);
-
-  // Show tabs when NOT viewing custom settings (even if custom is enabled, tabs show but disabled)
-  const showTabs = !viewCustomSettingsOpen;
-  const showCustomView = viewCustomSettingsOpen;
-
-  const handleDisableCustomPayload = React.useCallback(() => {
-    setUseCustomPayload(false);
-    import("@/services/settingsDb").then((m) =>
-      m.getCustomAgentSettings().then((stored) =>
-        m.setCustomAgentSettings({
-          useCustomPayload: false,
-          customPayloadJson: stored?.customPayloadJson ?? "",
-        }),
-      ),
-    );
-    setViewCustomSettingsOpen(false);
-  }, []);
-
-  const handleSaveAgentSettingsWithSync = React.useCallback(
-    (settings: AgentSettings) => {
-      onSaveAgentSettings(settings);
-      const json = buildJoinPayloadPreview(settings);
-      const toStore = getMaskedJsonToStore(json);
-      import("@/services/settingsDb").then((m) =>
-        m.setCustomAgentSettings({
-          useCustomPayload,
-          customPayloadJson: toStore,
-        }),
-      );
-    },
-    [onSaveAgentSettings, useCustomPayload],
-  );
 
   if (!isOpen) return null;
 
@@ -167,36 +114,8 @@ const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
           </button>
         </div>
 
-        {/* Custom Settings row: View to open, Back when in custom view */}
-        <div className="px-6 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <MdCode className="text-gray-600 dark:text-gray-400" size={20} />
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Custom Settings
-            </span>
-          </div>
-          {viewCustomSettingsOpen ? (
-            <button
-              type="button"
-              onClick={() => setViewCustomSettingsOpen(false)}
-              className="text-sm font-medium text-agora-accent-blue hover:underline px-2 py-1"
-            >
-              Back to agent settings
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setViewCustomSettingsOpen(true)}
-              className="text-sm font-medium text-agora-accent-blue hover:underline px-2 py-1"
-            >
-              View custom settings
-            </button>
-          )}
-        </div>
-
-        {/* Tabs (only when custom settings not applied and view not open) */}
-        {showTabs && (
-          <div className="flex gap-2 px-6 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+        {/* Tabs */}
+        <div className="flex gap-2 px-6 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
             <TabButton
               active={activeTab === "ai-agent"}
               onClick={() => setActiveTab("ai-agent")}
@@ -216,48 +135,11 @@ const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
               label="MCP Server"
             />
           </div>
-        )}
 
         {/* Content */}
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-          {showCustomView ? (
-            <CustomSettingsTabContent
-              onClose={onClose}
-              useCustomPayload={useCustomPayload}
-              onDisableCustomPayload={handleDisableCustomPayload}
-              onApplyCustomPayload={async (json) => {
-                await import("@/services/settingsDb").then((m) =>
-                  m.setCustomAgentSettings({
-                    useCustomPayload: true,
-                    customPayloadJson: json,
-                  }),
-                );
-                setUseCustomPayload(true);
-                setViewCustomSettingsOpen(false);
-              }}
-              onBackFromView={() => setViewCustomSettingsOpen(false)}
-              isDraftView={viewCustomSettingsOpen && !useCustomPayload}
-            />
-          ) : (
-            <div className="flex-1 min-h-0 overflow-y-auto relative">
-              {/* Warning banner when custom settings are enabled */}
-              {useCustomPayload && (
-                <div className="mx-6 mt-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-                  <p className="text-sm text-amber-800 dark:text-amber-200">
-                    <strong>Custom settings are enabled.</strong> These settings
-                    are read-only. Disable custom settings to edit agent
-                    settings here.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleDisableCustomPayload}
-                    className="mt-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition-colors"
-                  >
-                    Disable custom settings
-                  </button>
-                </div>
-              )}
-              {isAgentUpdating && activeTab === "ai-agent" && (
+          <div className="flex-1 min-h-0 overflow-y-auto relative">
+            {isAgentUpdating && activeTab === "ai-agent" && (
                 <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
                   <div className="flex flex-col items-center gap-3">
                     <div className="w-10 h-10 border-4 border-agora-accent-blue border-t-transparent rounded-full animate-spin" />
@@ -267,18 +149,14 @@ const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
                   </div>
                 </div>
               )}
-              <div
-                className={
-                  useCustomPayload ? "pointer-events-none opacity-50" : ""
-                }
-              >
-                {activeTab === "ai-agent" ? (
-                  <AgentSettingsContent
-                    onSave={handleSaveAgentSettingsWithSync}
-                    onClose={onClose}
-                    isAgentActive={isAgentActive}
-                    isDisabled={useCustomPayload}
-                  />
+            <div>
+              {activeTab === "ai-agent" ? (
+                <AgentSettingsContent
+                  onSave={onSaveAgentSettings}
+                  onClose={onClose}
+                  isAgentActive={isAgentActive}
+                  isDisabled={false}
+                />
                 ) : activeTab === "mcp-server" ? (
                   <MCPServerTabContent
                     onSave={onSaveAgentSettings}
@@ -293,7 +171,6 @@ const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
                 )}
               </div>
             </div>
-          )}
         </div>
       </div>
     </>
@@ -1465,275 +1342,6 @@ const MCPServerTabContent: React.FC<MCPServerTabContentProps> = ({
         initialServer={
           editingIndex !== null ? (servers[editingIndex] ?? null) : null
         }
-      />
-    </div>
-  );
-};
-
-// --- Custom Settings tab: JSON override for agent join payload ---
-const JOIN_PAYLOAD_MASK = "***MASKED***";
-
-function maskKeysInObject(
-  obj: Record<string, unknown>,
-): Record<string, unknown> {
-  const out = JSON.parse(JSON.stringify(obj)) as Record<string, unknown>;
-  if (out.llm && typeof out.llm === "object") {
-    const llm = out.llm as Record<string, unknown>;
-    if (String(llm.api_key ?? "").trim()) llm.api_key = JOIN_PAYLOAD_MASK;
-  }
-  const tts = out.tts as Record<string, unknown> | undefined;
-  if (tts?.params && typeof tts.params === "object") {
-    const p = tts.params as Record<string, unknown>;
-    if (String(p.key ?? "").trim()) p.key = JOIN_PAYLOAD_MASK;
-  }
-  const asr = out.asr as Record<string, unknown> | undefined;
-  if (asr?.params && typeof asr.params === "object") {
-    const p = asr.params as Record<string, unknown>;
-    if (String(p.api_key ?? "").trim()) p.api_key = JOIN_PAYLOAD_MASK;
-    if (String(p.key ?? "").trim()) p.key = JOIN_PAYLOAD_MASK;
-  }
-  const avatar = out.avatar as Record<string, unknown> | undefined;
-  if (avatar?.params && typeof avatar.params === "object") {
-    const p = avatar.params as Record<string, unknown>;
-    if (String(p.api_key ?? "").trim()) p.api_key = JOIN_PAYLOAD_MASK;
-  }
-  return out;
-}
-
-/** Build a join-payload-shaped preview from agentSettings (channel/token placeholders; keys masked). */
-function buildJoinPayloadPreview(settings: AgentSettings | null): string {
-  if (!settings) {
-    return JSON.stringify(
-      {
-        name: "agent-1",
-        properties: {
-          channel: "<channel>",
-          token: "<token>",
-          llm: {},
-          tts: {},
-        },
-      },
-      null,
-      2,
-    );
-  }
-  const props: Record<string, unknown> = {
-    channel: "<set by server>",
-    token: "<set by server>",
-    agent_rtc_uid: "0",
-    remote_rtc_uids: ["<uid>"],
-    enable_string_uid: false,
-    idle_timeout: settings.idle_timeout ?? 30,
-    llm: settings.llm
-      ? {
-          ...settings.llm,
-          api_key:
-            settings.llm.api_key && settings.llm.api_key.trim()
-              ? JOIN_PAYLOAD_MASK
-              : "",
-          // Only include enabled MCP servers, strip the UI-only 'enabled' field
-          mcp_servers: (settings.llm.mcp_servers ?? [])
-            .filter((s) => s.enabled)
-            .map(({ enabled: _, ...rest }) => rest),
-        }
-      : {},
-    tts: settings.tts ?? {},
-    asr: settings.asr ?? undefined,
-    turn_detection: settings.enable_turn_detection
-      ? (settings.turn_detection ?? undefined)
-      : undefined,
-    filler_words: settings.filler_words ?? undefined,
-    advanced_features: settings.advanced_features ?? undefined,
-    parameters: settings.parameters ?? undefined,
-    avatar: settings.avatar ?? undefined,
-  };
-  const masked = maskKeysInObject(props);
-  return JSON.stringify(
-    { name: settings.name ?? "agent-1", properties: masked },
-    null,
-    2,
-  );
-}
-
-interface CustomSettingsTabContentProps {
-  onClose: () => void;
-  useCustomPayload: boolean;
-  onDisableCustomPayload: () => void;
-  onApplyCustomPayload: (json: string) => void | Promise<void>;
-  onBackFromView: () => void;
-  isDraftView: boolean;
-}
-
-function getMaskedJsonToStore(v: string): string {
-  try {
-    const parsed = JSON.parse(v) as Record<string, unknown>;
-    const props = parsed.properties as Record<string, unknown> | undefined;
-    if (props && typeof props === "object") {
-      return JSON.stringify(
-        { ...parsed, properties: maskKeysInObject(props) },
-        null,
-        2,
-      );
-    }
-  } catch {
-    // ignore
-  }
-  return v;
-}
-
-const CustomSettingsTabContent: React.FC<CustomSettingsTabContentProps> = ({
-  useCustomPayload,
-  onDisableCustomPayload,
-  onApplyCustomPayload,
-  onBackFromView,
-  isDraftView,
-}) => {
-  const agentSettings = useAppStore((state) => state.agentSettings);
-  const [customPayloadJson, setCustomPayloadJson] = React.useState("");
-  const [loaded, setLoaded] = React.useState(false);
-
-  // Draft view: always show current agent settings (live). Applied view: load from IDB.
-  React.useEffect(() => {
-    if (isDraftView) {
-      setCustomPayloadJson(buildJoinPayloadPreview(agentSettings));
-      setLoaded(true);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      const stored = await import("@/services/settingsDb").then((m) =>
-        m.getCustomAgentSettings(),
-      );
-      if (cancelled) return;
-      if (stored?.customPayloadJson?.trim()) {
-        setCustomPayloadJson(stored.customPayloadJson);
-      } else {
-        setCustomPayloadJson(buildJoinPayloadPreview(agentSettings));
-      }
-      setLoaded(true);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [isDraftView, agentSettings]);
-
-  const handleJsonChange = React.useCallback(
-    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      setCustomPayloadJson(e.target.value);
-    },
-    [],
-  );
-
-  const handleSaveDraft = React.useCallback(() => {
-    const toStore = getMaskedJsonToStore(customPayloadJson);
-    import("@/services/settingsDb").then((m) =>
-      m.setCustomAgentSettings({
-        useCustomPayload: useCustomPayload,
-        customPayloadJson: toStore,
-      }),
-    );
-    showToast("Custom settings draft saved.", "success");
-  }, [customPayloadJson, useCustomPayload]);
-
-  const handleApply = React.useCallback(() => {
-    const toStore = getMaskedJsonToStore(customPayloadJson);
-    onApplyCustomPayload(toStore);
-  }, [customPayloadJson, onApplyCustomPayload]);
-
-  const handleReset = React.useCallback(async () => {
-    const stored = await import("@/services/settingsDb").then((m) =>
-      m.getCustomAgentSettings(),
-    );
-    setCustomPayloadJson(
-      stored?.customPayloadJson?.trim() ??
-        buildJoinPayloadPreview(agentSettings),
-    );
-    showToast("Restored from saved settings.", "success");
-  }, [agentSettings]);
-
-  const handleEnableToggle = React.useCallback(
-    (checked: boolean) => {
-      if (checked) handleApply();
-      else onDisableCustomPayload();
-    },
-    [handleApply, onDisableCustomPayload],
-  );
-
-  return (
-    <div className="flex flex-col flex-1 min-h-0 px-6 py-4">
-      {useCustomPayload ? (
-        <div className="mb-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 flex-shrink-0">
-          <p className="text-sm text-amber-800 dark:text-amber-200">
-            <strong>Custom settings are active.</strong> Normal agent settings
-            are disabled. Turn off custom settings below to use the AI Agent,
-            Voice, and MCP tabs again.
-          </p>
-        </div>
-      ) : (
-        <div className="mb-2 flex-shrink-0 space-y-1">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            {isDraftView
-              ? "Edit your custom join payload below. Save draft to keep without applying, or enable custom settings to use it for the agent (disables normal tabs)."
-              : "Edit the custom join payload (Agora Conversational AI join API)."}
-          </p>
-          <p className="text-xs text-gray-500 dark:text-gray-500">
-            Template variables: use <code className="px-1 py-0.5 rounded bg-gray-200 dark:bg-gray-700 font-mono text-xs">{`{{username}}`}</code> in{" "}
-            <code className="px-1 py-0.5 rounded bg-gray-200 dark:bg-gray-700 font-mono text-xs">properties.llm.greeting_message</code>. The app injects{" "}
-            <code className="px-1 py-0.5 rounded bg-gray-200 dark:bg-gray-700 font-mono text-xs">template_variables.username</code> with the joining user&apos;s name when you invite the agent.
-          </p>
-        </div>
-      )}
-
-      <div className="flex flex-wrap items-center gap-3 mb-3 flex-shrink-0">
-        <button
-          type="button"
-          onClick={handleSaveDraft}
-          className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-        >
-          Save draft
-        </button>
-        <button
-          type="button"
-          onClick={handleApply}
-          className="px-4 py-2 text-sm font-medium rounded-lg bg-agora-accent-blue text-white hover:opacity-90 transition-opacity"
-        >
-          Apply
-        </button>
-        <button
-          type="button"
-          onClick={handleReset}
-          className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-        >
-          Reset
-        </button>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            Enable custom settings
-          </span>
-          <button
-            type="button"
-            onClick={() => handleEnableToggle(!useCustomPayload)}
-            className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
-              useCustomPayload
-                ? "bg-agora-accent-blue"
-                : "bg-gray-300 dark:bg-gray-600"
-            }`}
-          >
-            <span
-              className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                useCustomPayload ? "translate-x-5" : ""
-              }`}
-            />
-          </button>
-        </div>
-      </div>
-
-      <textarea
-        className="flex-1 min-h-[200px] w-full px-3 py-2 font-mono text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-agora-accent-blue focus:border-transparent resize-none"
-        value={customPayloadJson}
-        onChange={handleJsonChange}
-        placeholder='{ "name": "agent-1", "properties": { ... } }'
-        spellCheck={false}
       />
     </div>
   );

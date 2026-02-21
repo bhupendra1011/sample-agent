@@ -148,6 +148,17 @@ export const useConversationalAI = ({
     setAgentState,
   ]);
 
+  // Apply transcript panel render mode (TEXT/WORD/AUTO) to toolkit at runtime
+  useEffect(() => {
+    if (!toolkitInitializedRef.current) return;
+    try {
+      const api = ConversationalAIAPI.getInstance();
+      api.setRenderMode(getToolkitRenderMode());
+    } catch {
+      // API not initialized (e.g. call ended) - ignore
+    }
+  }, [transcriptRenderMode, getToolkitRenderMode]);
+
   // Clear store when agent stops (toolkit unsubscribe is handled by effect cleanup)
   useEffect(() => {
     if (!isAgentActive) {

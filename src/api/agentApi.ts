@@ -1,18 +1,12 @@
 // src/api/agentApi.ts
 import type { AgentSettings, AgentQueryStatus } from "@/types/agora";
 
-export interface CustomJoinPayload {
-  name: string;
-  properties: Record<string, unknown>;
-}
-
 /** Default greeting message using {{username}} template variable (Agora LLM template_variables). */
 export const DEFAULT_GREETING_MESSAGE =
   "Hello {{username}}, glad to meet you, how can I help you?";
 
 /**
  * Invites an AI agent to the current call via the server-side API route.
- * When useCustomPayload is true, sends customJoinPayload instead of agentSettings.
  * Pass username so the server can inject it as llm.template_variables for greeting_message etc.
  */
 export async function inviteAgent(
@@ -20,8 +14,6 @@ export async function inviteAgent(
   uid: string,
   agentSettings: AgentSettings,
   options?: {
-    useCustomPayload?: boolean;
-    customJoinPayload?: CustomJoinPayload;
     /** User display name; sent as llm.template_variables.username for greeting e.g. "Hello {{username}}, ..." */
     username?: string;
   },
@@ -36,10 +28,6 @@ export async function inviteAgent(
     uid,
     agentSettings,
   };
-  if (options?.useCustomPayload && options?.customJoinPayload) {
-    body.useCustomPayload = true;
-    body.customJoinPayload = options.customJoinPayload;
-  }
   if (options?.username != null && options.username !== "") {
     body.username = options.username;
   }

@@ -37,6 +37,19 @@ export class SubRenderController {
     this.enableLog = options.enableLog ?? false;
   }
 
+  /**
+   * Update render mode at runtime (e.g. when user changes TEXT/WORD/AUTO in transcript panel).
+   * Affects subsequent processAgentTranscription / determineEffectiveMode calls.
+   */
+  public setRenderMode(
+    mode: ETranscriptHelperMode | ETranscriptRenderMode
+  ): void {
+    this.renderMode = mode;
+    if (this.enableLog) {
+      this.log("setRenderMode", mode);
+    }
+  }
+
   private log(...args: unknown[]): void {
     if (this.enableLog) {
       console.log("[SubRenderController]", ...args);

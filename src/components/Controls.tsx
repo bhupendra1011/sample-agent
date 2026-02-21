@@ -13,12 +13,8 @@ import {
 } from "react-icons/md";
 import { useAgora } from "@/hooks/useAgora";
 import { showToast } from "@/services/uiService";
-import {
-  setAgentSettings as persistAgentSettings,
-  getCustomAgentSettings,
-} from "@/services/settingsDb";
+import { setAgentSettings as persistAgentSettings } from "@/services/settingsDb";
 import { inviteAgent, stopAgent, updateAgent } from "@/api/agentApi";
-import { sanitizeCustomJoinPayload } from "@/utils/customPayloadSanitize";
 import SettingsSidebar from "@/components/SettingsSidebar";
 import AgentStatusBadge from "@/components/AgentStatusBadge";
 import type { AgentSettings } from "@/types/agora";
@@ -105,56 +101,15 @@ const Controls: React.FC = () => {
 
     setAgentLoading(true);
     try {
-      const custom = await getCustomAgentSettings();
-      const useCustom =
-        custom?.useCustomPayload && custom.customPayloadJson?.trim();
-      let options:
-        | {
-            useCustomPayload?: boolean;
-            customJoinPayload?: {
-              name: string;
-              properties: Record<string, unknown>;
-            };
-          }
-        | undefined;
-      if (useCustom) {
-        try {
-          const parsed = JSON.parse(custom!.customPayloadJson!) as Record<
-            string,
-            unknown
-          >;
-          const sanitized = sanitizeCustomJoinPayload(parsed);
-          if (sanitized)
-            options = { useCustomPayload: true, customJoinPayload: sanitized };
-        } catch (e) {
-          console.warn(
-            "Custom payload JSON invalid, using normal settings:",
-            e,
-          );
-        }
-      }
-      const result = await inviteAgent(
-        channelId,
-        localUID,
-        agentSettings,
-        { ...options, username: localUsername || undefined },
-      );
+      const result = await inviteAgent(channelId, localUID, agentSettings, {
+        username: localUsername || undefined,
+      });
       setAgentActive(
         result.agentId,
         result.agentRtcUid || "0",
         result.avatarRtcUid,
       );
-      const mode = options?.useCustomPayload
-        ? (
-            options.customJoinPayload?.properties?.advanced_features as
-              | { enable_rtm?: boolean }
-              | undefined
-          )?.enable_rtm
-          ? "rtm"
-          : "rtc"
-        : agentSettings?.advanced_features?.enable_rtm
-          ? "rtm"
-          : "rtc";
+      const mode = agentSettings?.advanced_features?.enable_rtm ? "rtm" : "rtc";
       useAppStore.getState().setTranscriptionMode(mode);
       showToast("AI Agent joined the call!", "success");
     } catch (error) {
