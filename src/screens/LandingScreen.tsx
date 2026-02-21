@@ -30,7 +30,9 @@ const LandingScreen: React.FC = () => {
       const res = await fetch("/api/generate-agora-token");
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error((err as { error?: string }).error || "Failed to get token");
+        throw new Error(
+          (err as { error?: string }).error || "Failed to get token",
+        );
       }
       const { token, uid, channel } = (await res.json()) as {
         token: string;
@@ -43,14 +45,14 @@ const LandingScreen: React.FC = () => {
         token,
         Number(uid),
         channel,
-        "Agent Talk",
-        userName
+        "My First Convo AI App",
+        userName,
       );
 
       callStart({
         userName,
         uid: String(uid),
-        meetingName: "Agent Talk",
+        meetingName: "My First Convo AI App",
         channelId: channel,
         isHost: true,
       });
@@ -59,8 +61,10 @@ const LandingScreen: React.FC = () => {
     } catch (error) {
       console.error("Failed to start conversation:", error);
       showToast(
-        error instanceof Error ? error.message : "Failed to start conversation. Please try again.",
-        "error"
+        error instanceof Error
+          ? error.message
+          : "Failed to start conversation. Please try again.",
+        "error",
       );
     } finally {
       setIsLoading(false);

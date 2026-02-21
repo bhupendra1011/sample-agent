@@ -22,6 +22,7 @@ async function handleCustomPayloadJoin(
   channelName: string,
   uid: string,
   customJoinPayload: { name: string; properties: Record<string, unknown> },
+  username?: string,
 ): Promise<NextResponse> {
   const agentUid = 0;
   const tokenExpiration = 3600;
@@ -52,6 +53,22 @@ async function handleCustomPayloadJoin(
       process.env.NEXT_PUBLIC_LLM_API_KEY ||
       ""
     ).trim();
+  }
+
+  // Inject username as llm.template_variables and default greeting_message (Agora template_variables)
+  if (llm && (username != null && username !== "")) {
+    llm.template_variables = {
+      ...(typeof llm.template_variables === "object" && llm.template_variables != null
+        ? (llm.template_variables as Record<string, string>)
+        : {}),
+      username,
+    };
+    if (
+      !llm.greeting_message ||
+      (typeof llm.greeting_message === "string" && llm.greeting_message.trim() === "")
+    ) {
+      llm.greeting_message = DEFAULT_GREETING_MESSAGE;
+    }
   }
 
   const tts = properties.tts as Record<string, unknown> | undefined;
@@ -265,12 +282,17 @@ async function handleCustomPayloadJoin(
   return NextResponse.json(response);
 }
 
+const DEFAULT_GREETING_MESSAGE =
+  "Hello {{username}}, glad to meet you, how can I help you?";
+
 type InviteBody = {
   channelName: string;
   uid: string;
   agentSettings: AgentSettings;
   useCustomPayload?: boolean;
   customJoinPayload?: { name: string; properties: Record<string, unknown> };
+  /** User display name; injected as llm.template_variables.username for greeting */
+  username?: string;
 };
 
 export async function POST(request: NextRequest) {
@@ -282,6 +304,7 @@ export async function POST(request: NextRequest) {
       agentSettings,
       useCustomPayload,
       customJoinPayload,
+      username,
     } = body;
 
     if (!channelName || !uid) {
@@ -296,7 +319,12 @@ export async function POST(request: NextRequest) {
       customJoinPayload?.name &&
       customJoinPayload?.properties
     ) {
-      return await handleCustomPayloadJoin(channelName, uid, customJoinPayload);
+      return await handleCustomPayloadJoin(
+        channelName,
+        uid,
+        customJoinPayload,
+        username,
+      );
     }
 
     if (!agentSettings) {
@@ -390,9 +418,16 @@ export async function POST(request: NextRequest) {
       llmPayload.system_messages = llm.system_messages;
     }
 
-    if (llm.greeting_message) {
-      llmPayload.greeting_message = llm.greeting_message;
-    }
+    // Username as template_variables for greeting_message (e.g. "Hello {{username}}, glad to meet you...")
+    const displayName = username != null && username !== "" ? username : "Guest";
+    llmPayload.template_variables = {
+      ...(typeof llm.template_variables === "object" && llm.template_variables != null
+        ? llm.template_variables
+        : {}),
+      username: displayName,
+    };
+    llmPayload.greeting_message =
+      llm.greeting_message?.trim() || DEFAULT_GREETING_MESSAGE;
 
     if (llm.failure_message) {
       llmPayload.failure_message = llm.failure_message;
@@ -649,21 +684,26 @@ export async function POST(request: NextRequest) {
       propertiesPayload.sal = salPayload;
     }
 
-    // When image modality is enabled, RTM is required for picture messages
-    const inputModalities = (llmPayload.input_modalities as (
-      | "text"
-      | "image"
-    )[]) ?? ["text", "image"];
+    // RTC mode: data_channel=datastream, input_modalities=text only. RTM mode: data_channel=rtm, input_modalities=text+image.
+    const userExplicitlyDisabledRtm = advanced_features?.enable_rtm === false;
+    if (userExplicitlyDisabledRtm) {
+      llmPayload.input_modalities = ["text"];
+    } else {
+      llmPayload.input_modalities = (llm.input_modalities ?? ["text", "image"]) as ("text" | "image")[];
+    }
+    const inputModalities = llmPayload.input_modalities as ("text" | "image")[];
     const needsRtmForImage = inputModalities.includes("image");
+    const enableRtmInPayload = userExplicitlyDisabledRtm
+      ? false
+      : (needsRtmForImage || (advanced_features?.enable_rtm ?? false));
 
     // Add advanced features; auto-enable tools when any enabled MCP server is configured
     const hasMcpServers = enabledMcpServers.length > 0;
     const enableTools = hasMcpServers || advanced_features?.enable_tools;
     if (advanced_features || hasMcpServers || needsRtmForImage) {
       propertiesPayload.advanced_features = {
-        // Enable RTM when explicitly set or when image modality is used (required for picture messages)
-        enable_rtm:
-          (needsRtmForImage || advanced_features?.enable_rtm) ?? false,
+        // Respect explicit enable_rtm: false from UI; otherwise enable when image modality needs RTM or user enabled it
+        enable_rtm: enableRtmInPayload,
         ...(advanced_features?.enable_sal !== undefined && {
           enable_sal: advanced_features.enable_sal,
         }),
@@ -672,8 +712,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Add agent parameters
-    // When RTM is enabled, set data_channel to "rtm" for transcript and picture messaging
-    if (parameters || advanced_features?.enable_rtm || needsRtmForImage) {
+    // data_channel per Agora docs: "rtm" = RTM (when enable_rtm); "datastream" = RTC data stream (default)
+    const useRtm = enableRtmInPayload;
+    const shouldSetDataChannel =
+      parameters || useRtm || (advanced_features != null && !useRtm);
+    if (shouldSetDataChannel) {
       propertiesPayload.parameters = {
         ...(parameters?.enable_farewell !== undefined && {
           enable_farewell: parameters.enable_farewell,
@@ -681,10 +724,8 @@ export async function POST(request: NextRequest) {
         ...(parameters?.farewell_phrases && {
           farewell_phrases: parameters.farewell_phrases,
         }),
-        // Set data_channel to RTM when RTM is enabled (required for RTM transcript mode and picture messages)
-        ...((needsRtmForImage || advanced_features?.enable_rtm) && {
-          data_channel: "rtm",
-        }),
+        // RTM: transcript + chat over Signaling. RTC: "datastream" = transcript over RTC data stream (client receives via stream-message)
+        data_channel: useRtm ? "rtm" : "datastream",
       };
     }
 

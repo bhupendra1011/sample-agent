@@ -63,16 +63,16 @@ export const useConversationalAI = ({
       : ETranscriptHelperMode.UNKNOWN;
   }, []); // No dependencies - uses ref
 
-  // Initialize and use ConversationalAIAPI toolkit (per Agora docs)
+  // Initialize and use ConversationalAIAPI toolkit (per Agora docs).
+  // RTC client is required for transcript (stream-message). RTM is optional (needed only for chat/send).
   useEffect(() => {
-    console.log("[useConversationalAI] Effect running, isAgentActive:", isAgentActive, 
-      "rtcClient:", !!rtcClient, "rtmClient:", !!rtmClient, 
+    console.log("[useConversationalAI] Effect running, isAgentActive:", isAgentActive,
+      "rtcClient:", !!rtcClient, "rtmClient:", !!rtmClient,
       "channelId:", channelId, "agentRtcUid:", agentRtcUid);
-    
+
     if (
       !isAgentActive ||
       !rtcClient ||
-      !rtmClient ||
       !channelId ||
       !agentRtcUid
     ) {
@@ -82,11 +82,11 @@ export const useConversationalAI = ({
 
     try {
       console.log("[useConversationalAI] Initializing ConversationalAIAPI...");
-      
-      // 1. Init toolkit instance
+
+      // 1. Init toolkit instance (rtmEngine optional for RTC-only transcript receive)
       const api = ConversationalAIAPI.init({
         rtcEngine: rtcClient,
-        rtmEngine: rtmClient,
+        rtmEngine: rtmClient ?? undefined,
         renderMode: getToolkitRenderMode(),
         enableLog: true,
       });

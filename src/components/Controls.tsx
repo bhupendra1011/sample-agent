@@ -64,6 +64,7 @@ const Controls: React.FC = () => {
 
   const channelId = useAppStore((state) => state.channelId);
   const localUID = useAppStore((state) => state.localUID);
+  const localUsername = useAppStore((state) => state.localUsername);
   const isHost = useAppStore((state) => state.isHost);
 
   // Agent state
@@ -136,7 +137,7 @@ const Controls: React.FC = () => {
         channelId,
         localUID,
         agentSettings,
-        options,
+        { ...options, username: localUsername || undefined },
       );
       setAgentActive(
         result.agentId,

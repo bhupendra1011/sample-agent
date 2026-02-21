@@ -528,6 +528,9 @@ const getDefaultAvatarParams = (
   }
 };
 
+const DEFAULT_GREETING_MESSAGE =
+  "Hello {{username}}, glad to meet you, how can I help you?";
+
 export const getDefaultSettings = (): AgentSettingsType => {
   const ttsVendor = getDefaultTTSVendor();
   const asrVendor = getDefaultASRVendor();
@@ -544,8 +547,7 @@ export const getDefaultSettings = (): AgentSettingsType => {
             "You are a helpful AI assistant in a video call. Be concise, friendly, and conversational.",
         },
       ],
-      greeting_message:
-        "Hello! I'm your AI assistant. How can I help you today?",
+      greeting_message: DEFAULT_GREETING_MESSAGE,
       failure_message:
         "I'm sorry, I didn't catch that. Could you please repeat?",
       max_history: 10,
@@ -1668,11 +1670,18 @@ const CustomSettingsTabContent: React.FC<CustomSettingsTabContentProps> = ({
           </p>
         </div>
       ) : (
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 flex-shrink-0">
-          {isDraftView
-            ? "Edit your custom join payload below. Save draft to keep without applying, or enable custom settings to use it for the agent (disables normal tabs)."
-            : "Edit the custom join payload (Agora Conversational AI join API)."}
-        </p>
+        <div className="mb-2 flex-shrink-0 space-y-1">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {isDraftView
+              ? "Edit your custom join payload below. Save draft to keep without applying, or enable custom settings to use it for the agent (disables normal tabs)."
+              : "Edit the custom join payload (Agora Conversational AI join API)."}
+          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-500">
+            Template variables: use <code className="px-1 py-0.5 rounded bg-gray-200 dark:bg-gray-700 font-mono text-xs">{`{{username}}`}</code> in{" "}
+            <code className="px-1 py-0.5 rounded bg-gray-200 dark:bg-gray-700 font-mono text-xs">properties.llm.greeting_message</code>. The app injects{" "}
+            <code className="px-1 py-0.5 rounded bg-gray-200 dark:bg-gray-700 font-mono text-xs">template_variables.username</code> with the joining user&apos;s name when you invite the agent.
+          </p>
+        </div>
       )}
 
       <div className="flex flex-wrap items-center gap-3 mb-3 flex-shrink-0">
@@ -2172,13 +2181,13 @@ const AgentSettingsSidebarContent: React.FC<{
 
           <FormField
             label="Greeting Message"
-            hint="What the agent says when joining"
-            tooltip="Message spoken when the agent joins."
+            hint="Use {{username}} for the user's name (injected when the agent joins)"
+            tooltip="Message spoken when the agent joins. Use {{username}} and it will be replaced with the joining user's display name."
           >
             <Input
               value={settings.llm.greeting_message || ""}
               onChange={(e) => updateLLM({ greeting_message: e.target.value })}
-              placeholder="Hello! How can I help you?"
+              placeholder="Hello {{username}}, glad to meet you, how can I help you?"
             />
           </FormField>
 

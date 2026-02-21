@@ -76,6 +76,8 @@ export interface LLMConfig {
   mcp_servers?: MCPServerConfig[];
   /** LLM input modalities: text only or text + image (default when omitted: ["text", "image"]) */
   input_modalities?: ("text" | "image")[];
+  /** Template variables for system_messages, greeting_message, etc. (e.g. { username: "John" } → {{username}}) */
+  template_variables?: Record<string, string>;
 }
 
 // --- TTS Vendors ---

@@ -35,7 +35,8 @@ import { SubRenderController } from "./utils/sub-render";
 
 export interface IConversationalAIAPIConfig {
   rtcEngine: IAgoraRTCClient;
-  rtmEngine: unknown; // agora-rtm-sdk RTM client
+  /** Optional: agora-rtm-sdk RTM client. Omit for RTC-only transcript receive (no chat). */
+  rtmEngine?: unknown | null;
   renderMode?: ETranscriptHelperMode;
   enableLog?: boolean;
   enableRenderModeFallback?: boolean;
@@ -74,7 +75,7 @@ export class ConversationalAIAPI extends EventHelper {
       ConversationalAIAPI._instance = new ConversationalAIAPI();
     }
     ConversationalAIAPI._instance.rtcEngine = cfg.rtcEngine;
-    ConversationalAIAPI._instance.rtmEngine = cfg.rtmEngine;
+    ConversationalAIAPI._instance.rtmEngine = cfg.rtmEngine ?? null;
     ConversationalAIAPI._instance.renderMode =
       cfg.renderMode ?? ETranscriptHelperMode.UNKNOWN;
     ConversationalAIAPI._instance.enableLog = cfg.enableLog ?? false;

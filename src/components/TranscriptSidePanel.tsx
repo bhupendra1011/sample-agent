@@ -26,11 +26,19 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
     (state) => state.currentInProgressMessage
   );
   const transcriptionMode = useAppStore((state) => state.transcriptionMode);
+  const agentSettings = useAppStore((state) => state.agentSettings);
   const transcriptRenderMode = useAppStore((state) => state.transcriptRenderMode);
   const setTranscriptRenderMode = useAppStore(
     (state) => state.setTranscriptRenderMode
   );
   const agentRtcUid = useAppStore((state) => state.agentRtcUid);
+  // Transmission label matches advanced settings (no flip on agent start)
+  const displayTransmissionMode =
+    agentSettings != null
+      ? agentSettings.advanced_features?.enable_rtm === false
+        ? "rtc"
+        : "rtm"
+      : transcriptionMode;
   const localUID = useAppStore((state) => state.localUID);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [messageText, setMessageText] = useState("");
@@ -151,22 +159,27 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
   });
 
   const header = (
-    <div className={`flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 ${inline ? "pr-4" : "px-6"}`}>
+    <div className={`flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 shrink-0 ${inline ? "pr-4" : "px-6"}`}>
       <div className="flex items-center gap-3">
         <div>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             Live Transcript
           </h2>
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
             <span
               className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                transcriptionMode === "rtm"
+                displayTransmissionMode === "rtm"
                   ? "bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400"
                   : "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
               }`}
             >
-              Transmission: {transcriptionMode.toUpperCase()}
+              Transmission: {displayTransmissionMode.toUpperCase()}
             </span>
+            {displayTransmissionMode === "rtc" && (
+              <span className="text-xs text-gray-500 dark:text-gray-400" title="Chat is only available in RTM mode">
+                Transcript only
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -186,7 +199,7 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
       {header}
 
       {/* Render Mode Toggle */}
-      <div className={`py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between ${inline ? "px-4" : "px-6"}`}>
+      <div className={`py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between shrink-0 ${inline ? "px-4" : "px-6"}`}>
           <span className="text-xs text-gray-600 dark:text-gray-400">
             Render Mode:
           </span>
@@ -231,7 +244,8 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className={`flex-1 overflow-y-auto py-4 space-y-4 bg-gray-50 dark:bg-gray-900/50 scroll-smooth ${inline ? "px-4" : "px-6"}`}
+        className={`flex-1 min-w-0 max-w-full overflow-x-hidden overflow-y-auto py-4 space-y-4 bg-gray-50 dark:bg-gray-900/50 scroll-smooth ${inline ? "px-4" : "px-6"}`}
+        style={{ width: '100%' }}
       >
           {displayItems.length === 0 && !currentInProgressMessage ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500">
@@ -250,19 +264,19 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
                   return (
                     <div
                       key={`user-${entry._time}-${index}`}
-                      className="flex justify-end"
+                      className="flex justify-end min-w-0 max-w-full"
                     >
-                      <div className="max-w-[80%] rounded-lg overflow-hidden bg-blue-500 dark:bg-blue-600 text-white px-4 py-2">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-medium opacity-80">
+                      <div className="min-w-0 max-w-[90%] rounded-lg overflow-hidden bg-blue-500 dark:bg-blue-600 text-white px-3 py-2">
+                        <div className="flex items-center gap-2 mb-1 min-w-0">
+                          <span className="text-xs font-medium opacity-80 shrink-0">
                             You
                           </span>
-                          <span className="text-xs opacity-60">
+                          <span className="text-xs opacity-60 shrink-0">
                             {formatTime(entry._time)}
                           </span>
                         </div>
                         {entry.text ? (
-                          <p className="text-sm whitespace-pre-wrap break-words mb-2">
+                          <p className="text-sm whitespace-pre-wrap break-words mb-2 min-w-0">
                             {entry.text}
                           </p>
                         ) : null}
@@ -270,7 +284,7 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
                           <img
                             src={entry.imageUrl}
                             alt="Sent"
-                            className="max-h-48 w-auto rounded object-contain bg-black/20"
+                            className="max-h-48 max-w-full w-auto rounded object-contain bg-black/20"
                           />
                         ) : null}
                       </div>
@@ -284,10 +298,10 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
                 return (
                   <div
                     key={`${item.turn_id}-${item.stream_id}-${index}`}
-                    className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+                    className={`flex min-w-0 max-w-full ${isUser ? "justify-end" : "justify-start"}`}
                   >
                     <div
-                      className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                      className={`min-w-0 max-w-[90%] rounded-lg px-3 py-2 overflow-hidden ${
                         isUser
                           ? "bg-blue-500 dark:bg-blue-600 text-white"
                           : isAgent
@@ -295,19 +309,19 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
                           : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
                       }`}
                     >
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-medium opacity-80">
+                      <div className="flex items-center gap-2 mb-1 min-w-0">
+                        <span className="text-xs font-medium opacity-80 shrink-0">
                           {isUser
                             ? "You"
                             : isAgent
                             ? "AI Agent"
                             : `User ${item.uid}`}
                         </span>
-                        <span className="text-xs opacity-60">
+                        <span className="text-xs opacity-60 shrink-0">
                           {formatTime(item._time)}
                         </span>
                       </div>
-                      <p className="text-sm whitespace-pre-wrap break-words">
+                      <p className="text-sm whitespace-pre-wrap break-words min-w-0">
                         {item.text}
                       </p>
                       {getStatusIndicator(item.status)}
@@ -319,14 +333,14 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
               {/* Render in-progress message separately with animation */}
               {currentInProgressMessage && (
                 <div
-                  className={`flex ${
+                  className={`flex min-w-0 max-w-full ${
                     currentInProgressMessage.uid === String(localUID)
                       ? "justify-end"
                       : "justify-start"
                   }`}
                 >
                   <div
-                    className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                    className={`min-w-0 max-w-[90%] rounded-lg px-3 py-2 overflow-hidden ${
                       currentInProgressMessage.uid === String(localUID)
                         ? "bg-blue-500 dark:bg-blue-600 text-white"
                         : "bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white"
@@ -336,8 +350,8 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
                         : ""
                     }`}
                   >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-medium opacity-80">
+                    <div className="flex items-center gap-2 mb-1 min-w-0">
+                      <span className="text-xs font-medium opacity-80 shrink-0">
                         {currentInProgressMessage.uid === String(localUID)
                           ? "You"
                           : currentInProgressMessage.uid === agentRtcUid ||
@@ -345,11 +359,11 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
                           ? "AI Agent"
                           : `User ${currentInProgressMessage.uid}`}
                       </span>
-                      <span className="text-xs opacity-60">
+                      <span className="text-xs opacity-60 shrink-0">
                         {formatTime(currentInProgressMessage._time)}
                       </span>
                     </div>
-                    <p className="text-sm whitespace-pre-wrap break-words">
+                    <p className="text-sm whitespace-pre-wrap break-words min-w-0">
                       {currentInProgressMessage.text}
                       {transcriptRenderMode === ETranscriptRenderMode.WORD && (
                         <span className="inline-block w-2 h-4 ml-1 bg-current animate-pulse" />
@@ -365,7 +379,7 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
 
       {/* RTM Mode: Message Input */}
       {canSendMessages && (
-        <div className={`py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 ${inline ? "px-4" : "px-6"}`}>
+        <div className={`py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shrink-0 ${inline ? "px-4" : "px-6"}`}>
             <div className="space-y-3">
               {imageFile && (
                 <div className="flex items-center gap-2 p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
@@ -420,7 +434,10 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
 
   if (inline) {
     return (
-      <div className="flex flex-col h-full bg-white dark:bg-gray-900 transition-colors duration-300 min-w-0">
+      <div 
+        className="flex flex-col h-full overflow-hidden bg-white dark:bg-gray-900 transition-colors duration-300"
+        style={{ width: '100%', maxWidth: '100%' }}
+      >
         {content}
       </div>
     );

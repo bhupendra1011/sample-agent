@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import useAppStore from "@/store/useAppStore";
 import VideoTile from "@/components/VideoTile";
@@ -12,18 +12,9 @@ import Button from "@/components/common/Button";
 import { useAgora } from "@/hooks/useAgora";
 import { useConversationalAI } from "@/hooks/useConversationalAI";
 import type { IAgoraRTCRemoteUser, IRemoteVideoTrack } from "agora-rtc-sdk-ng";
-import { MdWbSunny, MdDarkMode, MdTimer, MdHelpOutline } from "react-icons/md";
+import { MdWbSunny, MdDarkMode, MdHelpOutline } from "react-icons/md";
 import { useTour } from "@/hooks/useTour";
 import { TourOverlay } from "@/components/FeatureTour";
-
-const SESSION_DURATION_MS = 15 * 60 * 1000; // 15 minutes
-
-function formatRemaining(ms: number): string {
-  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-  const m = Math.floor(totalSeconds / 60);
-  const s = totalSeconds % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
 
 /** Dedicated tile that only shows avatar video + name overlay (no icon/state toggle). */
 function AvatarVideoTile({
@@ -60,7 +51,10 @@ function AvatarVideoTile({
         className="absolute inset-0 w-full h-full rounded-lg bg-black [&_video]:!object-contain [&_video]:!w-full [&_video]:!h-full"
         aria-hidden
       />
-      <div className="absolute inset-0 rounded-lg bg-gradient-to-t from-black/25 via-transparent to-black/5 pointer-events-none" aria-hidden />
+      <div
+        className="absolute inset-0 rounded-lg bg-gradient-to-t from-black/25 via-transparent to-black/5 pointer-events-none"
+        aria-hidden
+      />
       <div className="absolute bottom-2 left-2 right-2 z-10 flex justify-start">
         <div className="w-fit max-w-full bg-gray-900/80 dark:bg-gray-800/80 backdrop-blur-sm px-3 py-1.5 rounded-md text-sm shadow-md">
           <span className="font-medium truncate block">{agentName}</span>
@@ -91,42 +85,21 @@ const VideoCallScreen: React.FC = () => {
     agentAvatarRtcUid,
     agentSettings,
     transcriptionMode,
-    sessionStartTime,
   } = useAppStore();
 
-  const [remainingMs, setRemainingMs] = useState<number>(SESSION_DURATION_MS);
+  // Transmission label matches advanced settings (no flip when agent starts)
+  const displayTransmissionMode =
+    agentSettings != null
+      ? agentSettings.advanced_features?.enable_rtm === false
+        ? "rtc"
+        : "rtm"
+      : transcriptionMode;
 
   useEffect(() => {
     if (!callActive) {
       router.push("/");
     }
   }, [callActive, router]);
-
-  // Session timer: countdown and auto-logout at 0
-  useEffect(() => {
-    if (!sessionStartTime) return;
-    const update = () => {
-      const elapsed = Date.now() - sessionStartTime;
-      const remaining = SESSION_DURATION_MS - elapsed;
-      setRemainingMs(remaining);
-    };
-    update();
-    const interval = setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, [sessionStartTime]);
-
-  const { leaveCall } = useAgora();
-
-  const handleSessionExpired = useCallback(async () => {
-    await leaveCall();
-    router.push("/");
-  }, [leaveCall, router]);
-
-  useEffect(() => {
-    if (remainingMs <= 0 && sessionStartTime != null) {
-      handleSessionExpired();
-    }
-  }, [remainingMs, sessionStartTime, handleSessionExpired]);
 
   const {
     localTracks,
@@ -150,49 +123,39 @@ const VideoCallScreen: React.FC = () => {
     agentRtcUid,
   });
 
-  const transcriptSidebarContent =
-    transcriptionMode === "rtc" ? (
-      <div className="flex flex-col items-center justify-center h-full px-4 text-center text-gray-500 dark:text-gray-400">
-        <p className="text-sm font-medium">Enable RTM transmission mode for live transcript</p>
-      </div>
-    ) : (
-      <TranscriptSidePanel
-        inline
-        onSendMessage={
-          isAgentActive && agentRtcUid ? sendChatMessage : undefined
-        }
-      />
-    );
+  // Always show transcript panel; in RTC mode it is read-only (onSendMessage undefined)
+  const transcriptSidebarContent = (
+    <TranscriptSidePanel
+      inline
+      onSendMessage={
+        transcriptionMode === "rtm" && isAgentActive && agentRtcUid
+          ? sendChatMessage
+          : undefined
+      }
+    />
+  );
 
   return (
     <div className="flex flex-col h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-300">
       {/* Top Bar */}
       <div className="flex items-center bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white p-4 text-lg shadow-md transition-colors duration-300">
-        <span data-tour="tour-meeting-name" className="font-bold text-xl font-syne">
-          Meeting: {meetingName || channelId}
+        <span
+          data-tour="tour-meeting-name"
+          className="font-bold text-xl font-syne"
+        >
+          {meetingName || channelId}
         </span>
         <div className="flex items-center gap-3 ml-auto">
           {/* Transmission Badge - shown when agent is active */}
           {isAgentActive && (
             <span
               className={`text-xs px-2 py-1 rounded-full font-medium ${
-                transcriptionMode === "rtm"
+                displayTransmissionMode === "rtm"
                   ? "bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400"
                   : "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
               }`}
             >
-              Transmission: {transcriptionMode.toUpperCase()}
-            </span>
-          )}
-
-          {sessionStartTime != null && (
-            <span
-              data-tour="tour-session-timer"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-sm font-medium tabular-nums"
-              title="Session ends in 15 minutes; you will be logged out when time runs out."
-            >
-              <MdTimer className="w-4 h-4 text-[var(--agora-accent-blue)] shrink-0" aria-hidden />
-              {formatRemaining(remainingMs)}
+              Transmission: {displayTransmissionMode.toUpperCase()}
             </span>
           )}
 
@@ -222,124 +185,137 @@ const VideoCallScreen: React.FC = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex flex-1 overflow-hidden">
-        <div className="w-80 min-w-0 flex flex-col bg-gray-200 dark:bg-gray-800 border-r border-gray-300 dark:border-gray-700 hidden sm:flex shadow-inner transition-colors duration-300">
+      <div className="flex flex-row flex-1 overflow-hidden">
+        {/* Transcript Sidebar - fixed width */}
+        <aside
+          className="hidden sm:flex flex-col overflow-hidden bg-gray-200 dark:bg-gray-800 border-r border-gray-300 dark:border-gray-700 shadow-inner transition-colors duration-300"
+          style={{
+            width: "360px",
+            minWidth: "360px",
+            maxWidth: "360px",
+            flexShrink: 0,
+            flexGrow: 0,
+          }}
+        >
           {transcriptSidebarContent}
-        </div>
+        </aside>
 
-        <div className="flex-1 overflow-hidden bg-gray-100 dark:bg-gray-900 transition-colors duration-300">
+        {/* Video Tiles Area - takes remaining space */}
+        <main className="flex-1 min-w-0 overflow-hidden bg-gray-100 dark:bg-gray-900 transition-colors duration-300">
           <div className="h-full flex items-center justify-center p-4">
-              {(() => {
-                const allTiles = [];
+            {(() => {
+              const allTiles = [];
 
-                if (localUID) {
+              if (localUID) {
+                allTiles.push(
+                  <VideoTile
+                    key={localUID}
+                    uid={localUID}
+                    name={localUsername}
+                    isLocal={true}
+                    track={videoMuted ? null : localTracks.videoTrack}
+                    micMuted={audioMuted}
+                    videoMuted={!localTracks.videoTrack || videoMuted}
+                  />,
+                );
+              }
+
+              // Avatar video track comes directly from useAgora (tracked independently, like the sample)
+              // No need to look it up in remoteUsers - it's set directly from user-published events
+
+              // Exclude agent and avatar UIDs from "other" tiles
+              const agentAndAvatarUids = new Set<string>();
+              if (agentRtcUid) agentAndAvatarUids.add(agentRtcUid);
+              if (agentAvatarRtcUid) agentAndAvatarUids.add(agentAvatarRtcUid);
+              remoteUsers.forEach((user: IAgoraRTCRemoteUser) => {
+                const uidStr = String(user.uid);
+                if (agentAndAvatarUids.has(uidStr)) return;
+                const participantInfo = remoteParticipants[uidStr];
+                allTiles.push(
+                  <VideoTile
+                    key={user.uid}
+                    uid={user.uid}
+                    name={participantInfo?.name || `User ${user.uid}`}
+                    isLocal={false}
+                    track={user.videoTrack || null}
+                    micMuted={participantInfo?.micMuted || true}
+                    videoMuted={participantInfo?.videoMuted || true}
+                  />,
+                );
+              });
+
+              // Agent: separate render paths — dedicated avatar video tile vs normal/waiting AgentTile
+              if (isAgentActive && agentRtcUid) {
+                if (agentAvatarRtcUid && hookAvatarVideoTrack) {
                   allTiles.push(
-                    <VideoTile
-                      key={localUID}
-                      uid={localUID}
-                      name={localUsername}
-                      isLocal={true}
-                      track={videoMuted ? null : localTracks.videoTrack}
-                      micMuted={audioMuted}
-                      videoMuted={!localTracks.videoTrack || videoMuted}
-                    />
+                    <AvatarVideoTile
+                      key={`agent-avatar-${agentRtcUid}`}
+                      videoTrack={hookAvatarVideoTrack}
+                      agentName={agentSettings?.name || "AI Agent"}
+                    />,
                   );
-                }
-
-                // Avatar video track comes directly from useAgora (tracked independently, like the sample)
-                // No need to look it up in remoteUsers - it's set directly from user-published events
-
-                // Exclude agent and avatar UIDs from "other" tiles
-                const agentAndAvatarUids = new Set<string>();
-                if (agentRtcUid) agentAndAvatarUids.add(agentRtcUid);
-                if (agentAvatarRtcUid) agentAndAvatarUids.add(agentAvatarRtcUid);
-                remoteUsers.forEach((user: IAgoraRTCRemoteUser) => {
-                  const uidStr = String(user.uid);
-                  if (agentAndAvatarUids.has(uidStr)) return;
-                  const participantInfo = remoteParticipants[uidStr];
-                  allTiles.push(
-                    <VideoTile
-                      key={user.uid}
-                      uid={user.uid}
-                      name={participantInfo?.name || `User ${user.uid}`}
-                      isLocal={false}
-                      track={user.videoTrack || null}
-                      micMuted={participantInfo?.micMuted || true}
-                      videoMuted={participantInfo?.videoMuted || true}
-                    />
-                  );
-                });
-
-                // Agent: separate render paths — dedicated avatar video tile vs normal/waiting AgentTile
-                if (isAgentActive && agentRtcUid) {
-                  if (agentAvatarRtcUid && hookAvatarVideoTrack) {
-                    allTiles.push(
-                      <AvatarVideoTile
-                        key={`agent-avatar-${agentRtcUid}`}
-                        videoTrack={hookAvatarVideoTrack}
-                        agentName={agentSettings?.name || "AI Agent"}
-                      />
-                    );
-                  } else {
-                    allTiles.push(
-                      <AgentTile
-                        key={`agent-${agentRtcUid}`}
-                        agentUid={agentRtcUid}
-                        agentState={agentState}
-                        agentName={agentSettings?.name || "AI Agent"}
-                        transcriptionMode={transcriptionMode}
-                        videoTrack={null}
-                        avatarWaiting={!!(agentAvatarRtcUid && !hookAvatarVideoTrack)}
-                      />
-                    );
-                  }
-                }
-
-                const count = allTiles.length;
-                let gridClass = "";
-                let itemClass = "";
-
-                if (count === 1) {
-                  gridClass = "flex justify-center items-center w-full h-full";
-                  itemClass = "w-[70%] max-w-4xl aspect-video";
-                } else if (count === 2) {
-                  gridClass = "grid grid-cols-2 gap-4 w-full max-w-5xl";
-                  itemClass = "aspect-video";
-                } else if (count === 3) {
-                  return (
-                    <div className="flex flex-col gap-4 w-full max-w-5xl">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="aspect-video">{allTiles[0]}</div>
-                        <div className="aspect-video">{allTiles[1]}</div>
-                      </div>
-                      <div className="flex justify-center">
-                        <div className="aspect-video w-1/2">{allTiles[2]}</div>
-                      </div>
-                    </div>
-                  );
-                } else if (count === 4) {
-                  gridClass = "grid grid-cols-2 gap-4 w-full max-w-5xl";
-                  itemClass = "aspect-video";
-                } else if (count <= 6) {
-                  gridClass = "grid grid-cols-3 gap-3 w-full max-w-6xl";
-                  itemClass = "aspect-video";
                 } else {
-                  gridClass = "grid grid-cols-4 gap-2 w-full max-w-7xl";
-                  itemClass = "aspect-video";
+                  allTiles.push(
+                    <AgentTile
+                      key={`agent-${agentRtcUid}`}
+                      agentUid={agentRtcUid}
+                      agentState={agentState}
+                      agentName={agentSettings?.name || "AI Agent"}
+                      transcriptionMode={transcriptionMode}
+                      videoTrack={null}
+                      avatarWaiting={
+                        !!(agentAvatarRtcUid && !hookAvatarVideoTrack)
+                      }
+                    />,
+                  );
                 }
+              }
 
+              const count = allTiles.length;
+              let gridClass = "";
+              let itemClass = "";
+
+              if (count === 1) {
+                gridClass = "flex justify-center items-center w-full h-full";
+                itemClass = "w-[70%] max-w-4xl aspect-video";
+              } else if (count === 2) {
+                gridClass = "grid grid-cols-2 gap-4 w-full max-w-5xl";
+                itemClass = "aspect-video";
+              } else if (count === 3) {
                 return (
-                  <div className={gridClass}>
-                    {allTiles.map((tile, index) => (
-                      <div key={index} className={itemClass}>
-                        {tile}
-                      </div>
-                    ))}
+                  <div className="flex flex-col gap-4 w-full max-w-5xl">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="aspect-video">{allTiles[0]}</div>
+                      <div className="aspect-video">{allTiles[1]}</div>
+                    </div>
+                    <div className="flex justify-center">
+                      <div className="aspect-video w-1/2">{allTiles[2]}</div>
+                    </div>
                   </div>
                 );
-              })()}
+              } else if (count === 4) {
+                gridClass = "grid grid-cols-2 gap-4 w-full max-w-5xl";
+                itemClass = "aspect-video";
+              } else if (count <= 6) {
+                gridClass = "grid grid-cols-3 gap-3 w-full max-w-6xl";
+                itemClass = "aspect-video";
+              } else {
+                gridClass = "grid grid-cols-4 gap-2 w-full max-w-7xl";
+                itemClass = "aspect-video";
+              }
+
+              return (
+                <div className={gridClass}>
+                  {allTiles.map((tile, index) => (
+                    <div key={index} className={itemClass}>
+                      {tile}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
-        </div>
+        </main>
       </div>
 
       <Controls />

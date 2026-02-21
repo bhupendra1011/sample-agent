@@ -239,6 +239,9 @@ const getDefaultAvatarParams = (
 };
 
 // Default settings
+const DEFAULT_GREETING_MESSAGE =
+  "Hello {{username}}, glad to meet you, how can I help you?";
+
 const getDefaultSettings = (): AgentSettings => {
   const ttsVendor = getDefaultTTSVendor();
   const asrVendor = getDefaultASRVendor();
@@ -255,8 +258,7 @@ const getDefaultSettings = (): AgentSettings => {
             "You are a helpful AI assistant in a video call. Be concise, friendly, and conversational.",
         },
       ],
-      greeting_message:
-        "Hello! I'm your AI assistant. How can I help you today?",
+      greeting_message: DEFAULT_GREETING_MESSAGE,
       failure_message:
         "I'm sorry, I didn't catch that. Could you please repeat?",
       max_history: 10,
@@ -628,7 +630,7 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
   const [selectedAvatarVendor, setSelectedAvatarVendor] =
     useState<AvatarVendor>("anam");
 
-  // Sync with existing settings on open (normalize old turn_detection / ensure filler_words & sal)
+  // Sync with existing settings on open (normalize turn_detection / filler_words / sal)
   useEffect(() => {
     if (isOpen && existingSettings) {
       setSettings(normalizeAgentSettings(existingSettings));
@@ -1004,15 +1006,15 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
 
             <FormField
               label="Greeting Message"
-              hint="What the agent says when joining"
-              tooltip="Message spoken when the agent joins."
+              hint="Use {{username}} for the user's name (injected when the agent joins)"
+              tooltip="Message spoken when the agent joins. Use {{username}} and it will be replaced with the joining user's display name."
             >
               <Input
                 value={settings.llm.greeting_message || ""}
                 onChange={(e) =>
                   updateLLM({ greeting_message: e.target.value })
                 }
-                placeholder="Hello! How can I help you?"
+                placeholder="Hello {{username}}, glad to meet you, how can I help you?"
               />
             </FormField>
 
