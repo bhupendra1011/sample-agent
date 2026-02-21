@@ -8,16 +8,10 @@ import type {
   ITranscriptHelperItem,
 } from "@/types/agora";
 import { EAgentState, ETranscriptRenderMode } from "@/types/agora";
-import type { ILocalAudioTrack, ILocalVideoTrack, IRemoteVideoTrack } from "agora-rtc-sdk-ng";
+import type { ILocalAudioTrack, ILocalVideoTrack } from "agora-rtc-sdk-ng";
 
 // Define Theme type
 type Theme = "light" | "dark";
-
-// Dummy auth user (replace with real SSO later)
-export interface AuthUser {
-  displayName: string;
-  email: string;
-}
 
 // Define Toast types
 export type ToastType = "success" | "error" | "warning" | "info";
@@ -38,11 +32,8 @@ interface AppState {
   localUID: string | null;
   meetingName: string;
   channelId: string;
-  hostPassphrase: string;
-  viewerPassphrase: string;
   /** When the call started (for 15-min session timer). Set in callStart, cleared in callEnd. */
   sessionStartTime: number | null;
-  isScreenSharing: boolean;
   remoteParticipants: {
     [uid: string]: Participant;
   };
@@ -65,21 +56,6 @@ interface AppState {
     videoTrack: ILocalVideoTrack | null
   ) => void;
   // --- END NEW ---
-
-  // --- Whiteboard State ---
-  whiteboardRoomToken: string;
-  whiteboardRoomUuid: string;
-  whiteboardAppIdentifier: string;
-  whiteboardRegion: string;
-  isWhiteboardActive: boolean;
-  toggleWhiteboard: () => void;
-  setWhiteboardCredentials: (
-    token: string,
-    uuid: string,
-    appIdentifier: string,
-    region: string
-  ) => void;
-  // --- END Whiteboard State ---
 
   // Agent state
   agentId: string | null;
@@ -121,31 +97,12 @@ interface AppState {
   // Existing actions...
   toggleVideoMute: () => void;
   toggleAudioMute: () => void;
-  /** Screen share credentials from join API; used to start screen share. */
-  screenShareRtcToken: string;
-  screenShareUid: string | null;
-  /** UID of the user currently sharing screen (local or remote); drives layout. */
-  activeScreenShareUid: string | null;
-  setActiveScreenShareUid: (uid: string | null) => void;
-  /** Local screen video track when current user is sharing; stored globally so all components see it. */
-  localScreenVideoTrack: ILocalVideoTrack | null;
-  setLocalScreenVideoTrack: (track: ILocalVideoTrack | null) => void;
-  /** Remote screen video track when another user is sharing; stored globally for reliable access. */
-  remoteScreenVideoTrack: IRemoteVideoTrack | null;
-  setRemoteScreenVideoTrack: (track: IRemoteVideoTrack | null) => void;
-  /** Name of the user sharing screen (for display). */
-  screenSharerName: string | null;
-  setScreenSharerName: (name: string | null) => void;
   callStart: (payload: {
     userName: string;
     uid: string;
     meetingName: string;
     channelId: string;
-    hostPassphrase?: string;
-    viewerPassphrase?: string;
     isHost?: boolean;
-    screenShareRtcToken?: string;
-    screenShareUid?: string;
   }) => void;
   callEnd: () => void;
   /** Clear only session timer (e.g. when extending session). Keeps call state. */
@@ -159,7 +116,6 @@ interface AppState {
     videoMuted?: boolean;
   }) => void;
   removeRemoteParticipant: (payload: { uid: string }) => void;
-  setScreenShareStatus: (status: boolean) => void;
 
   // --- Toast State ---
   toasts: Toast[];
@@ -171,12 +127,6 @@ interface AppState {
   selectedMicrophoneId: string | null;
   setSelectedMicrophoneId: (id: string | null) => void;
   // --- END Voice Settings ---
-
-  // --- Auth (dummy until SSO) ---
-  user: AuthUser | null;
-  setUser: (user: AuthUser | null) => void;
-  logout: () => void;
-  // --- END Auth ---
 }
 
 /**
@@ -204,10 +154,7 @@ const useAppStore = create<AppState>((set, get) => ({
   localUID: null,
   meetingName: "",
   channelId: "",
-  hostPassphrase: "",
-  viewerPassphrase: "",
   sessionStartTime: null,
-  isScreenSharing: false,
   remoteParticipants: {},
 
   // Agent initial state
@@ -297,35 +244,6 @@ const useAppStore = create<AppState>((set, get) => ({
     set({ localAudioTrack: audioTrack, localVideoTrack: videoTrack }),
   // --- END NEW ---
 
-  // --- Whiteboard Initial State & Actions ---
-  whiteboardRoomToken: "",
-  whiteboardRoomUuid: "",
-  whiteboardAppIdentifier: "",
-  whiteboardRegion: "",
-  isWhiteboardActive: false,
-  toggleWhiteboard: () =>
-    set((state) => ({ isWhiteboardActive: !state.isWhiteboardActive })),
-  setWhiteboardCredentials: (token, uuid, appIdentifier, region) =>
-    set({
-      whiteboardRoomToken: token,
-      whiteboardRoomUuid: uuid,
-      whiteboardAppIdentifier: appIdentifier,
-      whiteboardRegion: region,
-    }),
-  // --- END Whiteboard ---
-
-  // Screen share state (credentials from API; active sharer for layout)
-  screenShareRtcToken: "",
-  screenShareUid: null as string | null,
-  activeScreenShareUid: null as string | null,
-  setActiveScreenShareUid: (uid) => set({ activeScreenShareUid: uid }),
-  localScreenVideoTrack: null as ILocalVideoTrack | null,
-  setLocalScreenVideoTrack: (track) => set({ localScreenVideoTrack: track }),
-  remoteScreenVideoTrack: null as IRemoteVideoTrack | null,
-  setRemoteScreenVideoTrack: (track) => set({ remoteScreenVideoTrack: track }),
-  screenSharerName: null as string | null,
-  setScreenSharerName: (name) => set({ screenSharerName: name }),
-
   // Existing actions...
   toggleVideoMute: () => set((state) => ({ videoMuted: !state.videoMuted })),
   toggleAudioMute: () => set((state) => ({ audioMuted: !state.audioMuted })),
@@ -336,14 +254,9 @@ const useAppStore = create<AppState>((set, get) => ({
       localUID: payload.uid,
       meetingName: payload.meetingName,
       channelId: payload.channelId,
-      hostPassphrase: payload.hostPassphrase || "",
-      viewerPassphrase: payload.viewerPassphrase || "",
-      isHost: payload.isHost || false,
+      isHost: payload.isHost ?? true,
       userCount: 1, // Start with 1 for local user
       sessionStartTime: Date.now(),
-      screenShareRtcToken: payload.screenShareRtcToken || "",
-      screenShareUid: payload.screenShareUid ?? null,
-      activeScreenShareUid: null,
     }),
   callEnd: () =>
     set({
@@ -353,22 +266,8 @@ const useAppStore = create<AppState>((set, get) => ({
       localUID: null,
       meetingName: "",
       channelId: "",
-      hostPassphrase: "",
-      viewerPassphrase: "",
       sessionStartTime: null,
-      isScreenSharing: false,
       remoteParticipants: {},
-      whiteboardRoomToken: "",
-      whiteboardRoomUuid: "",
-      whiteboardAppIdentifier: "",
-      whiteboardRegion: "",
-      isWhiteboardActive: false,
-      screenShareRtcToken: "",
-      screenShareUid: null,
-      activeScreenShareUid: null,
-      localScreenVideoTrack: null,
-      remoteScreenVideoTrack: null,
-      screenSharerName: null,
       isHost: false,
       pendingUnmuteRequest: null,
       agentId: null,
@@ -438,7 +337,6 @@ const useAppStore = create<AppState>((set, get) => ({
       delete newRemoteParticipants[payload.uid];
       return { remoteParticipants: newRemoteParticipants };
     }),
-  setScreenShareStatus: (status) => set({ isScreenSharing: status }),
 
   // --- Toast Actions ---
   toasts: [],
@@ -458,12 +356,6 @@ const useAppStore = create<AppState>((set, get) => ({
   selectedMicrophoneId: null,
   setSelectedMicrophoneId: (id) => set({ selectedMicrophoneId: id }),
   // --- END Voice Settings ---
-
-  // --- Auth (dummy until SSO) ---
-  user: null,
-  setUser: (user) => set({ user }),
-  logout: () => set({ user: null }),
-  // --- END Auth ---
 }));
 
 // Apply default theme to HTML root on load (important for initial render)

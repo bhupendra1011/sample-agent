@@ -7,15 +7,9 @@ import {
   MdMicOff,
   MdVideocam,
   MdVideocamOff,
-  MdMonitor,
-  MdClose,
   MdCallEnd,
-  MdShare,
-  MdDraw,
   MdSettings,
-  MdCreate,
   MdSync,
-  MdMessage,
 } from "react-icons/md";
 import { useAgora } from "@/hooks/useAgora";
 import { showToast } from "@/services/uiService";
@@ -25,10 +19,7 @@ import {
 } from "@/services/settingsDb";
 import { inviteAgent, stopAgent, updateAgent } from "@/api/agentApi";
 import { sanitizeCustomJoinPayload } from "@/utils/customPayloadSanitize";
-import Modal from "@/components/common/Modal";
-import CopyButton from "@/components/common/CopyButton";
 import SettingsSidebar from "@/components/SettingsSidebar";
-import TranscriptSidePanel from "@/components/TranscriptSidePanel";
 import AgentStatusBadge from "@/components/AgentStatusBadge";
 import type { AgentSettings } from "@/types/agora";
 
@@ -67,27 +58,13 @@ function hasRestartRequiredChanges(
   );
 }
 
-interface ControlsProps {
-  sendChatMessage?: (text: string, image?: File) => Promise<void>;
-}
-
-const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
+const Controls: React.FC = () => {
   const audioMuted = useAppStore((state) => state.audioMuted);
   const videoMuted = useAppStore((state) => state.videoMuted);
-  const isScreenSharing = useAppStore((state) => state.isScreenSharing);
 
-  const meetingName = useAppStore((state) => state.meetingName);
   const channelId = useAppStore((state) => state.channelId);
-  const hostPassphrase = useAppStore((state) => state.hostPassphrase);
-  const viewerPassphrase = useAppStore((state) => state.viewerPassphrase);
   const localUID = useAppStore((state) => state.localUID);
   const isHost = useAppStore((state) => state.isHost);
-
-  const isWhiteboardActive = useAppStore((state) => state.isWhiteboardActive);
-  const toggleWhiteboard = useAppStore((state) => state.toggleWhiteboard);
-  const whiteboardRoomUuid = useAppStore((state) => state.whiteboardRoomUuid);
-  const screenShareRtcToken = useAppStore((state) => state.screenShareRtcToken);
-  const screenShareUid = useAppStore((state) => state.screenShareUid);
 
   // Agent state
   const agentId = useAppStore((state) => state.agentId);
@@ -101,75 +78,13 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
   const clearAgent = useAppStore((state) => state.clearAgent);
   const setAgentSettings = useAppStore((state) => state.setAgentSettings);
 
-  const {
-    startScreenshare,
-    stopScreenshare,
-    leaveCall,
-    publishRtmMessage,
-    toggleLocalAudio,
-    toggleLocalVideo,
-  } = useAgora();
+  const { leaveCall, toggleLocalAudio, toggleLocalVideo } = useAgora();
 
-  const transcriptionMode = useAppStore((state) => state.transcriptionMode);
-  const agentRtcUid = useAppStore((state) => state.agentRtcUid);
-
-  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isSettingsPanelOpen, setIsSettingsPanelOpen] = useState(false);
-  const [isTranscriptPanelOpen, setIsTranscriptPanelOpen] = useState(false);
-
-  const handleToggleScreenShare = async () => {
-    if (isScreenSharing) {
-      await stopScreenshare();
-    } else {
-      if (!screenShareRtcToken || !screenShareUid) {
-        showToast("Screen share is not available for this meeting.", "error");
-        return;
-      }
-      await startScreenshare(screenShareRtcToken, screenShareUid);
-    }
-  };
 
   const handleCallEnd = async () => {
     // leaveCall() stops agent, clears uploads, and cleans up RTC/RTM
     await leaveCall();
-  };
-
-  const handleToggleWhiteboard = async () => {
-    if (!whiteboardRoomUuid) {
-      showToast("Whiteboard is not available for this meeting.", "error");
-      return;
-    }
-
-    const isStarting = !isWhiteboardActive;
-    toggleWhiteboard();
-
-    if (localUID) {
-      const whiteboardState = useAppStore.getState();
-      const message = {
-        type: isStarting ? "whiteboard-started" : "whiteboard-stopped",
-        uid: localUID,
-        userName: useAppStore.getState().localUsername,
-        roomToken: whiteboardState.whiteboardRoomToken,
-        roomUuid: whiteboardState.whiteboardRoomUuid,
-        appIdentifier: whiteboardState.whiteboardAppIdentifier,
-        region: whiteboardState.whiteboardRegion,
-      };
-
-      try {
-        await publishRtmMessage(JSON.stringify(message));
-      } catch (error) {
-        console.error("Failed to send whiteboard sync message:", error);
-        showToast("Failed to sync whiteboard state", "error");
-      }
-    }
-  };
-
-  const handleShareMeeting = () => {
-    if (meetingName && channelId) {
-      setIsShareModalOpen(true);
-    } else {
-      showToast("No active meeting to share.", "success");
-    }
   };
 
   const handleInviteAgent = useCallback(async () => {
@@ -364,37 +279,6 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
           </button>
 
           <button
-            data-tour="tour-screen-share"
-            onClick={handleToggleScreenShare}
-            className={controlButtonClass}
-            title={isScreenSharing ? "Stop Screen Share" : "Start Screen Share"}
-          >
-            {isScreenSharing ? <MdClose /> : <MdMonitor />}
-          </button>
-
-          <button
-            data-tour="tour-whiteboard"
-            onClick={handleToggleWhiteboard}
-            className={`flex items-center justify-center w-14 h-14 text-3xl rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-agora focus:ring-opacity-75 ${
-              isWhiteboardActive
-                ? "bg-agora text-white hover:opacity-90"
-                : "bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-400 dark:hover:bg-gray-600"
-            }`}
-            title={isWhiteboardActive ? "Close Whiteboard" : "Open Whiteboard"}
-          >
-            <MdDraw />
-          </button>
-
-          <button
-            data-tour="tour-share-meeting"
-            onClick={handleShareMeeting}
-            className={controlButtonClass}
-            title="Share Meeting Info"
-          >
-            <MdShare />
-          </button>
-
-          <button
             data-tour="tour-end-call"
             onClick={handleCallEnd}
             className="flex items-center justify-center w-16 h-16 bg-red-600 dark:bg-red-500 text-white text-4xl rounded-full hover:bg-red-700 dark:hover:bg-red-600 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-red-500 dark:focus:ring-red-400 shadow-lg"
@@ -404,25 +288,10 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
           </button>
         </div>
 
-        {/* Right side - Agent controls: message icon before Start/Stop to avoid layout shift when RTM enabled */}
+        {/* Right side - Agent controls */}
         <div className="flex-1 flex justify-end items-center gap-2">
           {isHost && (
             <div className="flex items-center space-x-2">
-              {transcriptionMode === "rtm" && (
-                <button
-                  data-tour="tour-transcript"
-                  onClick={() => setIsTranscriptPanelOpen(true)}
-                  className="flex items-center justify-center w-10 h-10 rounded-lg text-gray-800 dark:text-white transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-agora hover:bg-gray-400 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                  title={
-                    isAgentActive
-                      ? "Open Transcript"
-                      : "Transcript (start agent to chat)"
-                  }
-                  disabled={!isAgentActive}
-                >
-                  <MdMessage className="w-5 h-5" />
-                </button>
-              )}
               <button
                 data-tour="tour-agent-toggle"
                 onClick={handleToggleAgent}
@@ -485,58 +354,12 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
         </div>
       </div>
 
-      <Modal
-        isOpen={isShareModalOpen}
-        onClose={() => setIsShareModalOpen(false)}
-        title="Share Meeting Details"
-      >
-        <div className="space-y-4">
-          {hostPassphrase && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Host Passphrase:
-              </label>
-              <div className="flex items-center justify-between p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700">
-                <span className="text-gray-900 dark:text-white text-base font-semibold truncate">
-                  {hostPassphrase}
-                </span>
-                <CopyButton textToCopy={hostPassphrase} />
-              </div>
-            </div>
-          )}
-
-          {viewerPassphrase && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Attendee Passphrase:
-              </label>
-              <div className="flex items-center justify-between p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700">
-                <span className="text-gray-900 dark:text-white text-base font-semibold truncate">
-                  {viewerPassphrase}
-                </span>
-                <CopyButton textToCopy={viewerPassphrase} />
-              </div>
-            </div>
-          )}
-        </div>
-      </Modal>
-
       <SettingsSidebar
         isOpen={isSettingsPanelOpen}
         onClose={() => setIsSettingsPanelOpen(false)}
         onSaveAgentSettings={handleSaveAgentSettings}
         isAgentUpdating={isAgentUpdating}
         isAgentActive={isAgentActive}
-      />
-
-      <TranscriptSidePanel
-        isOpen={isTranscriptPanelOpen}
-        onClose={() => setIsTranscriptPanelOpen(false)}
-        onSendMessage={
-          transcriptionMode === "rtm" && agentRtcUid
-            ? sendChatMessage
-            : undefined
-        }
       />
     </React.Fragment>
   );
