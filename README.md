@@ -62,17 +62,17 @@ All secret keys stay on the server. Next.js API routes generate Agora tokens, in
 sequenceDiagram
     participant U as 👤 User
     participant C as 🖥️ Next.js Client
-    participant MS as ☁️ Agora Managed<br/>Service
-    participant RTC as 📡 Agora RTC
     participant API as ⚙️ Next.js API<br/>Routes
+    participant RTC as 📡 Agora RTC
     participant AI as 🧠 Conversational<br/>AI Engine
     participant LLM as 🤖 LLM Provider
 
-    Note over U,LLM: 🔵 Meeting Flow
+    Note over U,LLM: 🔵 Meeting Flow (no managed service)
 
-    U->>C: Create / Join meeting
-    C->>MS: Login + channel join request
-    MS-->>C: RTC/RTM tokens, channel info
+    U->>C: Enter name, "Start Conversation"
+    C->>API: GET /api/generate-agora-token
+    API->>API: Build RTC/RTM token (agora-token),<br/>generate channel + UID
+    API-->>C: token, uid, channel
     C->>RTC: Join channel with tokens
     RTC-->>C: Connected (audio/video streaming)
 
@@ -104,7 +104,7 @@ sequenceDiagram
     AI-->>RTC: Agent leaves channel
 ```
 
-> 💡 **How it works:** The Next.js client uses your Agora project credentials for authentication and channel management. For AI features, Next.js API routes generate tokens and inject API keys server-side, then call Agora's Conversational AI Engine.
+> 💡 **How it works:** Tokens are generated server-side by Next.js API routes using the `agora-token` library (no Agora Managed Service). The client fetches `/api/generate-agora-token` for RTC/RTM tokens and channel info, then joins the Agora channel. For the AI agent, API routes generate agent tokens and inject API keys, then call Agora's Conversational AI Engine.
 
 ---
 
