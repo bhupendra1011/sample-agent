@@ -1,7 +1,15 @@
 // src/components/Whiteboard.tsx
 import React, { useEffect } from "react";
 import { useFastboard, Fastboard } from "@netless/fastboard-react/full";
+import type { FastboardApp } from "@netless/fastboard-react/full";
 import useAppStore from "@/store/useAppStore";
+
+// Module scope — shared across hook instances (same pattern as localTracksRef in useAgora.ts)
+let fastboardInstance: FastboardApp | null = null;
+
+export function getFastboardInstance(): FastboardApp | null {
+  return fastboardInstance;
+}
 
 interface WhiteboardProps {
   roomUuid: string;
@@ -30,6 +38,18 @@ const Whiteboard: React.FC<WhiteboardProps> = ({
       roomToken,
     },
   }));
+
+  // Expose fastboard instance at module scope for useWhiteboardCommands hook
+  useEffect(() => {
+    if (fastboard) {
+      fastboardInstance = fastboard;
+    }
+    return () => {
+      if (fastboardInstance === fastboard) {
+        fastboardInstance = null;
+      }
+    };
+  }, [fastboard]);
 
   useEffect(() => {
     // Cleanup on unmount

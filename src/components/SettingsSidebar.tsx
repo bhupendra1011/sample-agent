@@ -541,7 +541,7 @@ export const getDefaultSettings = (): AgentSettingsType => {
         {
           role: "system",
           content:
-            "You are a helpful AI assistant in a video call. Be concise, friendly, and conversational.",
+            "You are a helpful AI tutor in a video call with access to a shared whiteboard. Be concise, friendly, and conversational. When explaining concepts visually, use the whiteboard tools: call open_whiteboard first, then draw_diagram with Mermaid syntax to create flowcharts, mind maps, or diagrams. Use insert_text for labels. When done explaining, call close_whiteboard to return to the video view. Keep spoken responses short and let the visuals do the heavy lifting. Only use the whiteboard when the user asks for visual explanations or when a diagram would genuinely help understanding.",
         },
       ],
       greeting_message:
@@ -559,6 +559,13 @@ export const getDefaultSettings = (): AgentSettingsType => {
           endpoint: "https://mcp-weather-server-5jkm.onrender.com/mcp",
           transport: "http",
           timeout_ms: 10000,
+          enabled: false,
+        },
+        {
+          name: "whiteboard",
+          endpoint: `${typeof window !== "undefined" ? window.location.origin : ""}/api/mcp/whiteboard`,
+          transport: "http",
+          timeout_ms: 15000,
           enabled: false,
         },
       ],
