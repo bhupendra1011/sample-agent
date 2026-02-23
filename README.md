@@ -160,7 +160,10 @@ npm install
 cp .env.example .env
 ```
 
-Edit `.env` with your credentials. Required variables:
+Edit `.env` and add your keys. **Minimum to run the app:**
+
+- **Agora (required):** `NEXT_PUBLIC_AGORA_APP_ID`, `AGORA_APP_CERTIFICATE`, `AGORA_CUSTOMER_ID`, `AGORA_CUSTOMER_SECRET` — then you can create/join meetings and use voice/video.
+- **AI agent (optional):** Set `LLM_API_KEY` and one TTS key (e.g. `ELEVENLABS_API_KEY`) to invite the conversational AI agent. Other LLM/TTS/ASR/avatar vars in `.env.example` are optional defaults.
 
 | Variable                     | Where to get it                                                                 |
 | ---------------------------- | ------------------------------------------------------------------------------- |
@@ -168,7 +171,7 @@ Edit `.env` with your credentials. Required variables:
 | `AGORA_APP_CERTIFICATE`      | [Agora Console](https://console.agora.io/) → Project → Security                |
 | `AGORA_CUSTOMER_ID` / `SECRET` | [Agora RESTful API](https://console.agora.io/restful-api)                     |
 
-For the AI agent, set `LLM_API_KEY` and `ELEVENLABS_API_KEY` (or other TTS/ASR keys as needed). See `.env.example` for the full list.
+All supported variables (LLM, TTS, ASR, avatars) are listed in `.env.example` with empty values — fill only what you need.
 
 ### 4️⃣ Start the development server
 
