@@ -76,6 +76,8 @@ export interface LLMConfig {
   mcp_servers?: MCPServerConfig[];
   /** LLM input modalities: text only or text + image (default when omitted: ["text", "image"]) */
   input_modalities?: ("text" | "image")[];
+  /** Template variables for dynamic content */
+  template_variables?: Record<string, unknown>;
 }
 
 // --- TTS Vendors ---
@@ -122,7 +124,11 @@ export interface TTSConfig {
   /** TTS vendor (required) */
   vendor: TTSVendor;
   /** Vendor-specific parameters */
-  params: TTSMicrosoftParams | TTSElevenLabsParams | TTSOpenAIParams | Record<string, unknown>;
+  params:
+    | TTSMicrosoftParams
+    | TTSElevenLabsParams
+    | TTSOpenAIParams
+    | Record<string, unknown>;
 }
 
 // --- ASR (STT) Vendors ---
@@ -470,7 +476,11 @@ export const LLM_PRESETS: Record<LLMVendor, VendorPreset> = {
     value: "anthropic",
     url: "https://api.anthropic.com/v1/messages",
     defaultModel: "claude-3-5-sonnet-latest",
-    models: ["claude-3-5-sonnet-latest", "claude-3-5-haiku-latest", "claude-3-opus-latest"],
+    models: [
+      "claude-3-5-sonnet-latest",
+      "claude-3-5-haiku-latest",
+      "claude-3-opus-latest",
+    ],
     requiresApiKey: true,
     style: "anthropic",
     headers: '{"anthropic-version":"2023-06-01"}',
@@ -489,7 +499,11 @@ export const LLM_PRESETS: Record<LLMVendor, VendorPreset> = {
     value: "groq",
     url: "https://api.groq.com/openai/v1/chat/completions",
     defaultModel: "llama-3.3-70b-versatile",
-    models: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"],
+    models: [
+      "llama-3.3-70b-versatile",
+      "llama-3.1-8b-instant",
+      "mixtral-8x7b-32768",
+    ],
     requiresApiKey: true,
     style: "openai",
   },
@@ -527,7 +541,10 @@ export const LLM_PRESETS: Record<LLMVendor, VendorPreset> = {
   },
 };
 
-export const TTS_PRESETS: Record<TTSVendor, VendorPreset & { voices?: string[] }> = {
+export const TTS_PRESETS: Record<
+  TTSVendor,
+  VendorPreset & { voices?: string[] }
+> = {
   microsoft: {
     label: "Microsoft Azure",
     value: "microsoft",
@@ -720,7 +737,9 @@ export interface Participant {
 /**
  * Host control message types for RTM User Channel (private messages)
  */
-export type HostControlMessageType = "host-mute-request" | "host-unmute-request";
+export type HostControlMessageType =
+  | "host-mute-request"
+  | "host-unmute-request";
 
 /**
  * Message payload for host mute/unmute requests

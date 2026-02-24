@@ -29,12 +29,25 @@ export async function POST(request: NextRequest) {
       params: {},
     };
 
+    // Auto-inject auth headers for whiteboard MCP endpoint
+    const mergedHeaders: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...headers,
+    };
+    if (endpoint.includes("/mcp/whiteboard")) {
+      const mcpSecret = process.env.WHITEBOARD_MCP_SECRET;
+      if (mcpSecret) {
+        mergedHeaders["Authorization"] = `Bearer ${mcpSecret}`;
+      }
+      const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+      if (bypassSecret) {
+        mergedHeaders["x-vercel-protection-bypass"] = bypassSecret;
+      }
+    }
+
     const res = await fetch(endpoint, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...headers,
-      },
+      headers: mergedHeaders,
       body: JSON.stringify(listRequest),
       signal: AbortSignal.timeout(15000),
     });

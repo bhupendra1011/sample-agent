@@ -17,6 +17,8 @@ export async function inviteAgent(
   options?: {
     useCustomPayload?: boolean;
     customJoinPayload?: CustomJoinPayload;
+    /** User display name from create/join screen; sent as username for agent template_variables */
+    username?: string;
   },
 ): Promise<{
   agentId: string;
@@ -32,6 +34,9 @@ export async function inviteAgent(
   if (options?.useCustomPayload && options?.customJoinPayload) {
     body.useCustomPayload = true;
     body.customJoinPayload = options.customJoinPayload;
+  }
+  if (options?.username != null && options.username !== "") {
+    body.username = options.username;
   }
 
   const response = await fetch("/api/agent/invite", {

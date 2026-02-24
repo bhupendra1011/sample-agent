@@ -109,10 +109,11 @@ const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
     setViewCustomSettingsOpen(false);
   }, []);
 
+  const localUsername = useAppStore((state) => state.localUsername);
   const handleSaveAgentSettingsWithSync = React.useCallback(
     (settings: AgentSettings) => {
       onSaveAgentSettings(settings);
-      const json = buildJoinPayloadPreview(settings);
+      const json = buildJoinPayloadPreview(settings, localUsername);
       const toStore = getMaskedJsonToStore(json);
       import("@/services/settingsDb").then((m) =>
         m.setCustomAgentSettings({
@@ -121,7 +122,7 @@ const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
         }),
       );
     },
-    [onSaveAgentSettings, useCustomPayload],
+    [onSaveAgentSettings, useCustomPayload, localUsername],
   );
 
   if (!isOpen) return null;
@@ -541,7 +542,7 @@ export const getDefaultSettings = (): AgentSettingsType => {
         {
           role: "system",
           content:
-            "You are a helpful AI assistant in a video call. Be concise, friendly, and conversational.",
+            "You are a helpful AI tutor in a video call with access to a shared whiteboard. Be concise, friendly, and conversational. When explaining concepts visually, use the whiteboard tools: call open_whiteboard first, then draw_diagram with Mermaid syntax to create flowcharts, mind maps, or diagrams. Use insert_text for labels. When done explaining, call close_whiteboard to return to the video view. Keep spoken responses short and let the visuals do the heavy lifting. Only use the whiteboard when the user asks for visual explanations or when a diagram would genuinely help understanding.",
         },
       ],
       greeting_message:
@@ -559,6 +560,13 @@ export const getDefaultSettings = (): AgentSettingsType => {
           endpoint: "https://mcp-weather-server-5jkm.onrender.com/mcp",
           transport: "http",
           timeout_ms: 10000,
+          enabled: false,
+        },
+        {
+          name: "whiteboard",
+          endpoint: `${typeof window !== "undefined" ? window.location.origin : ""}/api/mcp/whiteboard`,
+          transport: "http",
+          timeout_ms: 15000,
           enabled: false,
         },
       ],
@@ -1498,8 +1506,18 @@ function maskKeysInObject(
   return out;
 }
 
-/** Build a join-payload-shaped preview from agentSettings (channel/token placeholders; keys masked). */
-function buildJoinPayloadPreview(settings: AgentSettings | null): string {
+/**
+ * Build a join-payload-shaped preview from agentSettings (channel/token placeholders; keys masked).
+ * @param currentUsername - Display name from create/join screen; shown in template_variables.username (defaults to "Guest" if empty)
+ */
+function buildJoinPayloadPreview(
+  settings: AgentSettings | null,
+  currentUsername?: string,
+): string {
+  const usernameValue =
+    currentUsername != null && currentUsername.trim() !== ""
+      ? currentUsername.trim()
+      : "Guest";
   if (!settings) {
     return JSON.stringify(
       {
@@ -1507,7 +1525,11 @@ function buildJoinPayloadPreview(settings: AgentSettings | null): string {
         properties: {
           channel: "<channel>",
           token: "<token>",
-          llm: {},
+          llm: {
+            template_variables: {
+              username: usernameValue,
+            },
+          },
           tts: {},
         },
       },
@@ -1533,6 +1555,14 @@ function buildJoinPayloadPreview(settings: AgentSettings | null): string {
           mcp_servers: (settings.llm.mcp_servers ?? [])
             .filter((s) => s.enabled)
             .map(({ enabled: _, ...rest }) => rest),
+          // Template variables: use joined user's name when available
+          template_variables: {
+            username: usernameValue,
+            ...(typeof settings.llm.template_variables === "object" &&
+            settings.llm.template_variables != null
+              ? settings.llm.template_variables
+              : {}),
+          },
         }
       : {},
     tts: settings.tts ?? {},
@@ -1579,6 +1609,46 @@ function getMaskedJsonToStore(v: string): string {
   return v;
 }
 
+/** Required top-level keys for a valid custom join payload. */
+const CUSTOM_PAYLOAD_REQUIRED_KEYS = ["name", "properties"] as const;
+
+/**
+ * Validates custom payload JSON and returns formatted string or error.
+ * Ensures valid JSON and required fields (name, properties); recommends properties.llm for agent behavior.
+ */
+function validateAndFormatCustomPayloadJson(
+  raw: string,
+): { success: true; formatted: string; parsed: Record<string, unknown> } | { success: false; error: string } {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return { success: false, error: "JSON is empty." };
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Invalid JSON";
+    return { success: false, error: `Invalid JSON: ${message}` };
+  }
+  if (!parsed || typeof parsed !== "object") {
+    return { success: false, error: "Payload must be a JSON object." };
+  }
+  const obj = parsed as Record<string, unknown>;
+  for (const key of CUSTOM_PAYLOAD_REQUIRED_KEYS) {
+    if (!(key in obj)) {
+      return { success: false, error: `Missing required field: "${key}".` };
+    }
+  }
+  if (typeof obj.name !== "string" || !obj.name.trim()) {
+    return { success: false, error: "Field \"name\" must be a non-empty string." };
+  }
+  if (!obj.properties || typeof obj.properties !== "object") {
+    return { success: false, error: "Field \"properties\" must be an object." };
+  }
+  const formatted = JSON.stringify(parsed, null, 2);
+  return { success: true, formatted, parsed: obj };
+}
+
 const CustomSettingsTabContent: React.FC<CustomSettingsTabContentProps> = ({
   useCustomPayload,
   onDisableCustomPayload,
@@ -1587,13 +1657,15 @@ const CustomSettingsTabContent: React.FC<CustomSettingsTabContentProps> = ({
   isDraftView,
 }) => {
   const agentSettings = useAppStore((state) => state.agentSettings);
+  const localUsername = useAppStore((state) => state.localUsername);
   const [customPayloadJson, setCustomPayloadJson] = React.useState("");
   const [loaded, setLoaded] = React.useState(false);
+  const [validationError, setValidationError] = React.useState<string | null>(null);
 
   // Draft view: always show current agent settings (live). Applied view: load from IDB.
   React.useEffect(() => {
     if (isDraftView) {
-      setCustomPayloadJson(buildJoinPayloadPreview(agentSettings));
+      setCustomPayloadJson(buildJoinPayloadPreview(agentSettings, localUsername));
       setLoaded(true);
       return;
     }
@@ -1606,24 +1678,33 @@ const CustomSettingsTabContent: React.FC<CustomSettingsTabContentProps> = ({
       if (stored?.customPayloadJson?.trim()) {
         setCustomPayloadJson(stored.customPayloadJson);
       } else {
-        setCustomPayloadJson(buildJoinPayloadPreview(agentSettings));
+        setCustomPayloadJson(buildJoinPayloadPreview(agentSettings, localUsername));
       }
       setLoaded(true);
     })();
     return () => {
       cancelled = true;
     };
-  }, [isDraftView, agentSettings]);
+  }, [isDraftView, agentSettings, localUsername]);
 
   const handleJsonChange = React.useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       setCustomPayloadJson(e.target.value);
+      setValidationError(null);
     },
     [],
   );
 
   const handleSaveDraft = React.useCallback(() => {
-    const toStore = getMaskedJsonToStore(customPayloadJson);
+    const result = validateAndFormatCustomPayloadJson(customPayloadJson);
+    if (!result.success) {
+      setValidationError(result.error);
+      showToast(result.error, "error");
+      return;
+    }
+    setValidationError(null);
+    setCustomPayloadJson(result.formatted);
+    const toStore = getMaskedJsonToStore(result.formatted);
     import("@/services/settingsDb").then((m) =>
       m.setCustomAgentSettings({
         useCustomPayload: useCustomPayload,
@@ -1634,9 +1715,29 @@ const CustomSettingsTabContent: React.FC<CustomSettingsTabContentProps> = ({
   }, [customPayloadJson, useCustomPayload]);
 
   const handleApply = React.useCallback(() => {
-    const toStore = getMaskedJsonToStore(customPayloadJson);
+    const result = validateAndFormatCustomPayloadJson(customPayloadJson);
+    if (!result.success) {
+      setValidationError(result.error);
+      showToast(result.error, "error");
+      return;
+    }
+    setValidationError(null);
+    setCustomPayloadJson(result.formatted);
+    const toStore = getMaskedJsonToStore(result.formatted);
     onApplyCustomPayload(toStore);
   }, [customPayloadJson, onApplyCustomPayload]);
+
+  const handleFormat = React.useCallback(() => {
+    const result = validateAndFormatCustomPayloadJson(customPayloadJson);
+    if (!result.success) {
+      setValidationError(result.error);
+      showToast(result.error, "error");
+      return;
+    }
+    setValidationError(null);
+    setCustomPayloadJson(result.formatted);
+    showToast("JSON formatted.", "success");
+  }, [customPayloadJson]);
 
   const handleReset = React.useCallback(async () => {
     const stored = await import("@/services/settingsDb").then((m) =>
@@ -1644,10 +1745,10 @@ const CustomSettingsTabContent: React.FC<CustomSettingsTabContentProps> = ({
     );
     setCustomPayloadJson(
       stored?.customPayloadJson?.trim() ??
-        buildJoinPayloadPreview(agentSettings),
+        buildJoinPayloadPreview(agentSettings, localUsername),
     );
     showToast("Restored from saved settings.", "success");
-  }, [agentSettings]);
+  }, [agentSettings, localUsername]);
 
   const handleEnableToggle = React.useCallback(
     (checked: boolean) => {
@@ -1676,6 +1777,13 @@ const CustomSettingsTabContent: React.FC<CustomSettingsTabContentProps> = ({
       )}
 
       <div className="flex flex-wrap items-center gap-3 mb-3 flex-shrink-0">
+        <button
+          type="button"
+          onClick={handleFormat}
+          className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+        >
+          Format
+        </button>
         <button
           type="button"
           onClick={handleSaveDraft}
@@ -1719,13 +1827,29 @@ const CustomSettingsTabContent: React.FC<CustomSettingsTabContentProps> = ({
         </div>
       </div>
 
+      {validationError && (
+        <div className="mb-2 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm flex-shrink-0">
+          {validationError}
+        </div>
+      )}
       <textarea
-        className="flex-1 min-h-[200px] w-full px-3 py-2 font-mono text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-agora-accent-blue focus:border-transparent resize-none"
+        className={`flex-1 min-h-[200px] w-full px-3 py-2 font-mono text-sm rounded-lg focus:ring-2 focus:ring-agora-accent-blue focus:border-transparent resize-none ${
+          validationError
+            ? "bg-red-50/50 dark:bg-red-900/10 border-2 border-red-400 dark:border-red-600"
+            : "bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600"
+        }`}
         value={customPayloadJson}
         onChange={handleJsonChange}
         placeholder='{ "name": "agent-1", "properties": { ... } }'
         spellCheck={false}
+        style={{ tabSize: 2 }}
       />
+      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
+        Required: <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">name</code>,{" "}
+        <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">properties</code>. Use{" "}
+        <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">llm.template_variables.username</code> for{" "}
+        <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">{`{{username}}`}</code> in greetings.
+      </p>
     </div>
   );
 };

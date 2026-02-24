@@ -98,11 +98,10 @@ export const TOUR_STEPS: TourStep[] = [
     hostOnly: true,
   },
   {
-    id: "tour-transcript",
-    title: "Transcript & Chat",
+    id: "tour-participants",
+    title: "Participants",
     description:
-      "When the AI Agent uses RTM mode, open this panel to view the live transcript and send messages to the agent.",
+      "Open the participants list in the left sidebar. The sidebar shows the Live Transcript by default; close the participants panel to return to the transcript.",
     placement: "top",
-    hostOnly: true,
   },
 ];

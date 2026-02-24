@@ -12,12 +12,20 @@ import Whiteboard from "@/components/Whiteboard";
 import Modal from "@/components/common/Modal";
 import Button from "@/components/common/Button";
 import MeetingAuthHeader from "@/components/MeetingAuthHeader";
+import TranscriptSidePanel from "@/components/TranscriptSidePanel";
 import { useAgora } from "@/hooks/useAgora";
 import { useConversationalAI } from "@/hooks/useConversationalAI";
 import type { IAgoraRTCRemoteUser, IRemoteVideoTrack } from "agora-rtc-sdk-ng";
-import { MdWbSunny, MdDarkMode, MdTimer, MdHelpOutline } from "react-icons/md";
+import {
+  MdWbSunny,
+  MdDarkMode,
+  MdTimer,
+  MdHelpOutline,
+  MdClose,
+} from "react-icons/md";
 import { useTour } from "@/hooks/useTour";
 import { TourOverlay } from "@/components/FeatureTour";
+import useWhiteboardCommands from "@/hooks/useWhiteboardCommands";
 
 const SESSION_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
@@ -63,7 +71,10 @@ function AvatarVideoTile({
         className="absolute inset-0 w-full h-full rounded-lg bg-black [&_video]:!object-contain [&_video]:!w-full [&_video]:!h-full"
         aria-hidden
       />
-      <div className="absolute inset-0 rounded-lg bg-gradient-to-t from-black/25 via-transparent to-black/5 pointer-events-none" aria-hidden />
+      <div
+        className="absolute inset-0 rounded-lg bg-gradient-to-t from-black/25 via-transparent to-black/5 pointer-events-none"
+        aria-hidden
+      />
       <div className="absolute bottom-2 left-2 right-2 z-10 flex justify-start">
         <div className="w-fit max-w-full bg-gray-900/80 dark:bg-gray-800/80 backdrop-blur-sm px-3 py-1.5 rounded-md text-sm shadow-md">
           <span className="font-medium truncate block">{agentName}</span>
@@ -109,6 +120,7 @@ const VideoCallScreen: React.FC = () => {
   } = useAppStore();
 
   const [remainingMs, setRemainingMs] = useState<number>(SESSION_DURATION_MS);
+  const [isParticipantPanelOpen, setIsParticipantPanelOpen] = useState(false);
 
   useEffect(() => {
     if (!callActive) {
@@ -148,7 +160,7 @@ const VideoCallScreen: React.FC = () => {
     Object.keys(remoteParticipants).filter(
       (uid) =>
         uid !== String(localUID) &&
-        (screenShareUid == null || uid !== screenShareUid)
+        (screenShareUid == null || uid !== screenShareUid),
     ).length;
 
   const {
@@ -166,6 +178,9 @@ const VideoCallScreen: React.FC = () => {
 
   const tour = useTour();
 
+  // Poll for AI whiteboard commands when both whiteboard and agent are active
+  useWhiteboardCommands();
+
   // Initialize conversational AI hook for transcript handling
   const { sendChatMessage } = useConversationalAI({
     rtcClient,
@@ -180,35 +195,38 @@ const VideoCallScreen: React.FC = () => {
     (uid: string) => {
       sendHostControlRequest(uid, "mute", "audio");
     },
-    [sendHostControlRequest]
+    [sendHostControlRequest],
   );
 
   const handleMuteVideo = useCallback(
     (uid: string) => {
       sendHostControlRequest(uid, "mute", "video");
     },
-    [sendHostControlRequest]
+    [sendHostControlRequest],
   );
 
   const handleUnmuteAudio = useCallback(
     (uid: string) => {
       sendHostControlRequest(uid, "unmute", "audio");
     },
-    [sendHostControlRequest]
+    [sendHostControlRequest],
   );
 
   const handleUnmuteVideo = useCallback(
     (uid: string) => {
       sendHostControlRequest(uid, "unmute", "video");
     },
-    [sendHostControlRequest]
+    [sendHostControlRequest],
   );
 
   return (
     <div className="flex flex-col h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-300">
       {/* Top Bar */}
       <div className="flex items-center bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white p-4 text-lg shadow-md transition-colors duration-300">
-        <span data-tour="tour-meeting-name" className="font-bold text-xl font-syne">
+        <span
+          data-tour="tour-meeting-name"
+          className="font-bold text-xl font-syne"
+        >
           Meeting: {meetingName || channelId}
         </span>
         <div className="flex items-center gap-3 ml-auto">
@@ -231,7 +249,10 @@ const VideoCallScreen: React.FC = () => {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-sm font-medium tabular-nums"
               title="Session ends in 15 minutes; you will be logged out when time runs out."
             >
-              <MdTimer className="w-4 h-4 text-[var(--agora-accent-blue)] shrink-0" aria-hidden />
+              <MdTimer
+                className="w-4 h-4 text-[var(--agora-accent-blue)] shrink-0"
+                aria-hidden
+              />
               {formatRemaining(remainingMs)}
             </span>
           )}
@@ -265,37 +286,65 @@ const VideoCallScreen: React.FC = () => {
 
       {/* Main Content Area */}
       <div className="flex flex-1 overflow-hidden">
+        {/* Left sidebar: default = Live Transcript; optional = Participants (toggle from control bar) */}
         {!useSidebarLayout && (
-          <div className="w-56 bg-gray-200 dark:bg-gray-800 p-4 border-r border-gray-300 dark:border-gray-700 overflow-y-auto hidden sm:block shadow-inner transition-colors duration-300">
-            <strong className="text-xl mb-4 block text-gray-900 dark:text-white">
-              Participants: {participantCount}
-            </strong>
-            <hr className="my-3 border-gray-300 dark:border-gray-600" />
-            <ParticipantListItem
-              name={localUsername}
-              micMuted={audioMuted}
-              videoMuted={videoMuted}
-              isLocal={true}
-            />
-            <hr className="my-3 border-gray-300 dark:border-gray-600" />
-
-            {Object.entries(remoteParticipants)
-              .filter(([uid]) => uid !== String(localUID))
-              .map(([uid, participant]) => (
-                <ParticipantListItem
-                  key={uid}
-                  uid={uid}
-                  name={participant.name}
-                  micMuted={participant.micMuted}
-                  videoMuted={participant.videoMuted}
-                  isLocal={false}
-                  isHost={isHost}
-                  onMuteAudio={handleMuteAudio}
-                  onMuteVideo={handleMuteVideo}
-                  onUnmuteAudio={handleUnmuteAudio}
-                  onUnmuteVideo={handleUnmuteVideo}
-                />
-              ))}
+          <div
+            className="shrink-0 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 overflow-hidden hidden sm:flex flex-col shadow-inner transition-colors duration-300"
+            style={{ width: 350, minWidth: 350, maxWidth: 350 }}
+          >
+            {isParticipantPanelOpen ? (
+              <>
+                <div className="flex items-center justify-between gap-2 p-3 border-b border-gray-200 dark:border-gray-700 shrink-0 bg-white dark:bg-gray-900 w-full min-w-0">
+                  <strong className="text-sm text-gray-900 dark:text-white truncate">
+                    Participants: {participantCount}
+                  </strong>
+                  <button
+                    onClick={() => setIsParticipantPanelOpen(false)}
+                    className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 transition-colors shrink-0"
+                    title="Close and show Live Transcript"
+                  >
+                    <MdClose className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-3 min-w-0 w-full bg-gray-50 dark:bg-gray-900/50">
+                  <ParticipantListItem
+                    name={localUsername}
+                    micMuted={audioMuted}
+                    videoMuted={videoMuted}
+                    isLocal={true}
+                  />
+                  <hr className="my-3 border-gray-200 dark:border-gray-600" />
+                  {Object.entries(remoteParticipants)
+                    .filter(([uid]) => uid !== String(localUID))
+                    .map(([uid, participant]) => (
+                      <ParticipantListItem
+                        key={uid}
+                        uid={uid}
+                        name={participant.name}
+                        micMuted={participant.micMuted}
+                        videoMuted={participant.videoMuted}
+                        isLocal={false}
+                        isHost={isHost}
+                        onMuteAudio={handleMuteAudio}
+                        onMuteVideo={handleMuteVideo}
+                        onUnmuteAudio={handleUnmuteAudio}
+                        onUnmuteVideo={handleUnmuteVideo}
+                      />
+                    ))}
+                </div>
+              </>
+            ) : (
+              <TranscriptSidePanel
+                isOpen={true}
+                onClose={() => {}}
+                embedded={true}
+                onSendMessage={
+                  transcriptionMode === "rtm" && agentRtcUid
+                    ? sendChatMessage
+                    : undefined
+                }
+              />
+            )}
           </div>
         )}
 
@@ -360,7 +409,7 @@ const VideoCallScreen: React.FC = () => {
                       track={videoMuted ? null : localTracks.videoTrack}
                       micMuted={audioMuted}
                       videoMuted={!localTracks.videoTrack || videoMuted}
-                    />
+                    />,
                   );
                 }
 
@@ -370,7 +419,8 @@ const VideoCallScreen: React.FC = () => {
                 // Exclude agent, avatar, and screen-share UIDs from "other" tiles
                 const agentAndAvatarUids = new Set<string>();
                 if (agentRtcUid) agentAndAvatarUids.add(agentRtcUid);
-                if (agentAvatarRtcUid) agentAndAvatarUids.add(agentAvatarRtcUid);
+                if (agentAvatarRtcUid)
+                  agentAndAvatarUids.add(agentAvatarRtcUid);
                 if (screenShareUid) agentAndAvatarUids.add(screenShareUid);
                 remoteUsers.forEach((user: IAgoraRTCRemoteUser) => {
                   const uidStr = String(user.uid);
@@ -385,7 +435,7 @@ const VideoCallScreen: React.FC = () => {
                       track={user.videoTrack || null}
                       micMuted={participantInfo?.micMuted || true}
                       videoMuted={participantInfo?.videoMuted || true}
-                    />
+                    />,
                   );
                 });
 
@@ -397,7 +447,7 @@ const VideoCallScreen: React.FC = () => {
                         key={`agent-avatar-${agentRtcUid}`}
                         videoTrack={hookAvatarVideoTrack}
                         agentName={agentSettings?.name || "AI Agent"}
-                      />
+                      />,
                     );
                   } else {
                     allTiles.push(
@@ -408,8 +458,10 @@ const VideoCallScreen: React.FC = () => {
                         agentName={agentSettings?.name || "AI Agent"}
                         transcriptionMode={transcriptionMode}
                         videoTrack={null}
-                        avatarWaiting={!!(agentAvatarRtcUid && !hookAvatarVideoTrack)}
-                      />
+                        avatarWaiting={
+                          !!(agentAvatarRtcUid && !hookAvatarVideoTrack)
+                        }
+                      />,
                     );
                   }
                 }
@@ -486,15 +538,20 @@ const VideoCallScreen: React.FC = () => {
               {remoteUsers
                 .filter((user) => {
                   const uidStr = String(user.uid);
-                  if (activeScreenShareUid && uidStr === activeScreenShareUid) return false;
+                  if (activeScreenShareUid && uidStr === activeScreenShareUid)
+                    return false;
                   if (screenShareUid && uidStr === screenShareUid) return false;
                   if (agentRtcUid && uidStr === agentRtcUid) return false;
-                  if (agentAvatarRtcUid && uidStr === agentAvatarRtcUid) return false;
+                  if (agentAvatarRtcUid && uidStr === agentAvatarRtcUid)
+                    return false;
                   if (isAgentActive && agentAvatarRtcUid && user.videoTrack) {
-                    const dedicated = remoteUsers.find((u) => String(u.uid) === agentAvatarRtcUid);
+                    const dedicated = remoteUsers.find(
+                      (u) => String(u.uid) === agentAvatarRtcUid,
+                    );
                     if (!dedicated?.videoTrack) {
                       const fallback = remoteUsers.find((u) => u.videoTrack);
-                      if (fallback && String(fallback.uid) === uidStr) return false;
+                      if (fallback && String(fallback.uid) === uidStr)
+                        return false;
                     }
                   }
                   return true;
@@ -533,7 +590,9 @@ const VideoCallScreen: React.FC = () => {
                       agentName={agentSettings?.name || "AI Agent"}
                       transcriptionMode={transcriptionMode}
                       videoTrack={null}
-                      avatarWaiting={!!(agentAvatarRtcUid && !hookAvatarVideoTrack)}
+                      avatarWaiting={
+                        !!(agentAvatarRtcUid && !hookAvatarVideoTrack)
+                      }
                     />
                   )}
                 </div>
@@ -543,7 +602,13 @@ const VideoCallScreen: React.FC = () => {
         )}
       </div>
 
-      <Controls sendChatMessage={sendChatMessage} />
+      <Controls
+        sendChatMessage={sendChatMessage}
+        onToggleParticipantPanel={
+          !useSidebarLayout ? () => setIsParticipantPanelOpen((prev) => !prev) : undefined
+        }
+        isParticipantPanelOpen={isParticipantPanelOpen}
+      />
 
       <TourOverlay {...tour} />
 
