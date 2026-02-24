@@ -81,6 +81,7 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
   const hostPassphrase = useAppStore((state) => state.hostPassphrase);
   const viewerPassphrase = useAppStore((state) => state.viewerPassphrase);
   const localUID = useAppStore((state) => state.localUID);
+  const localUsername = useAppStore((state) => state.localUsername);
   const isHost = useAppStore((state) => state.isHost);
 
   const isWhiteboardActive = useAppStore((state) => state.isWhiteboardActive);
@@ -199,6 +200,7 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
               name: string;
               properties: Record<string, unknown>;
             };
+            username?: string;
           }
         | undefined;
       if (useCustom) {
@@ -221,7 +223,7 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
         channelId,
         localUID,
         agentSettings,
-        options,
+        { ...options, username: localUsername || undefined },
       );
       setAgentActive(
         result.agentId,
@@ -249,7 +251,7 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
       );
       setAgentLoading(false);
     }
-  }, [localUID, channelId, agentSettings, setAgentLoading, setAgentActive]);
+  }, [localUID, channelId, localUsername, agentSettings, setAgentLoading, setAgentActive]);
 
   const handleStopAgent = useCallback(async () => {
     if (!agentId) return;

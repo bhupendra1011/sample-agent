@@ -22,6 +22,7 @@ async function handleCustomPayloadJoin(
   channelName: string,
   uid: string,
   customJoinPayload: { name: string; properties: Record<string, unknown> },
+  username?: string,
 ): Promise<NextResponse> {
   const agentUid = 0;
   const tokenExpiration = 3600;
@@ -46,6 +47,14 @@ async function handleCustomPayloadJoin(
   properties.remote_rtc_uids = [String(uid)];
 
   const llm = properties.llm as Record<string, unknown> | undefined;
+  // Inject template_variables.username for greeting (e.g. "Hello {{username}}")
+  if (llm && username != null && username.trim() !== "") {
+    const existing =
+      (typeof llm.template_variables === "object" && llm.template_variables != null
+        ? llm.template_variables
+        : {}) as Record<string, unknown>;
+    llm.template_variables = { ...existing, username: username.trim() };
+  }
   if (llm && shouldInjectServerKey(llm.api_key as string)) {
     llm.api_key = (
       process.env.LLM_API_KEY ||
@@ -150,12 +159,11 @@ async function handleCustomPayloadJoin(
       const keyToInject =
         (params.api_key as string) ?? (params.anam_api_key as string);
       if (shouldInjectServerKey(keyToInject)) {
-        const injected =
-          (
-            process.env.ANAM_API_KEY ||
-            process.env.NEXT_PUBLIC_ANAM_API_KEY ||
-            ""
-          ).trim();
+        const injected = (
+          process.env.ANAM_API_KEY ||
+          process.env.NEXT_PUBLIC_ANAM_API_KEY ||
+          ""
+        ).trim();
         params.api_key = injected;
         params.anam_api_key = injected;
       }
@@ -231,8 +239,14 @@ async function handleCustomPayloadJoin(
     "[Agent invite] Custom payload join request:",
     JSON.stringify(sanitized, null, 2),
   );
-  if (process.env.AGORA_LOG_PAYLOAD_VERBOSE === "1" || process.env.AGORA_LOG_PAYLOAD_VERBOSE === "true") {
-    console.log("[Agent invite] [VERBOSE] Full request payload (no masking):", JSON.stringify(joinPayload, null, 2));
+  if (
+    process.env.AGORA_LOG_PAYLOAD_VERBOSE === "1" ||
+    process.env.AGORA_LOG_PAYLOAD_VERBOSE === "true"
+  ) {
+    console.log(
+      "[Agent invite] [VERBOSE] Full request payload (no masking):",
+      JSON.stringify(joinPayload, null, 2),
+    );
   }
 
   const agoraResponse = await fetch(apiUrl, {
@@ -271,6 +285,8 @@ type InviteBody = {
   agentSettings: AgentSettings;
   useCustomPayload?: boolean;
   customJoinPayload?: { name: string; properties: Record<string, unknown> };
+  /** User display name; injected as llm.template_variables.username for greeting */
+  username?: string;
 };
 
 export async function POST(request: NextRequest) {
@@ -282,6 +298,7 @@ export async function POST(request: NextRequest) {
       agentSettings,
       useCustomPayload,
       customJoinPayload,
+      username,
     } = body;
 
     if (!channelName || !uid) {
@@ -296,7 +313,12 @@ export async function POST(request: NextRequest) {
       customJoinPayload?.name &&
       customJoinPayload?.properties
     ) {
-      return await handleCustomPayloadJoin(channelName, uid, customJoinPayload);
+      return await handleCustomPayloadJoin(
+        channelName,
+        uid,
+        customJoinPayload,
+        username,
+      );
     }
 
     if (!agentSettings) {
@@ -390,6 +412,16 @@ export async function POST(request: NextRequest) {
       llmPayload.system_messages = llm.system_messages;
     }
 
+    const displayName =
+      username != null && username !== "" ? username : "Guest";
+    llmPayload.template_variables = {
+      ...(typeof llm.template_variables === "object" &&
+      llm.template_variables != null
+        ? llm.template_variables
+        : {}),
+      username: displayName,
+    };
+
     if (llm.greeting_message) {
       llmPayload.greeting_message = llm.greeting_message;
     }
@@ -414,7 +446,9 @@ export async function POST(request: NextRequest) {
     llmPayload.input_modalities = llm.input_modalities ?? ["text", "image"];
 
     // Build MCP servers for LLM (tool invocation) — only include enabled servers
-    const enabledMcpServers = (llm.mcp_servers ?? []).filter((s) => s.enabled !== false);
+    const enabledMcpServers = (llm.mcp_servers ?? []).filter(
+      (s) => s.enabled !== false,
+    );
     if (enabledMcpServers.length > 0) {
       llmPayload.mcp_servers = enabledMcpServers.map((s) => {
         // Auto-inject channelName into query params for whiteboard MCP servers
@@ -449,7 +483,9 @@ export async function POST(request: NextRequest) {
         return {
           ...rest,
           endpoint,
-          ...(Object.keys(mergedHeaders).length > 0 && { headers: mergedHeaders }),
+          ...(Object.keys(mergedHeaders).length > 0 && {
+            headers: mergedHeaders,
+          }),
         };
       });
     }
@@ -547,41 +583,46 @@ export async function POST(request: NextRequest) {
     }
 
     // Add turn detection (Agora v2 config format)
-    const legacyTurn = turn_detection as { silence_duration_ms?: number; mode?: string } | undefined;
+    const legacyTurn = turn_detection as
+      | { silence_duration_ms?: number; mode?: string }
+      | undefined;
     const turnDetectionNormalized =
       turn_detection && (turn_detection as TurnDetectionConfig).config
         ? (turn_detection as TurnDetectionConfig)
         : turn_detection && !(turn_detection as TurnDetectionConfig).config
-        ? ({
-            mode: "default" as const,
-            config: {
-              speech_threshold: 0.5,
-              start_of_speech: {
-                mode: "vad" as const,
-                vad_config: {
-                  interrupt_duration_ms: 160,
-                  speaking_interrupt_duration_ms: 160,
-                  prefix_padding_ms: 800,
+          ? ({
+              mode: "default" as const,
+              config: {
+                speech_threshold: 0.5,
+                start_of_speech: {
+                  mode: "vad" as const,
+                  vad_config: {
+                    interrupt_duration_ms: 160,
+                    speaking_interrupt_duration_ms: 160,
+                    prefix_padding_ms: 800,
+                  },
+                },
+                end_of_speech: {
+                  mode: (legacyTurn?.mode === "semantic"
+                    ? "semantic"
+                    : "vad") as "vad" | "semantic",
+                  ...(legacyTurn?.mode === "semantic"
+                    ? {
+                        semantic_config: {
+                          silence_duration_ms: 320,
+                          max_wait_ms: 3000,
+                        },
+                      }
+                    : {
+                        vad_config: {
+                          silence_duration_ms:
+                            legacyTurn?.silence_duration_ms ?? 640,
+                        },
+                      }),
                 },
               },
-              end_of_speech: {
-                mode: (legacyTurn?.mode === "semantic" ? "semantic" : "vad") as "vad" | "semantic",
-                ...(legacyTurn?.mode === "semantic"
-                  ? {
-                      semantic_config: {
-                        silence_duration_ms: 320,
-                        max_wait_ms: 3000,
-                      },
-                    }
-                  : {
-                      vad_config: {
-                        silence_duration_ms: legacyTurn?.silence_duration_ms ?? 640,
-                      },
-                    }),
-              },
-            },
-          } as TurnDetectionConfig)
-        : null;
+            } as TurnDetectionConfig)
+          : null;
     // Only include turn_detection when user has enabled it (draft vs apply)
     if (agentSettings.enable_turn_detection && turnDetectionNormalized) {
       const td = turnDetectionNormalized;
@@ -591,62 +632,77 @@ export async function POST(request: NextRequest) {
       const turnPayload: Record<string, unknown> = {
         mode: td.mode ?? "default",
         config: {
-          ...(cfg.speech_threshold != null && { speech_threshold: cfg.speech_threshold }),
-          ...(start && (() => {
-            const base: Record<string, unknown> = { mode: start.mode };
-            if (start.mode === "vad" && start.vad_config) {
-              base.vad_config = {
-                interrupt_duration_ms: start.vad_config.interrupt_duration_ms ?? 160,
-                speaking_interrupt_duration_ms: start.vad_config.speaking_interrupt_duration_ms ?? 160,
-                prefix_padding_ms: start.vad_config.prefix_padding_ms ?? 800,
-              };
-            }
-            if (start.mode === "keywords" && start.keywords_config) {
-              base.keywords_config = {
-                interrupt_duration_ms: start.keywords_config.interrupt_duration_ms ?? 160,
-                prefix_padding_ms: start.keywords_config.prefix_padding_ms ?? 800,
-                ...(start.keywords_config.triggered_keywords?.length && {
-                  triggered_keywords: start.keywords_config.triggered_keywords,
-                }),
-              };
-            }
-            if (start.mode === "disabled" && start.disabled_config) {
-              base.disabled_config = {
-                strategy: start.disabled_config.strategy ?? "append",
-              };
-            }
-            return { start_of_speech: base };
-          })()),
-          ...(end && (() => {
-            const base: Record<string, unknown> = { mode: end.mode };
-            if (end.mode === "vad" && end.vad_config) {
-              base.vad_config = {
-                silence_duration_ms: end.vad_config.silence_duration_ms ?? 640,
-              };
-            }
-            if (end.mode === "semantic" && end.semantic_config) {
-              base.semantic_config = {
-                silence_duration_ms: end.semantic_config.silence_duration_ms ?? 320,
-                max_wait_ms: end.semantic_config.max_wait_ms ?? 3000,
-              };
-            }
-            return { end_of_speech: base };
-          })()),
+          ...(cfg.speech_threshold != null && {
+            speech_threshold: cfg.speech_threshold,
+          }),
+          ...(start &&
+            (() => {
+              const base: Record<string, unknown> = { mode: start.mode };
+              if (start.mode === "vad" && start.vad_config) {
+                base.vad_config = {
+                  interrupt_duration_ms:
+                    start.vad_config.interrupt_duration_ms ?? 160,
+                  speaking_interrupt_duration_ms:
+                    start.vad_config.speaking_interrupt_duration_ms ?? 160,
+                  prefix_padding_ms: start.vad_config.prefix_padding_ms ?? 800,
+                };
+              }
+              if (start.mode === "keywords" && start.keywords_config) {
+                base.keywords_config = {
+                  interrupt_duration_ms:
+                    start.keywords_config.interrupt_duration_ms ?? 160,
+                  prefix_padding_ms:
+                    start.keywords_config.prefix_padding_ms ?? 800,
+                  ...(start.keywords_config.triggered_keywords?.length && {
+                    triggered_keywords:
+                      start.keywords_config.triggered_keywords,
+                  }),
+                };
+              }
+              if (start.mode === "disabled" && start.disabled_config) {
+                base.disabled_config = {
+                  strategy: start.disabled_config.strategy ?? "append",
+                };
+              }
+              return { start_of_speech: base };
+            })()),
+          ...(end &&
+            (() => {
+              const base: Record<string, unknown> = { mode: end.mode };
+              if (end.mode === "vad" && end.vad_config) {
+                base.vad_config = {
+                  silence_duration_ms:
+                    end.vad_config.silence_duration_ms ?? 640,
+                };
+              }
+              if (end.mode === "semantic" && end.semantic_config) {
+                base.semantic_config = {
+                  silence_duration_ms:
+                    end.semantic_config.silence_duration_ms ?? 320,
+                  max_wait_ms: end.semantic_config.max_wait_ms ?? 3000,
+                };
+              }
+              return { end_of_speech: base };
+            })()),
         },
       };
       propertiesPayload.turn_detection = turnPayload;
     }
 
     // Add filler words when enabled
-    const filler_words = agentSettings.filler_words as FillerWordsConfig | undefined;
+    const filler_words = agentSettings.filler_words as
+      | FillerWordsConfig
+      | undefined;
     if (filler_words?.enable) {
-      const responseWaitMs = filler_words.trigger?.fixed_time_config?.response_wait_ms ?? 1500;
+      const responseWaitMs =
+        filler_words.trigger?.fixed_time_config?.response_wait_ms ?? 1500;
       const phrases = filler_words.content?.static_config?.phrases ?? [
         "Please wait.",
         "Okay.",
         "Uh-huh.",
       ];
-      const selectionRule = filler_words.content?.static_config?.selection_rule ?? "shuffle";
+      const selectionRule =
+        filler_words.content?.static_config?.selection_rule ?? "shuffle";
       propertiesPayload.filler_words = {
         enable: true,
         trigger: {
@@ -656,7 +712,9 @@ export async function POST(request: NextRequest) {
         content: {
           mode: "static",
           static_config: {
-            phrases: phrases.length ? phrases : ["Please wait.", "Okay.", "Uh-huh."],
+            phrases: phrases.length
+              ? phrases
+              : ["Please wait.", "Okay.", "Uh-huh."],
             selection_rule: selectionRule,
           },
         },
@@ -939,7 +997,10 @@ export async function POST(request: NextRequest) {
     });
     console.log("Payload:", JSON.stringify(sanitizedPayload, null, 2));
     // When AGORA_LOG_PAYLOAD_VERBOSE=1, log full payload (no masking) for verification
-    if (process.env.AGORA_LOG_PAYLOAD_VERBOSE === "1" || process.env.AGORA_LOG_PAYLOAD_VERBOSE === "true") {
+    if (
+      process.env.AGORA_LOG_PAYLOAD_VERBOSE === "1" ||
+      process.env.AGORA_LOG_PAYLOAD_VERBOSE === "true"
+    ) {
       console.log("\n[VERBOSE] Full request payload (no masking):");
       console.log(JSON.stringify(joinPayload, null, 2));
     }

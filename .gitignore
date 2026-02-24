@@ -28,8 +28,10 @@ out/
 *.sln
 *.sw?
 
-# Environments
+# Environments (never commit secrets)
 .env
+.env.*
+!.env.example
 .venv
 
 # TypeScript build artifacts (don't compile with tsc directly)
