@@ -1,9 +1,9 @@
 /**
  * Skeleton loading screen shown during the transition from
  * Create/Join Meeting to the Video Call screen. Mirrors the
- * VideoCallScreen layout with shimmer effects so the user sees
- * a seamless "preparing your meeting" experience instead of a
- * white flash.
+ * VideoCallScreen layout (left Live Transcript panel + video area + controls)
+ * with shimmer effects so the user sees a seamless "preparing your meeting"
+ * experience instead of a white flash.
  *
  * Pure HTML + Tailwind — no hooks or client state — so it works
  * as both a Server Component (loading.tsx) and a Client Component
@@ -54,27 +54,58 @@ export default function MeetingLoadingSkeleton() {
 
       {/* ── Main Content ── */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar (hidden on mobile) */}
-        <div className="w-56 bg-gray-200 dark:bg-gray-800 p-4 border-r border-gray-300 dark:border-gray-700 hidden sm:block shadow-inner transition-colors duration-300">
-          {/* "Participants" label */}
-          <ShimmerBlock
-            className="h-6 w-32 rounded bg-gray-300 dark:bg-gray-700 mb-4"
-          />
-          <hr className="my-3 border-gray-300 dark:border-gray-600" />
-
-          {/* Participant placeholders */}
-          {[0, 1].map((i) => (
-            <div key={i} className="flex items-center gap-2 mb-3">
+        {/* Left sidebar: Live Transcript skeleton (matches VideoCallScreen default) */}
+        <div
+          className="shrink-0 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 hidden sm:flex flex-col shadow-inner transition-colors duration-300 overflow-hidden"
+          style={{ width: 350, minWidth: 350, maxWidth: 350 }}
+        >
+          {/* Transcript header */}
+          <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
+            <div className="min-w-0">
               <ShimmerBlock
-                className="h-8 w-8 rounded-full bg-gray-300 dark:bg-gray-700 shrink-0"
-                delay={i * 0.3}
+                className="h-5 w-32 rounded bg-gray-300 dark:bg-gray-700 mb-2"
+                delay={0}
               />
               <ShimmerBlock
-                className="h-4 flex-1 rounded bg-gray-300 dark:bg-gray-700"
-                delay={i * 0.3 + 0.1}
+                className="h-5 w-24 rounded-full bg-gray-300 dark:bg-gray-700"
+                delay={0.1}
               />
             </div>
-          ))}
+          </div>
+          {/* Render mode bar */}
+          <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between">
+            <ShimmerBlock
+              className="h-4 w-20 rounded bg-gray-300 dark:bg-gray-700"
+              delay={0.2}
+            />
+            <div className="flex gap-1">
+              <ShimmerBlock
+                className="h-7 w-7 rounded bg-gray-300 dark:bg-gray-700"
+                delay={0.25}
+              />
+              <ShimmerBlock
+                className="h-7 w-7 rounded bg-gray-300 dark:bg-gray-700"
+                delay={0.3}
+              />
+              <ShimmerBlock
+                className="h-7 w-10 rounded bg-gray-300 dark:bg-gray-700"
+                delay={0.35}
+              />
+            </div>
+          </div>
+          {/* Transcript content area */}
+          <div className="flex-1 overflow-hidden px-4 py-4 bg-gray-50 dark:bg-gray-900/50 min-w-0">
+            <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500 space-y-2">
+              <ShimmerBlock
+                className="h-4 w-44 rounded bg-gray-300 dark:bg-gray-700"
+                delay={0.4}
+              />
+              <ShimmerBlock
+                className="h-3 w-56 rounded bg-gray-300 dark:bg-gray-700"
+                delay={0.5}
+              />
+            </div>
+          </div>
         </div>
 
         {/* Video area */}
