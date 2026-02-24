@@ -174,6 +174,14 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
                 >
                   Transmission: {transcriptionMode.toUpperCase()}
                 </span>
+                {transcriptionMode === "rtc" && (
+                  <span
+                    className="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+                    title="Chat is only available in RTM mode"
+                  >
+                    Transcript only
+                  </span>
+                )}
               </div>
             </div>
           </div>

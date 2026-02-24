@@ -443,7 +443,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Image modality: default to text + image so agent can receive picture messages
-    llmPayload.input_modalities = llm.input_modalities ?? ["text", "image"];
+    // When RTM is explicitly disabled (RTC mode), use text-only so we don't force RTM
+    const rtmExplicitlyDisabled = advanced_features?.enable_rtm === false;
+    llmPayload.input_modalities =
+      rtmExplicitlyDisabled ? ["text"] : (llm.input_modalities ?? ["text", "image"]);
 
     // Build MCP servers for LLM (tool invocation) — only include enabled servers
     const enabledMcpServers = (llm.mcp_servers ?? []).filter(
@@ -733,12 +736,14 @@ export async function POST(request: NextRequest) {
       propertiesPayload.sal = salPayload;
     }
 
-    // When image modality is enabled, RTM is required for picture messages
+    // When image modality is enabled, RTM is required for picture messages.
+    // When user explicitly disabled RTM (RTC mode), we already set input_modalities to ["text"] above.
     const inputModalities = (llmPayload.input_modalities as (
       | "text"
       | "image"
     )[]) ?? ["text", "image"];
-    const needsRtmForImage = inputModalities.includes("image");
+    const needsRtmForImage =
+      !rtmExplicitlyDisabled && inputModalities.includes("image");
 
     // Add advanced features; auto-enable tools when any enabled MCP server is configured
     const hasMcpServers = enabledMcpServers.length > 0;
@@ -756,8 +761,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Add agent parameters
-    // When RTM is enabled, set data_channel to "rtm" for transcript and picture messaging
-    if (parameters || advanced_features?.enable_rtm || needsRtmForImage) {
+    // data_channel: "datastream" when RTM is disabled (RTC transcript), "rtm" when RTM is enabled (chat + transcript)
+    const useRtm = needsRtmForImage || advanced_features?.enable_rtm;
+    if (parameters || advanced_features || needsRtmForImage) {
       propertiesPayload.parameters = {
         ...(parameters?.enable_farewell !== undefined && {
           enable_farewell: parameters.enable_farewell,
@@ -765,10 +771,7 @@ export async function POST(request: NextRequest) {
         ...(parameters?.farewell_phrases && {
           farewell_phrases: parameters.farewell_phrases,
         }),
-        // Set data_channel to RTM when RTM is enabled (required for RTM transcript mode and picture messages)
-        ...((needsRtmForImage || advanced_features?.enable_rtm) && {
-          data_channel: "rtm",
-        }),
+        data_channel: useRtm ? "rtm" : "datastream",
       };
     }
 

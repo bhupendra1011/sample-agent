@@ -410,15 +410,17 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
         <div className="flex-1 flex justify-end items-center gap-2">
           {isHost && (
             <div className="flex items-center space-x-2">
-              {transcriptionMode === "rtm" && (
+              {(transcriptionMode === "rtm" || transcriptionMode === "rtc") && (
                 <button
                   data-tour="tour-transcript"
                   onClick={() => setIsTranscriptPanelOpen(true)}
                   className="flex items-center justify-center w-10 h-10 rounded-lg text-gray-800 dark:text-white transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-agora hover:bg-gray-400 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                   title={
-                    isAgentActive
-                      ? "Open Transcript"
-                      : "Transcript (start agent to chat)"
+                    !isAgentActive
+                      ? "Transcript (start agent to view)"
+                      : transcriptionMode === "rtm"
+                        ? "Open Transcript"
+                        : "Open Transcript (view only)"
                   }
                   disabled={!isAgentActive}
                 >
