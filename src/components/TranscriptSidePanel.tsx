@@ -10,12 +10,15 @@ interface TranscriptSidePanelProps {
   isOpen: boolean;
   onClose: () => void;
   onSendMessage?: (text: string, image?: File) => void;
+  /** When true, render inline in a sidebar (no overlay, no close button). */
+  embedded?: boolean;
 }
 
 const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
   isOpen,
   onClose,
   onSendMessage,
+  embedded = false,
 }) => {
   const transcriptItems = useAppStore((state) => state.transcriptItems);
   const userSentMessages = useAppStore((state) => state.userSentMessages);
@@ -107,7 +110,7 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen && !embedded) return null;
 
   const isRTMMode = transcriptionMode === "rtm";
   const canSendMessages = isRTMMode && agentRtcUid && onSendMessage;
@@ -149,24 +152,31 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/50 z-40 transition-opacity"
-        onClick={onClose}
-      />
+      {!embedded && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 transition-opacity"
+          onClick={onClose}
+        />
+      )}
 
-      {/* Sidebar */}
-      <div className="fixed right-0 top-0 h-full w-[480px] max-w-full bg-white dark:bg-gray-900 z-50 shadow-2xl flex flex-col transition-colors duration-300">
+      {/* Sidebar - when embedded, fill container; otherwise fixed right panel */}
+      <div
+        className={
+          embedded
+            ? "h-full w-full flex flex-col min-w-0 transition-colors duration-300 bg-white dark:bg-gray-900"
+            : "fixed right-0 top-0 h-full w-[480px] max-w-full bg-white dark:bg-gray-900 z-50 shadow-2xl flex flex-col transition-colors duration-300"
+        }
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center gap-3">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+        <div className={`flex items-center justify-between ${embedded ? "px-4" : "px-6"} py-4 border-b border-gray-200 dark:border-gray-700 shrink-0`}>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
                 Live Transcript
               </h2>
-              <div className="flex items-center gap-2 mt-1">
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <span
-                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                  className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${
                     transcriptionMode === "rtm"
                       ? "bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400"
                       : "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
@@ -176,7 +186,7 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
                 </span>
                 {transcriptionMode === "rtc" && (
                   <span
-                    className="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+                    className="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 shrink-0"
                     title="Chat is only available in RTM mode"
                   >
                     Transcript only
@@ -185,16 +195,18 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
               </div>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-          >
-            <MdClose className="text-gray-500 dark:text-gray-400" size={24} />
-          </button>
+          {!embedded && (
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors shrink-0"
+            >
+              <MdClose className="text-gray-500 dark:text-gray-400" size={24} />
+            </button>
+          )}
         </div>
 
         {/* Render Mode Toggle */}
-        <div className="px-6 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between">
+        <div className={`${embedded ? "px-4" : "px-6"} py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between`}>
           <span className="text-xs text-gray-600 dark:text-gray-400">
             Render Mode:
           </span>
@@ -239,7 +251,7 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
         <div
           ref={scrollRef}
           onScroll={handleScroll}
-          className="flex-1 overflow-y-auto px-6 py-4 space-y-4 bg-gray-50 dark:bg-gray-900/50 scroll-smooth"
+          className={`flex-1 overflow-y-auto overflow-x-hidden py-4 space-y-4 bg-gray-50 dark:bg-gray-900/50 scroll-smooth min-w-0 ${embedded ? "px-4" : "px-6"}`}
         >
           {displayItems.length === 0 && !currentInProgressMessage ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500">
@@ -373,7 +385,7 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
 
         {/* RTM Mode: Message Input */}
         {canSendMessages && (
-          <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+          <div className={`${embedded ? "px-4" : "px-6"} py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900`}>
             <div className="space-y-3">
               {imageFile && (
                 <div className="flex items-center gap-2 p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">

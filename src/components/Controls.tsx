@@ -13,9 +13,8 @@ import {
   MdShare,
   MdDraw,
   MdSettings,
-  MdCreate,
   MdSync,
-  MdMessage,
+  MdPeople,
 } from "react-icons/md";
 import { useAgora } from "@/hooks/useAgora";
 import { showToast } from "@/services/uiService";
@@ -28,7 +27,6 @@ import { sanitizeCustomJoinPayload } from "@/utils/customPayloadSanitize";
 import Modal from "@/components/common/Modal";
 import CopyButton from "@/components/common/CopyButton";
 import SettingsSidebar from "@/components/SettingsSidebar";
-import TranscriptSidePanel from "@/components/TranscriptSidePanel";
 import AgentStatusBadge from "@/components/AgentStatusBadge";
 import type { AgentSettings } from "@/types/agora";
 
@@ -69,9 +67,17 @@ function hasRestartRequiredChanges(
 
 interface ControlsProps {
   sendChatMessage?: (text: string, image?: File) => Promise<void>;
+  /** Toggle the participant panel in the left sidebar (open/close). */
+  onToggleParticipantPanel?: () => void;
+  /** Whether the participant panel is currently open (for control bar button state). */
+  isParticipantPanelOpen?: boolean;
 }
 
-const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
+const Controls: React.FC<ControlsProps> = ({
+  sendChatMessage: _sendChatMessage,
+  onToggleParticipantPanel,
+  isParticipantPanelOpen = false,
+}) => {
   const audioMuted = useAppStore((state) => state.audioMuted);
   const videoMuted = useAppStore((state) => state.videoMuted);
   const isScreenSharing = useAppStore((state) => state.isScreenSharing);
@@ -111,12 +117,8 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
     toggleLocalVideo,
   } = useAgora();
 
-  const transcriptionMode = useAppStore((state) => state.transcriptionMode);
-  const agentRtcUid = useAppStore((state) => state.agentRtcUid);
-
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isSettingsPanelOpen, setIsSettingsPanelOpen] = useState(false);
-  const [isTranscriptPanelOpen, setIsTranscriptPanelOpen] = useState(false);
 
   const handleToggleScreenShare = async () => {
     if (isScreenSharing) {
@@ -406,27 +408,28 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
           </button>
         </div>
 
-        {/* Right side - Agent controls: message icon before Start/Stop to avoid layout shift when RTM enabled */}
+        {/* Right side - Agent controls; people icon toggles left sidebar participant panel */}
         <div className="flex-1 flex justify-end items-center gap-2">
+          {onToggleParticipantPanel && (
+            <button
+              data-tour="tour-participants"
+              onClick={onToggleParticipantPanel}
+              className={`flex items-center justify-center w-10 h-10 rounded-lg transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-agora ${
+                isParticipantPanelOpen
+                  ? "bg-agora text-white hover:opacity-90"
+                  : "text-gray-800 dark:text-white hover:bg-gray-400 dark:hover:bg-gray-600"
+              }`}
+              title={
+                isParticipantPanelOpen
+                  ? "Hide participants (show transcript)"
+                  : "Show participants in sidebar"
+              }
+            >
+              <MdPeople className="w-5 h-5" />
+            </button>
+          )}
           {isHost && (
             <div className="flex items-center space-x-2">
-              {(transcriptionMode === "rtm" || transcriptionMode === "rtc") && (
-                <button
-                  data-tour="tour-transcript"
-                  onClick={() => setIsTranscriptPanelOpen(true)}
-                  className="flex items-center justify-center w-10 h-10 rounded-lg text-gray-800 dark:text-white transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-agora hover:bg-gray-400 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                  title={
-                    !isAgentActive
-                      ? "Transcript (start agent to view)"
-                      : transcriptionMode === "rtm"
-                        ? "Open Transcript"
-                        : "Open Transcript (view only)"
-                  }
-                  disabled={!isAgentActive}
-                >
-                  <MdMessage className="w-5 h-5" />
-                </button>
-              )}
               <button
                 data-tour="tour-agent-toggle"
                 onClick={handleToggleAgent}
@@ -531,16 +534,6 @@ const Controls: React.FC<ControlsProps> = ({ sendChatMessage }) => {
         onSaveAgentSettings={handleSaveAgentSettings}
         isAgentUpdating={isAgentUpdating}
         isAgentActive={isAgentActive}
-      />
-
-      <TranscriptSidePanel
-        isOpen={isTranscriptPanelOpen}
-        onClose={() => setIsTranscriptPanelOpen(false)}
-        onSendMessage={
-          transcriptionMode === "rtm" && agentRtcUid
-            ? sendChatMessage
-            : undefined
-        }
       />
     </React.Fragment>
   );
