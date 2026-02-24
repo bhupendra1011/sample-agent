@@ -2,7 +2,7 @@
   <img src="public/favicon.svg" alt="My Agora App" width="80" />
 </p>
 
-<h1 align="center">🎙️ My Agora AI App</h1>
+<h1 align="center">🎙️ My First Convo AI App</h1>
 
 <p align="center">
   <b>A real-time communication app built with Next.js, TypeScript & Agora SDKs</b><br/>
@@ -21,9 +21,8 @@
 
 ## 📖 Overview
 
-This app delivers a **production-ready real-time communication experience** powered by Agora. Users can create or join video meetings with screen sharing, host controls, and real-time messaging.
-
-On top of the RTC foundation, the app integrates **Agora Conversational AI** — letting you invite an AI agent into any call. The agent uses configurable LLM, TTS, and ASR providers, supports AI avatars (HeyGen, Akool, Anam), and can call external tools via **MCP (Model Context Protocol)** servers.
+This app delivers  **playground experience** to try out the latest features on [Conversatioal AI Engine](https://docs.agora.io/en/conversational-ai/overview/product-overview).
+The agent uses configurable LLM, TTS, and ASR providers, supports AI avatars (HeyGen, Akool, Anam), and can call external tools via **MCP (Model Context Protocol)** servers.
 
 All secret keys stay on the server. Next.js API routes generate Agora tokens, inject API keys, and proxy requests to the [Agora Conversational AI v2 API](https://docs.agora.io/en/conversational-ai/overview/product-overview).
 
