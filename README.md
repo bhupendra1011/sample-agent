@@ -19,6 +19,7 @@
 
 ---
 
+
 ## 📖 Overview
 
 This app delivers  **playground experience** to try out the latest features on [Conversatioal AI Engine](https://docs.agora.io/en/conversational-ai/overview/product-overview).
@@ -28,12 +29,13 @@ All secret keys stay on the server. Next.js API routes generate Agora tokens, in
 
 ---
 
+https://github.com/user-attachments/assets/8f5fe262-dbfd-41c7-9a23-5fb523e91e68
+
 ## ✨ Features
 
 | Feature                        | Description                                            |
 | ------------------------------ | ------------------------------------------------------ |
 | 🎥 **Video & Voice Calling**   | HD video/voice calls powered by Agora RTC SDK          |
-| 🖥️ **Screen Sharing**          | Share your screen with participants in real time       |
 | 💬 **Real-time Messaging**     | Instant chat using Agora RTM SDK v2                    |
 | 🤖 **AI Conversational Agent** | Talk to an AI agent with LLM, TTS & ASR support        |
 | 🖼️ **AI Avatars**              | Optional avatar integration (HeyGen, Akool, Anam)      |
