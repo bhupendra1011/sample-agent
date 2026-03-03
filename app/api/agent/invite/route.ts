@@ -623,10 +623,10 @@ export async function POST(request: NextRequest) {
       properties: propertiesPayload,
     };
 
-    // Call Agora Conversational AI API
-    const authHeader = Buffer.from(
-      `${CUSTOMER_ID}:${CUSTOMER_SECRET}`,
-    ).toString("base64");
+    // Call Agora Conversational AI API — use same token as in payload for Authorization header
+    // const authHeader = Buffer.from(
+    //   `${CUSTOMER_ID}:${CUSTOMER_SECRET}`,
+    // ).toString("base64");
     const apiUrl = `https://api.agora.io/api/conversational-ai-agent/v2/projects/${APP_ID}/join`;
 
     // Create a sanitized version for logging (mask sensitive data)
@@ -656,9 +656,12 @@ export async function POST(request: NextRequest) {
     console.log("\n========== AGORA CONVERSATIONAL AI REQUEST ==========");
     console.log("URL:", apiUrl);
     console.log("Method: POST");
+    const tokenPreview = agentRtcToken
+      ? `${agentRtcToken.substring(0, 25)}...`
+      : "(empty)";
     console.log("Headers:", {
       "Content-Type": "application/json",
-      Authorization: "Basic ***MASKED***",
+      Authorization: `agora token=${tokenPreview}`,
     });
     console.log("Payload:", JSON.stringify(sanitizedPayload, null, 2));
     // When AGORA_LOG_PAYLOAD_VERBOSE=1, log full payload (no masking) for verification
@@ -672,7 +675,7 @@ export async function POST(request: NextRequest) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Basic ${authHeader}`,
+        Authorization: `agora token=${agentRtcToken}`,
       },
       body: JSON.stringify(joinPayload),
     });
