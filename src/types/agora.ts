@@ -434,6 +434,14 @@ export interface AgentSettings {
 
   // Avatar configuration (optional)
   avatar?: AvatarConfig;
+
+  /** Pre-assigned RTC UID for the agent (default: 0 = Agora-assigned).
+   *  Used for podcast dual-agent setup where each agent needs a distinct UID. */
+  agent_rtc_uid?: number;
+
+  /** Override remote_rtc_uids the agent subscribes to.
+   *  For podcast: host listens to guest UID, guest listens to host UID. */
+  remote_rtc_uids?: string[];
 }
 
 // --- Preset Configurations for Quick Setup ---

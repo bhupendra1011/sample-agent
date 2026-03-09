@@ -171,6 +171,15 @@ body {
   animation: skeleton-shimmer 1.8s ease-in-out infinite;
 }
 
+/* ----- Shared: staggered fade-in-up reveal ----- */
+@keyframes fade-in-up {
+  0% { opacity: 0; transform: translateY(16px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up {
+  animation: fade-in-up 0.6s ease-out forwards;
+}
+
 /* ----- Landing: subtle, classy animations (respect reduced motion) ----- */
 @keyframes landing-bg-float {
   0%, 100% {

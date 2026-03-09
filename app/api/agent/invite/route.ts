@@ -54,8 +54,8 @@ export async function POST(request: NextRequest) {
 
     // Generate token for the agent
     // When RTM is enabled, use buildTokenWithRtm to grant both RTC and Signaling privileges
-    const agentUid = 0; // Let Agora assign UID
-    const agentAccount = String(agentUid); // "0" - required for buildTokenWithRtm
+    const agentUid = agentSettings.agent_rtc_uid ?? 0; // Use pre-assigned UID or let Agora assign
+    const agentAccount = String(agentUid);
     const tokenExpiration = 3600; // 1 hour
     const privilegeExpiration = 3600;
 
@@ -244,7 +244,10 @@ export async function POST(request: NextRequest) {
 
     // When avatar is enabled, Agora does not allow "subscribe all" (*).
     // Must specify the local user's UID explicitly.
-    const remoteRtcUids = avatar?.enable ? [String(uid)] : ["*"];
+    // Override with agentSettings.remote_rtc_uids when provided (e.g. podcast dual-agent).
+    const remoteRtcUids = agentSettings.remote_rtc_uids
+      ? agentSettings.remote_rtc_uids
+      : avatar?.enable ? [String(uid)] : ["*"];
 
     // Build the complete properties payload
     const propertiesPayload: Record<string, unknown> = {
@@ -442,8 +445,9 @@ export async function POST(request: NextRequest) {
 
     // Add avatar configuration if enabled
     if (avatar?.enable) {
-      // Use a distinct avatar UID (999999) to avoid conflicts with agent (0) or user
-      const avatarUid = 999999;
+      // Use avatar UID from params if provided (e.g. podcast pre-assigns distinct UIDs), else default 999999
+      const avatarUidFromParams = (avatar.params as unknown as Record<string, unknown>)?.agora_uid;
+      const avatarUid = avatarUidFromParams ? Number(avatarUidFromParams) : 999999;
       avatarRtcUidReturn = String(avatarUid);
       const avatarRtcToken = RtcTokenBuilder.buildTokenWithUid(
         APP_ID,

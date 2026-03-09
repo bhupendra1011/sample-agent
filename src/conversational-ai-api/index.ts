@@ -536,12 +536,15 @@ export class ConversationalAIAPI extends EventHelper {
       );
     } else if (msgType === EMessageType.AGENT_TRANSCRIPTION) {
       const agentMsg = message as unknown as IAgentTranscription;
+      // Use RTM publisher UID when available (important for multi-agent scenarios like podcast),
+      // fall back to the singleton agentRtcUid for 1-on-1 conversations.
+      const effectiveUid = (_publisher && _publisher !== "unknown") ? _publisher : this.agentRtcUid;
       if (this.enableLog) {
         console.log(`[${TAG}] Agent transcription:`, agentMsg.text, `turn_status=${agentMsg.turn_status}`);
       }
       this.subRenderController.processAgentTranscription(
         agentMsg,
-        this.agentRtcUid
+        effectiveUid
       );
     } else if (msgType === EMessageType.MSG_INTERRUPTED) {
       const turnId = message.turn_id as number;
