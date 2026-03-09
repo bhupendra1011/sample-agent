@@ -6,7 +6,7 @@ import type { IAgoraRTCClient } from "agora-rtc-sdk-ng";
 import { ConversationalAIAPI, EConversationalAIAPIEvents } from "@/conversational-ai-api";
 import usePodcastStore from "@/store/usePodcastStore";
 import type { ITranscriptHelperItem } from "@/types/agora";
-import { ETurnStatus } from "@/types/agora";
+import { ETurnStatus, EAgentState } from "@/types/agora";
 import type { PodcastTranscriptEntry } from "@/types/podcast";
 import { podcastDB } from "@/utils/podcast/podcastDB";
 
@@ -40,6 +40,8 @@ export const usePodcastTranscript = (options: UsePodcastTranscriptOptions) => {
 
   const addTranscript = usePodcastStore((s) => s.addTranscript);
   const updateTranscript = usePodcastStore((s) => s.updateTranscript);
+  const setHostAgentState = usePodcastStore((s) => s.setHostAgentState);
+  const setGuestAgentState = usePodcastStore((s) => s.setGuestAgentState);
 
   const handleTranscriptUpdate = useCallback(
     (items: ITranscriptHelperItem[]) => {
@@ -119,10 +121,29 @@ export const usePodcastTranscript = (options: UsePodcastTranscriptOptions) => {
       handleTranscriptUpdate(args[0] as ITranscriptHelperItem[]);
     api.on(EConversationalAIAPIEvents.TRANSCRIPT_UPDATED, wrappedHandler);
 
+    // Handle agent state changes (idle/listening/thinking/speaking)
+    const handleAgentStateChanged = (...args: unknown[]) => {
+      const uid = String(args[0]);
+      const event = args[1] as { state: string };
+      if (!event?.state) return;
+
+      const state = event.state as EAgentState;
+      const validStates = Object.values(EAgentState);
+      if (!validStates.includes(state)) return;
+
+      if (uid === String(hostRtcUid)) {
+        setHostAgentState(state);
+      } else if (uid === String(guestRtcUid)) {
+        setGuestAgentState(state);
+      }
+    };
+    api.on(EConversationalAIAPIEvents.AGENT_STATE_CHANGED, handleAgentStateChanged);
+
     return () => {
       api.off(EConversationalAIAPIEvents.TRANSCRIPT_UPDATED, wrappedHandler);
+      api.off(EConversationalAIAPIEvents.AGENT_STATE_CHANGED, handleAgentStateChanged);
     };
-  }, [isActive, rtcClient, rtmClient, channelId, handleTranscriptUpdate]);
+  }, [isActive, rtcClient, rtmClient, channelId, handleTranscriptUpdate, hostRtcUid, guestRtcUid, setHostAgentState, setGuestAgentState]);
 
   // Cleanup on unmount
   useEffect(() => {

@@ -470,11 +470,14 @@ export class ConversationalAIAPI extends EventHelper {
 
     this.handleRTMPresence = (event: unknown) => {
       try {
-        const e = event as { stateChanged?: { state?: string } };
+        const e = event as { stateChanged?: { state?: string }; publisher?: string; userId?: string };
         if (e.stateChanged?.state) {
+          // Use publisher/userId from the presence event for multi-agent support,
+          // fall back to singleton agentRtcUid for 1-on-1 conversations.
+          const uid = e.publisher || e.userId || this.agentRtcUid;
           this.emit(
             EConversationalAIAPIEvents.AGENT_STATE_CHANGED,
-            this.agentRtcUid,
+            uid,
             {
               state: e.stateChanged.state,
               turnID: 0,
