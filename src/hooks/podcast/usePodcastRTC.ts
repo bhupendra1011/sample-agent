@@ -38,9 +38,15 @@ export const usePodcastRTC = (options: UsePodcastRTCOptions) => {
       // Set as audience with low-latency so we can subscribe to audio/video
       await client.setClientRole("audience", { level: 1 });
 
+      // Debug: log when any remote user joins/leaves the channel
+      client.on("user-joined", (user: IAgoraRTCRemoteUser) => {
+        console.log(`[PodcastRTC] user-joined: uid=${user.uid}, hasAudio=${user.hasAudio}, hasVideo=${user.hasVideo}`);
+        console.log(`[PodcastRTC] Expected avatar UIDs: host=${hostAvatarUid}, guest=${guestAvatarUid}`);
+      });
+
       // Handle remote user published tracks
       client.on("user-published", async (user: IAgoraRTCRemoteUser, mediaType: "audio" | "video") => {
-        console.log(`[PodcastRTC] user-published: uid=${user.uid}, mediaType=${mediaType}`);
+        console.log(`[PodcastRTC] user-published: uid=${user.uid}, mediaType=${mediaType}, hasVideo=${user.hasVideo}, hasAudio=${user.hasAudio}`);
         await client.subscribe(user, mediaType);
         const userUid = Number(user.uid);
 
@@ -84,6 +90,9 @@ export const usePodcastRTC = (options: UsePodcastRTCOptions) => {
       await client.join(AGORA_CONFIG.APP_ID!, channel, token, uid);
       setIsJoined(true);
       console.log("[PodcastRTC] Joined as audience, uid:", uid, "channel:", channel);
+      console.log("[PodcastRTC] Remote users after join:", client.remoteUsers.map(u => ({
+        uid: u.uid, hasAudio: u.hasAudio, hasVideo: u.hasVideo,
+      })));
     },
     [hostRtcUid, guestRtcUid, hostAvatarUid, guestAvatarUid],
   );
@@ -113,6 +122,27 @@ export const usePodcastRTC = (options: UsePodcastRTCOptions) => {
       if (!client) return;
 
       for (const user of client.remoteUsers) {
+        const userUid = Number(user.uid);
+
+        // Try to subscribe to any unsubscribed video tracks (avatar UIDs)
+        if (user.hasVideo && !user.videoTrack) {
+          try {
+            await client.subscribe(user, "video");
+            console.log(`[PodcastRTC] Proactive subscribe video: uid=${user.uid}`);
+          } catch {
+            // May fail if already subscribing
+          }
+        }
+
+        // Set video tracks for avatar UIDs
+        if (user.videoTrack) {
+          if (userUid === hostAvatarUid) {
+            setHostVideoTrack((prev) => prev ?? (user.videoTrack as IRemoteVideoTrack));
+          } else if (userUid === guestAvatarUid) {
+            setGuestVideoTrack((prev) => prev ?? (user.videoTrack as IRemoteVideoTrack));
+          }
+        }
+
         // Try to subscribe to any unsubscribed audio tracks
         if (user.hasAudio && !user.audioTrack) {
           try {
@@ -130,7 +160,6 @@ export const usePodcastRTC = (options: UsePodcastRTCOptions) => {
           if (typeof track.setVolume === "function") {
             track.setVolume(100);
           }
-          const userUid = Number(user.uid);
           console.log(`[PodcastRTC] Proactive play audio: uid=${userUid}`);
           if (userUid === hostRtcUid || userUid === hostAvatarUid) {
             setHostAudioPlaying(true);

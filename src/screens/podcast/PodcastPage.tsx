@@ -26,6 +26,15 @@ import PodcastSetupScreen from "./PodcastSetupScreen";
 import PodcastStudioScreen from "./PodcastStudioScreen";
 import PodcastEndedScreen from "./PodcastEndedScreen";
 
+// Two Anam API keys — one per avatar agent to avoid concurrency limits
+const ANAM_API_KEY_HOST = process.env.NEXT_PUBLIC_ANAM_PODCAST_KEY_HOST ?? "";
+const ANAM_API_KEY_GUEST = process.env.NEXT_PUBLIC_ANAM_PODCAST_KEY_GUEST ?? "";
+
+if (typeof window !== "undefined") {
+  if (!ANAM_API_KEY_HOST) console.warn("[PodcastPage] NEXT_PUBLIC_ANAM_PODCAST_KEY_HOST is empty — restart dev server after adding .env vars");
+  if (!ANAM_API_KEY_GUEST) console.warn("[PodcastPage] NEXT_PUBLIC_ANAM_PODCAST_KEY_GUEST is empty — restart dev server after adding .env vars");
+}
+
 const PodcastPage: React.FC = () => {
   const status = usePodcastStore((s) => s.status);
   const config = usePodcastStore((s) => s.config);
@@ -127,19 +136,22 @@ const PodcastPage: React.FC = () => {
         },
         advanced_features: { enable_rtm: true, enable_tools: false },
         parameters: { data_channel: "rtm" },
-        // Avatar disabled temporarily — Anam avatar prevents agent audio publishing.
-        // When avatar is enabled, the agent shows mute-audio:true and never publishes
-        // audio tracks to the channel, making audio inaudible to the audience.
-        // TODO: Re-enable once avatar audio routing is resolved.
-        // avatar: {
-        //   enable: true,
-        //   vendor: "anam",
-        //   params: {
-        //     api_key: "***MASKED***",
-        //     agora_uid: String(isHost ? sessionData.hostAvatarUid : sessionData.guestAvatarUid),
-        //     avatar_id: avatar.anamAvatarId,
-        //   },
-        // },
+        // Conditionally enable Anam avatar based on user toggle
+        ...(cfg.avatarEnabled
+          ? {
+              avatar: {
+                enable: true,
+                vendor: "anam" as const,
+                params: {
+                  api_key: isHost ? ANAM_API_KEY_HOST : ANAM_API_KEY_GUEST,
+                  agora_uid: String(
+                    isHost ? sessionData.hostAvatarUid : sessionData.guestAvatarUid,
+                  ),
+                  avatar_id: avatar.anamAvatarId,
+                },
+              },
+            }
+          : {}),
       };
     },
     [],

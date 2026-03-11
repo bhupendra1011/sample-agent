@@ -60,6 +60,7 @@ const PodcastSetupScreen: React.FC<PodcastSetupScreenProps> = ({
   );
   const [selectedTheme, setSelectedTheme] = useState(DEFAULT_THEME);
   const [selectedLighting, setSelectedLighting] = useState(DEFAULT_LIGHTING);
+  const [avatarEnabled, setAvatarEnabled] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
 
   const setConfig = usePodcastStore((s) => s.setConfig);
@@ -84,6 +85,7 @@ const PodcastSetupScreen: React.FC<PodcastSetupScreenProps> = ({
         guestAvatar,
         theme: selectedTheme,
         lighting: selectedLighting,
+        avatarEnabled,
       });
 
       const response = await fetch("/api/podcast/start", {
@@ -136,6 +138,7 @@ const PodcastSetupScreen: React.FC<PodcastSetupScreenProps> = ({
     guestAvatar,
     selectedTheme,
     selectedLighting,
+    avatarEnabled,
     setConfig,
     setStatus,
     setSession,
@@ -272,6 +275,52 @@ const PodcastSetupScreen: React.FC<PodcastSetupScreenProps> = ({
                   {opt.label}
                 </button>
               ))}
+            </div>
+          </section>
+
+          {/* ── Avatar Toggle ── */}
+          <section className="p-5 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <svg
+                  className="w-5 h-5 text-[var(--agora-accent-blue)]"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                  />
+                </svg>
+                <div>
+                  <span className="text-sm font-medium text-gray-200">
+                    Enable Avatars
+                  </span>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Show animated Anam avatars for host &amp; guest
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={avatarEnabled}
+                onClick={() => setAvatarEnabled(!avatarEnabled)}
+                className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--agora-accent-blue)] focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950 ${
+                  avatarEnabled
+                    ? "bg-[var(--agora-accent-blue)]"
+                    : "bg-white/10"
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-6 w-6 rounded-full bg-white shadow-lg ring-0 transition-transform duration-200 ease-in-out ${
+                    avatarEnabled ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
             </div>
           </section>
 

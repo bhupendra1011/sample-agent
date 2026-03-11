@@ -31,12 +31,29 @@ const AvatarTile: React.FC<AvatarTileProps> = ({
   const videoRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (videoTrack && videoRef.current) {
-      videoTrack.play(videoRef.current);
-      return () => {
-        videoTrack.stop();
-      };
-    }
+    const container = videoRef.current;
+    if (!container || !videoTrack) return;
+
+    videoTrack.play(container);
+
+    // Force object-fit: contain so avatar isn't cropped
+    const setContain = (el: Element) => {
+      (el as HTMLVideoElement).style.objectFit = "contain";
+    };
+    const video = container.querySelector("video");
+    if (video) setContain(video);
+
+    // Agora may inject <video> async; observe so we override object-fit when it appears
+    const observer = new MutationObserver(() => {
+      const v = container.querySelector("video");
+      if (v) setContain(v);
+    });
+    observer.observe(container, { childList: true, subtree: true });
+
+    return () => {
+      observer.disconnect();
+      videoTrack.stop();
+    };
   }, [videoTrack]);
 
   const isSpeaking = agentState === EAgentState.SPEAKING;
@@ -55,7 +72,10 @@ const AvatarTile: React.FC<AvatarTileProps> = ({
         style={isSpeaking ? { boxShadow: `0 0 30px ${accentColor}40, 0 0 0 4px ${accentColor}` } : {}}
       >
         {videoTrack ? (
-          <div ref={videoRef} className="w-full h-full" />
+          <div
+            ref={videoRef}
+            className="w-full h-full bg-black [&_video]:!object-contain [&_video]:!w-full [&_video]:!h-full"
+          />
         ) : (
           <div
             className={`w-full h-full bg-gradient-to-br ${gradientColors} flex items-center justify-center`}

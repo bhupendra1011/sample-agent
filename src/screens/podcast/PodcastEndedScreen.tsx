@@ -43,110 +43,121 @@ const PodcastEndedScreen: React.FC = () => {
     return `${m}m ${s}s`;
   };
 
+  const finalTranscripts = transcripts.filter((t) => t.isFinal);
+  const wordCount = finalTranscripts.reduce(
+    (acc, t) => acc + t.text.split(" ").length,
+    0,
+  );
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-purple-950/20 to-gray-950 text-white p-4 sm:p-8">
-      <div className="max-w-3xl mx-auto">
+    <div className="min-h-screen bg-gray-950 text-gray-100 overflow-hidden">
+      {/* Background — same as landing/setup */}
+      <div className="fixed inset-0 pointer-events-none" aria-hidden>
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_0%,rgba(0,194,255,0.08),transparent_50%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_50%_40%_at_80%_100%,rgba(0,194,255,0.05),transparent_45%)]" />
+      </div>
+
+      <div className="relative max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-green-600/20 border border-green-500/40 mb-4">
-            <span className="w-2 h-2 rounded-full bg-green-500" />
-            <span className="text-sm font-medium text-green-400">
-              Podcast Ended
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[var(--agora-accent-blue)]/20 bg-[var(--agora-accent-blue)]/5 mb-4">
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--agora-accent-blue)]" />
+            <span className="text-sm font-medium text-[var(--agora-accent-blue)]">
+              Podcast Complete
             </span>
           </div>
-          <h1 className="text-3xl font-bold mb-2">
+          <h1 className="text-3xl sm:text-4xl font-bold text-white font-syne mb-2">
             {config?.topic || "Podcast Complete"}
           </h1>
-          <p className="text-gray-400">
-            Great conversation between {config?.hostAvatar.name} and{" "}
-            {config?.guestAvatar.name}
+          <p className="text-sm text-gray-500">
+            Great conversation between{" "}
+            <span className="text-gray-400">{config?.hostAvatar.name}</span>
+            {" and "}
+            <span className="text-gray-400">{config?.guestAvatar.name}</span>
           </p>
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4 mb-8">
-          <div className="bg-gray-900/60 rounded-xl p-4 text-center border border-white/5">
-            <span className="block text-2xl font-bold text-white">
-              {formatDuration(timer.elapsed)}
-            </span>
-            <span className="text-xs text-gray-500">Duration</span>
-          </div>
-          <div className="bg-gray-900/60 rounded-xl p-4 text-center border border-white/5">
-            <span className="block text-2xl font-bold text-white">
-              {transcripts.filter((t) => t.isFinal).length}
-            </span>
-            <span className="text-xs text-gray-500">Turns</span>
-          </div>
-          <div className="bg-gray-900/60 rounded-xl p-4 text-center border border-white/5">
-            <span className="block text-2xl font-bold text-white">
-              {transcripts
-                .filter((t) => t.isFinal)
-                .reduce((acc, t) => acc + t.text.split(" ").length, 0)}
-            </span>
-            <span className="text-xs text-gray-500">Words</span>
-          </div>
+          {[
+            { label: "Duration", value: formatDuration(timer.elapsed) },
+            { label: "Turns", value: String(finalTranscripts.length) },
+            { label: "Words", value: String(wordCount) },
+          ].map((stat) => (
+            <div
+              key={stat.label}
+              className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06] text-center"
+            >
+              <span className="block text-2xl font-bold text-white">
+                {stat.value}
+              </span>
+              <span className="text-xs text-gray-500">{stat.label}</span>
+            </div>
+          ))}
         </div>
 
         {/* Transcript */}
-        <div className="bg-gray-900/60 rounded-xl border border-white/5 mb-6">
-          <div className="flex items-center justify-between px-5 py-3 border-b border-white/10">
-            <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
+        <section className="rounded-xl bg-white/[0.03] border border-white/[0.06] mb-8">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
+            <h3 className="text-sm font-medium text-gray-300">
               Full Transcript
             </h3>
             <button
               onClick={handleCopyTranscript}
-              className="text-xs px-3 py-1.5 rounded-lg bg-purple-600/20 text-purple-300 hover:bg-purple-600/30 transition-colors"
+              className="text-xs px-3 py-1.5 rounded-lg bg-[var(--agora-accent-blue)]/10 text-[var(--agora-accent-blue)] hover:bg-[var(--agora-accent-blue)]/20 transition-colors"
             >
               {copied ? "Copied!" : "Copy Transcript"}
             </button>
           </div>
 
           <div className="max-h-96 overflow-y-auto p-5 space-y-4">
-            {transcripts
-              .filter((t) => t.isFinal)
-              .map((entry, idx) => (
-                <div key={idx} className="flex gap-3">
-                  <div
-                    className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${
-                      entry.role === "host" ? "bg-purple-500" : "bg-pink-500"
+            {finalTranscripts.map((entry, idx) => (
+              <div key={idx} className="flex gap-3">
+                <div
+                  className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${
+                    entry.role === "host"
+                      ? "bg-[var(--agora-accent-blue)]"
+                      : "bg-rose-400"
+                  }`}
+                />
+                <div>
+                  <span
+                    className={`text-xs font-semibold ${
+                      entry.role === "host"
+                        ? "text-[var(--agora-accent-blue)]"
+                        : "text-rose-400"
                     }`}
-                  />
-                  <div>
-                    <span
-                      className={`text-xs font-semibold ${
-                        entry.role === "host"
-                          ? "text-purple-400"
-                          : "text-pink-400"
-                      }`}
-                    >
-                      {entry.speakerName}
-                    </span>
-                    <p className="text-sm text-gray-300 leading-relaxed mt-0.5">
-                      {entry.text}
-                    </p>
-                  </div>
+                  >
+                    {entry.speakerName}
+                  </span>
+                  <p className="text-sm text-gray-300 leading-relaxed mt-0.5">
+                    {entry.text}
+                  </p>
                 </div>
-              ))}
+              </div>
+            ))}
 
-            {transcripts.filter((t) => t.isFinal).length === 0 && (
+            {finalTranscripts.length === 0 && (
               <p className="text-gray-500 text-sm text-center py-8">
                 No transcript entries recorded.
               </p>
             )}
           </div>
-        </div>
+        </section>
 
         {/* Actions */}
         <div className="flex gap-4">
-          <button
-            onClick={handleStartNew}
-            className="flex-1 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold text-lg transition-all shadow-lg"
-          >
-            Start New Podcast
-          </button>
+          <div className="flex-1 relative rounded-xl animate-landing-button-glow">
+            <button
+              onClick={handleStartNew}
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-[var(--agora-accent-blue)] text-white font-semibold shadow-lg hover:opacity-90 hover:scale-[1.01] active:scale-[0.99] transition-all duration-300"
+            >
+              Start New Podcast
+            </button>
+          </div>
           <button
             onClick={() => router.push("/podcast")}
-            className="px-6 py-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium transition-colors"
+            className="px-6 py-3.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-gray-400 hover:text-white font-medium transition-colors border border-white/[0.06]"
           >
             Back
           </button>

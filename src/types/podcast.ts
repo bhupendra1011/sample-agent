@@ -100,6 +100,7 @@ export interface PodcastConfig {
   guestAvatar: PodcastAvatarConfig;
   theme: PodcastTheme;
   lighting: LightingPreset;
+  avatarEnabled: boolean;
 }
 
 // --- API Request/Response types ---
