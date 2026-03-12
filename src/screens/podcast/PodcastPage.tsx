@@ -95,11 +95,15 @@ const PodcastPage: React.FC = () => {
       return {
         name: `podcast-${role}-${sessionData.sessionId}`,
         agent_rtc_uid: isHost ? sessionData.hostRtcUid : sessionData.guestRtcUid,
-        // Each agent subscribes to the OTHER agent's audio — same as user↔agent voice interaction.
-        // VAD turn detection handles natural turn-taking.
-        remote_rtc_uids: isHost
-          ? [String(sessionData.guestRtcUid)]
-          : [String(sessionData.hostRtcUid)],
+        // Each agent subscribes to the OTHER agent's audio.
+        // When avatars are enabled, audio is published via the avatar UID, not the agent RTC UID.
+        remote_rtc_uids: cfg.avatarEnabled
+          ? (isHost
+              ? [String(sessionData.guestAvatarUid)]
+              : [String(sessionData.hostAvatarUid)])
+          : (isHost
+              ? [String(sessionData.guestRtcUid)]
+              : [String(sessionData.hostRtcUid)]),
         llm: {
           url: "https://api.openai.com/v1/chat/completions",
           api_key: "***MASKED***",
