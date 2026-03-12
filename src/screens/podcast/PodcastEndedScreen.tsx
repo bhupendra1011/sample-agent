@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import usePodcastStore from "@/store/usePodcastStore";
 import { podcastDB } from "@/utils/podcast/podcastDB";
 import { showToast } from "@/services/uiService";
+import PoweredByAgora from "@/components/podcast/PoweredByAgora";
 
 const PodcastEndedScreen: React.FC = () => {
   const router = useRouter();
@@ -162,6 +163,9 @@ const PodcastEndedScreen: React.FC = () => {
             Back
           </button>
         </div>
+        <footer className="mt-8 pt-6 border-t border-white/10 flex justify-center">
+          <PoweredByAgora variant="compact" className="text-gray-500" />
+        </footer>
       </div>
     </div>
   );

@@ -98,7 +98,7 @@ const AvatarTile: React.FC<AvatarTileProps> = ({
         </span>
       </div>
 
-      {/* Agent state badge */}
+      {/* Agent state badge: use theme accent for active states (not fixed blue) */}
       <span
         className={`text-xs px-2.5 py-1 rounded-full ${
           agentState === EAgentState.SPEAKING
@@ -106,9 +106,14 @@ const AvatarTile: React.FC<AvatarTileProps> = ({
             : agentState === EAgentState.THINKING
             ? "bg-yellow-500/20 text-yellow-400"
             : agentState === EAgentState.LISTENING
-            ? "bg-blue-500/20 text-blue-400"
+            ? "text-white/90"
             : "bg-gray-500/20 text-gray-400"
         }`}
+        style={
+          agentState === EAgentState.LISTENING
+            ? { backgroundColor: `${accentColor}40`, color: accentColor }
+            : undefined
+        }
       >
         {stateLabels[agentState]}
       </span>

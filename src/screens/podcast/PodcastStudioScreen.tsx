@@ -153,7 +153,6 @@ const PodcastStudioScreen: React.FC<PodcastStudioScreenProps> = ({
             guestVideoTrack={guestVideoTrack}
             hostAgentState={hostAgent?.state ?? EAgentState.IDLE}
             guestAgentState={guestAgent?.state ?? EAgentState.IDLE}
-            topic={config.topic}
           />
         </div>
 
@@ -174,7 +173,7 @@ const PodcastStudioScreen: React.FC<PodcastStudioScreenProps> = ({
         </div>
       </div>
 
-      {/* Controls Bar */}
+      {/* Controls Bar (includes Powered by Agora on same bar) */}
       <PodcastControls
         onThemeChange={onThemeChange}
         onLightingChange={onLightingChange}

@@ -10,9 +10,11 @@ import {
   LIGHTING_PRESETS,
   DEFAULT_THEME,
   DEFAULT_LIGHTING,
+  getAmbientLightColor,
 } from "@/config/podcast/themes";
 import { showToast } from "@/services/uiService";
 import type { PodcastAvatarConfig, PodcastStartResponse } from "@/types/podcast";
+import PoweredByAgora from "@/components/podcast/PoweredByAgora";
 
 const DURATION_OPTIONS = [
   { label: "3 min", value: 180 },
@@ -149,14 +151,14 @@ const PodcastSetupScreen: React.FC<PodcastSetupScreenProps> = ({
   const topicValid = topic.trim().length >= 10;
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 overflow-hidden">
-      {/* Background */}
+    <div className="min-h-screen text-gray-100 overflow-hidden bg-gray-950">
+      {/* Create screen: no theme preview, no lighting — simple neutral background only */}
+      <div className="fixed inset-0 pointer-events-none bg-gray-950" aria-hidden />
       <div className="fixed inset-0 pointer-events-none" aria-hidden>
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_0%,rgba(0,194,255,0.08),transparent_50%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_50%_40%_at_80%_100%,rgba(0,194,255,0.05),transparent_45%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_0%,rgba(255,255,255,0.03),transparent_50%)]" />
       </div>
 
-      <div className="relative max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <div className="relative max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12 pb-20">
         {/* Back + Header */}
         <div className="flex items-center gap-4 mb-8">
           <button
@@ -417,17 +419,18 @@ const PodcastSetupScreen: React.FC<PodcastSetupScreenProps> = ({
                 Visual Theme
               </span>
             </label>
-            <div className="grid grid-cols-5 gap-3 mb-5">
+            <div className="grid grid-cols-4 gap-3 mb-5">
               {PODCAST_THEMES.map((theme) => (
                 <button
                   key={theme.id}
                   onClick={() => setSelectedTheme(theme)}
                   className={`relative h-16 rounded-xl overflow-hidden transition-all ${
-                    selectedTheme.id === theme.id
-                      ? "ring-2 ring-[var(--agora-accent-blue)] scale-105 shadow-lg"
-                      : "opacity-60 hover:opacity-100"
+                    selectedTheme.id === theme.id ? "ring-2 scale-105 shadow-lg" : "opacity-60 hover:opacity-100"
                   }`}
-                  style={{ background: theme.cssGradient }}
+                  style={{
+                    background: theme.cssGradient,
+                    ...(selectedTheme.id === theme.id ? { boxShadow: `0 0 0 2px ${theme.accentColor}` } : {}),
+                  }}
                 >
                   <span className="absolute bottom-1 inset-x-0 text-center text-[10px] font-medium text-white/90 drop-shadow-lg">
                     {theme.name}
@@ -437,22 +440,30 @@ const PodcastSetupScreen: React.FC<PodcastSetupScreenProps> = ({
             </div>
 
             <label className="block text-xs font-medium text-gray-400 mb-2">
-              Lighting
+              Ambient lighting
             </label>
             <div className="grid grid-cols-4 gap-3">
-              {LIGHTING_PRESETS.map((preset) => (
-                <button
-                  key={preset.id}
-                  onClick={() => setSelectedLighting(preset)}
-                  className={`py-2 rounded-lg text-xs font-medium transition-all ${
-                    selectedLighting.id === preset.id
-                      ? "bg-[var(--agora-accent-blue)] text-white"
-                      : "bg-white/[0.04] text-gray-400 hover:bg-white/[0.08] hover:text-white border border-white/[0.06]"
-                  }`}
-                >
-                  {preset.name}
-                </button>
-              ))}
+              {LIGHTING_PRESETS.map((preset) => {
+                const ambientColor = getAmbientLightColor(selectedTheme.accentColor, preset.id);
+                return (
+                  <button
+                    key={preset.id}
+                    onClick={() => setSelectedLighting(preset)}
+                    className={`py-2 rounded-lg text-xs font-medium transition-all ${
+                      selectedLighting.id === preset.id
+                        ? "text-white"
+                        : "bg-white/[0.04] text-gray-400 hover:bg-white/[0.08] hover:text-white border border-white/[0.06]"
+                    }`}
+                    style={
+                      selectedLighting.id === preset.id
+                        ? { backgroundColor: ambientColor }
+                        : undefined
+                    }
+                  >
+                    {preset.name}
+                  </button>
+                );
+              })}
             </div>
           </section>
 
@@ -525,6 +536,11 @@ const PodcastSetupScreen: React.FC<PodcastSetupScreenProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Footer: Powered by Agora */}
+      <footer className="fixed bottom-0 left-0 right-0 py-3 px-4 bg-black/30 backdrop-blur-sm border-t border-white/10 flex justify-center">
+        <PoweredByAgora variant="compact" className="text-gray-400" />
+      </footer>
     </div>
   );
 };

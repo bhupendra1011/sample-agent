@@ -31,6 +31,8 @@ interface PodcastState {
 
   // Production controls
   ambienceVolume: number;
+  /** 0–100: studio lighting level (pendant glow + overall brightness) */
+  studioLightLevel: number;
   isMuted: boolean;
   wrapUpTriggered: boolean;
 
@@ -49,6 +51,7 @@ interface PodcastState {
   setTimer: (timer: Partial<TimerState>) => void;
   tickTimer: () => void;
   setAmbienceVolume: (volume: number) => void;
+  setStudioLightLevel: (level: number) => void;
   setIsMuted: (muted: boolean) => void;
   triggerWrapUp: () => void;
   reset: () => void;
@@ -71,6 +74,7 @@ const usePodcastStore = create<PodcastState>((set, _get) => ({
   transcripts: [],
   audienceMessages: [],
   ambienceVolume: 0.3,
+  studioLightLevel: 70,
   isMuted: false,
   wrapUpTriggered: false,
 
@@ -132,6 +136,7 @@ const usePodcastStore = create<PodcastState>((set, _get) => ({
     }),
 
   setAmbienceVolume: (volume) => set({ ambienceVolume: volume }),
+  setStudioLightLevel: (level) => set({ studioLightLevel: Math.max(0, Math.min(100, level)) }),
   setIsMuted: (muted) => set({ isMuted: muted }),
   triggerWrapUp: () => set({ wrapUpTriggered: true }),
 
@@ -146,6 +151,7 @@ const usePodcastStore = create<PodcastState>((set, _get) => ({
       transcripts: [],
       audienceMessages: [],
       ambienceVolume: 0.3,
+      studioLightLevel: 70,
       isMuted: false,
       wrapUpTriggered: false,
     }),

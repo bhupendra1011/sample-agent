@@ -6,6 +6,7 @@ import usePodcastStore from "@/store/usePodcastStore";
 import { PODCAST_THEMES, LIGHTING_PRESETS } from "@/config/podcast/themes";
 import type { PodcastTheme, LightingPreset } from "@/types/podcast";
 import Modal from "@/components/common/Modal";
+import PoweredByAgora from "@/components/podcast/PoweredByAgora";
 
 interface PodcastControlsProps {
   onThemeChange: (theme: PodcastTheme) => void;
@@ -25,6 +26,8 @@ const PodcastControls: React.FC<PodcastControlsProps> = ({
   const config = usePodcastStore((s) => s.config);
   const status = usePodcastStore((s) => s.status);
   const ambienceVolume = usePodcastStore((s) => s.ambienceVolume);
+  const studioLightLevel = usePodcastStore((s) => s.studioLightLevel);
+  const setStudioLightLevel = usePodcastStore((s) => s.setStudioLightLevel);
   const wrapUpTriggered = usePodcastStore((s) => s.wrapUpTriggered);
   const [showStopModal, setShowStopModal] = useState(false);
 
@@ -49,7 +52,8 @@ const PodcastControls: React.FC<PodcastControlsProps> = ({
                 const theme = PODCAST_THEMES.find((t) => t.id === e.target.value);
                 if (theme) onThemeChange(theme);
               }}
-              className="bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 text-sm text-gray-300 focus:outline-none focus:border-purple-500"
+              className="bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 text-sm text-gray-300 focus:outline-none"
+              style={{ borderColor: config.theme.accentColor + "40" }}
             >
               {PODCAST_THEMES.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -59,16 +63,17 @@ const PodcastControls: React.FC<PodcastControlsProps> = ({
             </select>
           </div>
 
-          {/* Lighting selector */}
+          {/* Ambient lighting selector */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">Lighting</span>
+            <span className="text-xs text-gray-500">Ambient lighting</span>
             <select
               value={config.lighting.id}
               onChange={(e) => {
                 const lighting = LIGHTING_PRESETS.find((l) => l.id === e.target.value);
                 if (lighting) onLightingChange(lighting);
               }}
-              className="bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 text-sm text-gray-300 focus:outline-none focus:border-purple-500"
+              className="bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 text-sm text-gray-300 focus:outline-none"
+              style={{ borderColor: config.theme.accentColor + "40" }}
             >
               {LIGHTING_PRESETS.map((l) => (
                 <option key={l.id} value={l.id}>
@@ -76,6 +81,22 @@ const PodcastControls: React.FC<PodcastControlsProps> = ({
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Studio lighting: accent uses current theme color (not fixed blue) */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500">Studio lighting</span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={studioLightLevel}
+              onChange={(e) => setStudioLightLevel(Number(e.target.value))}
+              className="w-24 h-1.5"
+              style={{ accentColor: config.theme.accentColor }}
+              title="Adjust studio lighting level"
+            />
+            <span className="text-xs text-gray-400 w-6">{studioLightLevel}%</span>
           </div>
 
           {/* Volume slider */}
@@ -92,8 +113,8 @@ const PodcastControls: React.FC<PodcastControlsProps> = ({
           </div>
         </div>
 
-        {/* Right: Wrap Up + Stop */}
-        <div className="flex items-center gap-3">
+        {/* Right: Wrap Up + Stop + Powered by Agora (on same control bar) */}
+        <div className="flex items-center gap-4">
           {!wrapUpTriggered && status === "live" && (
             <button
               onClick={onWrapUp}
@@ -109,6 +130,8 @@ const PodcastControls: React.FC<PodcastControlsProps> = ({
           >
             Stop Podcast
           </button>
+
+          <PoweredByAgora variant="compact" className="text-gray-400 ml-2 shrink-0" />
         </div>
       </div>
 

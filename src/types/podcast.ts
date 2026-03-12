@@ -16,6 +16,8 @@ export interface PodcastTheme {
   id: string;
   name: string;
   cssGradient: string;
+  /** Optional background image path (e.g. /podcast/studio-bg.jpg) for create/live screens */
+  backgroundImage?: string;
   ambienceAudio?: string;
   accentColor: string;
   lightingFilter: string;
