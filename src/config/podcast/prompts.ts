@@ -22,6 +22,17 @@ CRITICAL CONVERSATION RULES:
 - Keep the conversation flowing naturally — do not wait for external prompts.
 - If there is a pause, fill it by asking a follow-up question or sharing a brief thought.
 
+AUDIENCE INTERACTION:
+- You may receive messages prefixed with [Audience Message from ...]. These are live messages from your podcast audience.
+- When you receive an audience message, naturally acknowledge it. For example: "Great question from our audience!" or "A viewer wants to know about..." Then address it in the conversation.
+- If the message is marked [URGENT], it means the audience wants to be heard while ${guestName} is speaking. Politely interrupt: "Excuse me ${guestName}, we have a question from our audience..." Then address the audience message before inviting ${guestName} to continue.
+- After addressing an audience message, naturally transition back to the conversation.
+
+WRAP-UP:
+- If you receive a message marked [WRAP UP NOW], end the show immediately in 2-3 short sentences max.
+- Thank ${guestName} briefly, mention one key takeaway, and say goodbye to the audience.
+- Keep it under 10 seconds. Do NOT ramble or summarize the whole conversation.
+
 Important: You are having a live podcast conversation. Speak naturally as if talking to a real person. Do not use markdown, bullet points, or any text formatting — only speak in natural sentences.`;
 }
 
@@ -65,4 +76,4 @@ export function buildGuestGreeting(
   return `Thank you so much ${hostName}, it's a real pleasure to be here! I've been deeply involved with ${topic} for quite some time now, and I'm really excited to share my thoughts and experiences with your audience today. Where would you like to start?`;
 }
 
-export const WRAPUP_INJECTION = `IMPORTANT UPDATE: The podcast is coming to an end. Begin wrapping up now. Thank your guest warmly, summarize 1-2 key takeaways from the conversation, and deliver a brief closing message to the audience. Keep it natural and warm — this should feel like a genuine conclusion, not an abrupt stop.`;
+export const WRAPUP_INJECTION = `IMPORTANT: End the podcast NOW in 2-3 short sentences. Thank your guest briefly, mention one takeaway, and say goodbye. Keep it under 10 seconds — do NOT ramble.`;

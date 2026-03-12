@@ -7,13 +7,15 @@ import { AGORA_CONFIG } from "@/api/agoraApi";
 import usePodcastStore from "@/store/usePodcastStore";
 import type { AudienceMessage } from "@/types/podcast";
 import { ConversationalAIAPI, EChatMessageType } from "@/conversational-ai-api";
+import { EAgentState } from "@/types/agora";
 
 interface UsePodcastRTMOptions {
   hostRtcUid: number;
+  guestName?: string;
 }
 
 export const usePodcastRTM = (options: UsePodcastRTMOptions) => {
-  const { hostRtcUid } = options;
+  const { hostRtcUid, guestName } = options;
 
   const rtmClientRef = useRef<InstanceType<typeof AgoraRTM.RTM> | null>(null);
   const channelRef = useRef<string | null>(null);
@@ -44,6 +46,8 @@ export const usePodcastRTM = (options: UsePodcastRTMOptions) => {
           if (!e.message || e.channelName !== channel) return;
           // Only handle audience chat messages (not transcript data)
           if (e.customType !== "AUDIENCE_CHAT") return;
+          // Skip own messages (already added locally in sendAudienceMessage)
+          if (e.publisher === String(uid)) return;
 
           const data =
             typeof e.message === "string"
@@ -101,8 +105,40 @@ export const usePodcastRTM = (options: UsePodcastRTMOptions) => {
         ...payload,
         userId: "local",
       });
+
+      // Auto-relay to host agent — skip during wrap-up
+      const currentStatus = usePodcastStore.getState().status;
+      if (currentStatus !== "wrapping-up") {
+        try {
+          const api = ConversationalAIAPI.getInstance();
+          const store = usePodcastStore.getState();
+          const isGuestSpeaking =
+            store.guestAgent?.state === EAgentState.SPEAKING;
+
+          // If guest is speaking, interrupt the guest first so host can take over
+          if (isGuestSpeaking && store.guestAgent?.rtcUid) {
+            await api.chat(String(store.guestAgent.rtcUid), {
+              messageType: EChatMessageType.TEXT,
+              text: `[PAUSE] The host needs to address an audience message. Stop speaking and listen.`,
+            });
+            console.log("[PodcastRTM] Interrupted guest agent for audience message");
+          }
+
+          const prefix = isGuestSpeaking
+            ? `[URGENT - Politely interrupt your guest and address this audience message]`
+            : `[Audience Message from ${displayName}]`;
+
+          await api.chat(String(hostRtcUid), {
+            messageType: EChatMessageType.TEXT,
+            text: `${prefix} ${text}`,
+          });
+          console.log("[PodcastRTM] Auto-relayed audience message to host agent");
+        } catch (err) {
+          console.error("[PodcastRTM] Failed to relay to host:", err);
+        }
+      }
     },
-    [addAudienceMessage],
+    [addAudienceMessage, hostRtcUid],
   );
 
   const sendQuestionToAgent = useCallback(

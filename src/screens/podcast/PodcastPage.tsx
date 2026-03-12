@@ -14,7 +14,6 @@ import {
   buildHostSystemPrompt,
   buildGuestSystemPrompt,
   buildHostGreeting,
-  buildGuestGreeting,
 } from "@/config/podcast/prompts";
 
 import { usePodcastRTC } from "@/hooks/podcast/usePodcastRTC";
@@ -60,7 +59,7 @@ const PodcastPage: React.FC = () => {
     guestAvatarUid,
   });
 
-  const podcastRTM = usePodcastRTM({ hostRtcUid });
+  const podcastRTM = usePodcastRTM({ hostRtcUid, guestName: config?.guestAvatar.name });
   const ambience = useAmbience();
 
   usePodcastTranscript({
@@ -100,9 +99,11 @@ const PodcastPage: React.FC = () => {
           url: "https://api.openai.com/v1/chat/completions",
           api_key: "***MASKED***",
           system_messages: [{ role: "system", content: systemPrompt }],
+          // Host gets a greeting (opens the show). Guest joins silently —
+          // introduction triggered via chat after host finishes.
           greeting_message: isHost
             ? buildHostGreeting(cfg.hostAvatar.name, cfg.guestAvatar.name, cfg.topic)
-            : buildGuestGreeting(cfg.guestAvatar.name, cfg.hostAvatar.name, cfg.topic),
+            : "__NONE__",
           params: { model: "gpt-4o-mini", max_tokens: 512, temperature: 0.8 },
           input_modalities: ["text"],
         },
@@ -120,17 +121,18 @@ const PodcastPage: React.FC = () => {
         turn_detection: {
           mode: "default",
           config: {
-            speech_threshold: 0.5,
+            speech_threshold: 0.6,
             start_of_speech: {
-              mode: "vad",
-              vad_config: {
-                interrupt_duration_ms: 200,
-                prefix_padding_ms: 600,
-              },
+              // "disabled" + "append" = agent doesn't interrupt the other speaker.
+              // Buffers incoming speech and processes it after current turn ends.
+              mode: "disabled",
+              disabled_config: { strategy: "append" },
             },
             end_of_speech: {
-              mode: "vad",
-              vad_config: { silence_duration_ms: 500 },
+              // Semantic mode uses LLM to detect natural turn boundaries
+              // rather than just silence duration.
+              mode: "semantic",
+              semantic_config: { silence_duration_ms: 1200, max_wait_ms: 5000 },
             },
           },
         },
@@ -178,10 +180,15 @@ const PodcastPage: React.FC = () => {
           sessionData.channel,
         );
 
-        // 3. Load ambience
+        // 3. Load ambience + init ConversationalAIAPI early (before orchestration needs it)
         ambience.loadTheme(cfg.theme);
+        const api = ConversationalAIAPI.init({
+          rtcEngine: podcastRTC.rtcClient!,
+          rtmEngine: podcastRTM.rtmClient,
+          enableLog: true,
+        });
 
-        // 4. Invite Host agent
+        // 4. Invite Host agent (speaks greeting immediately on join)
         const hostSettings = buildAgentSettings("host", sessionData, cfg);
         const hostResult = await inviteAgent(
           sessionData.channel,
@@ -196,16 +203,9 @@ const PodcastPage: React.FC = () => {
           state: EAgentState.IDLE,
         });
 
-        // Update session with host agent ID
-        const currentSession = usePodcastStore.getState().session;
-        if (currentSession) {
-          setSession({ ...currentSession, hostAgentId: hostResult.agentId });
-        }
+        // 5. Invite Guest agent shortly after (joins silently — no greeting)
+        await new Promise((resolve) => setTimeout(resolve, 2000));
 
-        // 5. Wait for host greeting to finish speaking before inviting guest
-        await new Promise((resolve) => setTimeout(resolve, 8000));
-
-        // 6. Invite Guest agent
         const guestSettings = buildAgentSettings("guest", sessionData, cfg);
         const guestResult = await inviteAgent(
           sessionData.channel,
@@ -221,10 +221,10 @@ const PodcastPage: React.FC = () => {
         });
 
         // Update session with both agent IDs
-        const updatedSession = usePodcastStore.getState().session;
-        if (updatedSession) {
+        const currentSession = usePodcastStore.getState().session;
+        if (currentSession) {
           setSession({
-            ...updatedSession,
+            ...currentSession,
             hostAgentId: hostResult.agentId,
             guestAgentId: guestResult.agentId,
           });
@@ -233,20 +233,34 @@ const PodcastPage: React.FC = () => {
         setStatus("live");
         showToast("Podcast is live!", "success");
 
-        // 7. Wait for guest greeting to finish, then kick-start the conversation
-        // by sending a text prompt to the host agent to begin interviewing
-        setTimeout(async () => {
-          try {
-            const api = ConversationalAIAPI.getInstance();
-            await api.chat(String(sessionData.hostRtcUid), {
-              messageType: EChatMessageType.TEXT,
-              text: `Your guest ${cfg.guestAvatar.name} just introduced themselves. Now ask your first interview question about ${cfg.topic}. Keep it conversational and engaging.`,
-            });
-            console.log("[PodcastPage] Sent conversation kick-start to host agent");
-          } catch (err) {
-            console.error("[PodcastPage] Failed to kick-start conversation:", err);
-          }
-        }, 10000); // Wait 10s for guest greeting TTS to finish
+        // 6. Orchestrate conversation start with controlled timing:
+        //    Host greeting ~10s → prompt guest intro → prompt host first question
+
+        // Wait for host greeting TTS to finish (~8s remaining after 2s guest invite delay)
+        await new Promise((resolve) => setTimeout(resolve, 8000));
+
+        try {
+          await api.chat(String(sessionData.guestRtcUid), {
+            messageType: EChatMessageType.TEXT,
+            text: `${cfg.hostAvatar.name} just introduced you on the podcast. Give a warm, enthusiastic introduction of yourself and your passion for ${cfg.topic}. Keep it to 15-20 seconds.`,
+          });
+          console.log("[PodcastPage] Prompted guest to introduce themselves");
+        } catch (err) {
+          console.error("[PodcastPage] Failed to prompt guest introduction:", err);
+        }
+
+        // Wait for guest introduction TTS (~12s)
+        await new Promise((resolve) => setTimeout(resolve, 12000));
+
+        try {
+          await api.chat(String(sessionData.hostRtcUid), {
+            messageType: EChatMessageType.TEXT,
+            text: `Your guest ${cfg.guestAvatar.name} just introduced themselves. Now ask your first interview question about ${cfg.topic}. Keep it conversational and engaging.`,
+          });
+          console.log("[PodcastPage] Sent first question prompt to host");
+        } catch (err) {
+          console.error("[PodcastPage] Failed to kick-start host:", err);
+        }
       } catch (err) {
         console.error("[PodcastPage] Start error:", err);
         showToast(

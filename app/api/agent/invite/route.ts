@@ -134,8 +134,11 @@ export async function POST(request: NextRequest) {
         : {}),
       username: displayName,
     };
-    llmPayload.greeting_message =
-      llm.greeting_message?.trim() || DEFAULT_GREETING_MESSAGE;
+    // Support skipping greeting: "__NONE__" omits greeting_message so agent joins silently.
+    const rawGreeting = llm.greeting_message?.trim() ?? "";
+    if (rawGreeting !== "__NONE__") {
+      llmPayload.greeting_message = rawGreeting || DEFAULT_GREETING_MESSAGE;
+    }
 
     if (llm.failure_message) {
       llmPayload.failure_message = llm.failure_message;

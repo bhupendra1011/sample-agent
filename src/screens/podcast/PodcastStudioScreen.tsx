@@ -1,9 +1,10 @@
 // src/screens/podcast/PodcastStudioScreen.tsx
 "use client";
 
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import usePodcastStore from "@/store/usePodcastStore";
 import { EAgentState } from "@/types/agora";
+import { ConversationalAIAPI, EChatMessageType } from "@/conversational-ai-api";
 import type { IRemoteVideoTrack } from "agora-rtc-sdk-ng";
 import type { PodcastTheme, LightingPreset } from "@/types/podcast";
 import { showToast } from "@/services/uiService";
@@ -43,6 +44,10 @@ const PodcastStudioScreen: React.FC<PodcastStudioScreenProps> = ({
   const setStatus = usePodcastStore((s) => s.setStatus);
   const triggerWrapUp = usePodcastStore((s) => s.triggerWrapUp);
 
+  const wrapUpTriggered = usePodcastStore((s) => s.wrapUpTriggered);
+  const wrapUpSpokenRef = useRef(false);
+  const wrapUpFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const handleWrapUp = useCallback(async () => {
     if (!session?.hostAgentId || !session?.channel || !config) return;
 
@@ -50,6 +55,7 @@ const PodcastStudioScreen: React.FC<PodcastStudioScreenProps> = ({
       triggerWrapUp();
       setStatus("wrapping-up");
 
+      // Step 1: Update system prompt (belt-and-suspenders fallback)
       const systemMessages = [
         {
           role: "system",
@@ -68,12 +74,55 @@ const PodcastStudioScreen: React.FC<PodcastStudioScreenProps> = ({
         }),
       });
 
+      // Step 2: Directly tell the host to wrap up via chat()
+      try {
+        const api = ConversationalAIAPI.getInstance();
+        await api.chat(String(session.hostRtcUid), {
+          messageType: EChatMessageType.TEXT,
+          text: `[WRAP UP NOW] Wrap up in 2-3 short sentences. Thank ${config.guestAvatar.name}, mention one takeaway, and say goodbye to the audience. Keep it brief.`,
+        });
+      } catch (chatErr) {
+        console.error("[PodcastStudio] Wrap-up chat() error:", chatErr);
+      }
+
+      // Step 3: Fallback auto-stop after 45 seconds
+      wrapUpFallbackRef.current = setTimeout(() => {
+        const currentStatus = usePodcastStore.getState().status;
+        if (currentStatus === "wrapping-up") {
+          console.log("[PodcastStudio] Wrap-up fallback timer fired, stopping");
+          onStop();
+        }
+      }, 45000);
+
       showToast("Wrap-up signal sent to host", "info");
     } catch (err) {
       console.error("[PodcastStudio] Wrap-up error:", err);
       showToast("Failed to trigger wrap-up", "error");
     }
-  }, [session, config, triggerWrapUp, setStatus]);
+  }, [session, config, triggerWrapUp, setStatus, onStop]);
+
+  // State-based auto-stop: when host finishes speaking after wrap-up
+  useEffect(() => {
+    if (!wrapUpTriggered) return;
+
+    const state = hostAgent?.state;
+    if (state === EAgentState.SPEAKING) {
+      wrapUpSpokenRef.current = true;
+    }
+
+    // After host has spoken, any non-speaking state means closing remarks are done
+    if (wrapUpSpokenRef.current && state && state !== EAgentState.SPEAKING) {
+      const t = setTimeout(() => {
+        if (wrapUpFallbackRef.current) {
+          clearTimeout(wrapUpFallbackRef.current);
+          wrapUpFallbackRef.current = null;
+        }
+        console.log("[PodcastStudio] Host finished wrap-up speech, auto-stopping");
+        onStop();
+      }, 3000);
+      return () => clearTimeout(t);
+    }
+  }, [wrapUpTriggered, hostAgent?.state, onStop]);
 
   const timer = usePodcastTimer({
     onWrapUp: handleWrapUp,
