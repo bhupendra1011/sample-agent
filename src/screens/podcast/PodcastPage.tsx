@@ -325,7 +325,7 @@ const PodcastPage: React.FC = () => {
       <div className="h-screen flex items-center justify-center bg-gray-950">
         <div className="text-center">
           <svg
-            className="animate-spin h-12 w-12 mx-auto mb-4 text-purple-500"
+            className="animate-spin h-12 w-12 mx-auto mb-4 text-agora-accent-blue"
             viewBox="0 0 24 24"
             fill="none"
           >
