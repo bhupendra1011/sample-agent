@@ -1845,7 +1845,7 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
                                 start_of_speech: {
                                   ...settings.turn_detection?.config?.start_of_speech,
                                   mode: "disabled",
-                                  disabled_config: { strategy: v as "append" | "ignored" },
+                                  disabled_config: { strategy: v as "append" | "ignore" },
                                 },
                               },
                             },
@@ -1853,7 +1853,7 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
                         }
                         options={[
                           { value: "append", label: "Append" },
-                          { value: "ignored", label: "Ignored" },
+                          { value: "ignore", label: "Ignore" },
                         ]}
                       />
                     </FormField>

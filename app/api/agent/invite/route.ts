@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { RtcTokenBuilder, RtcRole } from "agora-token";
 import type {
   AgentSettings,
+  AgentParametersConfig,
   TurnDetectionConfig,
   FillerWordsConfig,
   SalConfig,
@@ -142,6 +143,10 @@ export async function POST(request: NextRequest) {
 
     if (llm.failure_message) {
       llmPayload.failure_message = llm.failure_message;
+    }
+
+    if (llm.greeting_configs?.mode) {
+      llmPayload.greeting_configs = { mode: llm.greeting_configs.mode };
     }
 
     if (llm.max_history) {
@@ -428,18 +433,26 @@ export async function POST(request: NextRequest) {
     // Add agent parameters
     // data_channel per Agora docs: "rtm" = RTM (when enable_rtm); "datastream" = RTC data stream (default)
     const useRtm = enableRtmInPayload;
+    const params = parameters as AgentParametersConfig | undefined;
     const shouldSetDataChannel =
       parameters || useRtm || (advanced_features != null && !useRtm);
-    if (shouldSetDataChannel) {
+    if (shouldSetDataChannel || params?.silence_config) {
       propertiesPayload.parameters = {
-        ...(parameters?.enable_farewell !== undefined && {
-          enable_farewell: parameters.enable_farewell,
+        ...(params?.enable_farewell !== undefined && {
+          enable_farewell: params.enable_farewell,
         }),
-        ...(parameters?.farewell_phrases && {
-          farewell_phrases: parameters.farewell_phrases,
+        ...(params?.farewell_phrases && {
+          farewell_phrases: params.farewell_phrases,
         }),
         // RTM: transcript + chat over Signaling. RTC: "datastream" = transcript over RTC data stream (client receives via stream-message)
         data_channel: useRtm ? "rtm" : "datastream",
+        ...(params?.silence_config && {
+          silence_config: {
+            timeout_ms: params.silence_config.timeout_ms,
+            action: params.silence_config.action,
+            content: params.silence_config.content,
+          },
+        }),
       };
     }
 

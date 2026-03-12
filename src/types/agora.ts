@@ -78,6 +78,8 @@ export interface LLMConfig {
   input_modalities?: ("text" | "image")[];
   /** Template variables for system_messages, greeting_message, etc. (e.g. { username: "John" } → {{username}}) */
   template_variables?: Record<string, string>;
+  /** When to send greeting: single_every = every join, single_first = only first user */
+  greeting_configs?: { mode: "single_every" | "single_first" };
 }
 
 // --- TTS Vendors ---
@@ -179,7 +181,7 @@ export interface TurnDetectionKeywordsConfig {
 
 /** Disabled start-of-speech config */
 export interface TurnDetectionDisabledConfig {
-  strategy?: "append" | "ignored";
+  strategy?: "append" | "ignore";
 }
 
 export type TurnDetectionStartOfSpeechMode = "vad" | "keywords" | "disabled";
@@ -273,6 +275,12 @@ export interface AgentParametersConfig {
   farewell_phrases?: string[];
   /** Data channel mode: "rtc" for RTC stream, "rtm" for RTM signaling */
   data_channel?: "rtc" | "rtm";
+  /** Silence timeout: when agent is silent this long, trigger action (speak or think) with content */
+  silence_config?: {
+    timeout_ms: number;
+    action: "speak" | "think";
+    content: string;
+  };
 }
 
 // --- Avatar Vendors ---

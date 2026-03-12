@@ -2664,7 +2664,7 @@ const AgentSettingsSidebarContent: React.FC<{
                                   ?.start_of_speech,
                                 mode: "disabled",
                                 disabled_config: {
-                                  strategy: v as "append" | "ignored",
+                                  strategy: v as "append" | "ignore",
                                 },
                               },
                             },
@@ -2673,7 +2673,7 @@ const AgentSettingsSidebarContent: React.FC<{
                       }
                       options={[
                         { value: "append", label: "Append" },
-                        { value: "ignored", label: "Ignored" },
+                        { value: "ignore", label: "Ignore" },
                       ]}
                     />
                   </FormField>

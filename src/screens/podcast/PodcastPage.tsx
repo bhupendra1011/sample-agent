@@ -8,7 +8,7 @@ import { EAgentState } from "@/types/agora";
 import type { AgentSettings } from "@/types/agora";
 import { showToast } from "@/services/uiService";
 import { inviteAgent } from "@/api/agentApi";
-import { ConversationalAIAPI, EChatMessageType } from "@/conversational-ai-api";
+import { ConversationalAIAPI } from "@/conversational-ai-api";
 import type { PodcastStartResponse, PodcastTheme, LightingPreset } from "@/types/podcast";
 import {
   buildHostSystemPrompt,
@@ -74,6 +74,9 @@ const PodcastPage: React.FC = () => {
     sessionId: session?.sessionId ?? null,
   });
 
+  // Voice-based turn detection: agents hear each other directly via audio.
+  // No text relay needed — VAD handles turn-taking naturally.
+
   // Build agent settings for invitation
   const buildAgentSettings = useCallback(
     (
@@ -92,19 +95,22 @@ const PodcastPage: React.FC = () => {
       return {
         name: `podcast-${role}-${sessionData.sessionId}`,
         agent_rtc_uid: isHost ? sessionData.hostRtcUid : sessionData.guestRtcUid,
-        // Each agent subscribes to the other agent's audio.
-        // Host is invited first; guest UID is pre-assigned so Agora handles late-join subscription.
-        remote_rtc_uids: [String(isHost ? sessionData.guestRtcUid : sessionData.hostRtcUid)],
+        // Each agent subscribes to the OTHER agent's audio — same as user↔agent voice interaction.
+        // VAD turn detection handles natural turn-taking.
+        remote_rtc_uids: isHost
+          ? [String(sessionData.guestRtcUid)]
+          : [String(sessionData.hostRtcUid)],
         llm: {
           url: "https://api.openai.com/v1/chat/completions",
           api_key: "***MASKED***",
           system_messages: [{ role: "system", content: systemPrompt }],
-          // Host gets a greeting (opens the show). Guest joins silently —
-          // introduction triggered via chat after host finishes.
+          // Host gets a greeting (opens the show). Guest joins silently — intro triggered via one chat after host finishes.
           greeting_message: isHost
             ? buildHostGreeting(cfg.hostAvatar.name, cfg.guestAvatar.name, cfg.topic)
             : "__NONE__",
-          params: { model: "gpt-4o-mini", max_tokens: 512, temperature: 0.8 },
+          greeting_configs: isHost ? { mode: "single_first" } : undefined,
+          max_history: 20,
+          params: { model: "gpt-4o-mini", max_tokens: 512, temperature: 0.7 },
           input_modalities: ["text"],
         },
         tts: {
@@ -116,23 +122,26 @@ const PodcastPage: React.FC = () => {
           },
         },
         asr: { vendor: "ares" },
-        idle_timeout: 300,
+        idle_timeout: 600,
+        // VAD turn detection — agents hear each other and take turns naturally like user↔agent.
         enable_turn_detection: true,
         turn_detection: {
-          mode: "default",
+          mode: "default" as const,
           config: {
-            speech_threshold: 0.6,
+            speech_threshold: 0.5,
             start_of_speech: {
-              // "disabled" + "append" = agent doesn't interrupt the other speaker.
-              // Buffers incoming speech and processes it after current turn ends.
-              mode: "disabled",
-              disabled_config: { strategy: "append" },
+              mode: "vad" as const,
+              vad_config: {
+                interrupt_duration_ms: 160,
+                speaking_interrupt_duration_ms: 160,
+                prefix_padding_ms: 800,
+              },
             },
             end_of_speech: {
-              // Semantic mode uses LLM to detect natural turn boundaries
-              // rather than just silence duration.
-              mode: "semantic",
-              semantic_config: { silence_duration_ms: 1200, max_wait_ms: 5000 },
+              mode: "vad" as const,
+              vad_config: {
+                silence_duration_ms: isHost ? 1500 : 1500,
+              },
             },
           },
         },
@@ -180,9 +189,9 @@ const PodcastPage: React.FC = () => {
           sessionData.channel,
         );
 
-        // 3. Load ambience + init ConversationalAIAPI early (before orchestration needs it)
+        // 3. Load ambience + init ConversationalAIAPI early (transcript/RTM use getInstance())
         ambience.loadTheme(cfg.theme);
-        const api = ConversationalAIAPI.init({
+        ConversationalAIAPI.init({
           rtcEngine: podcastRTC.rtcClient!,
           rtmEngine: podcastRTM.rtmClient,
           enableLog: true,
@@ -203,8 +212,8 @@ const PodcastPage: React.FC = () => {
           state: EAgentState.IDLE,
         });
 
-        // 5. Invite Guest agent shortly after (joins silently — no greeting)
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        // 5. Invite guest after brief stagger so both are in channel; turn-taking is purely VAD (2s silence on stream)
+        await new Promise((resolve) => setTimeout(resolve, 1000));
 
         const guestSettings = buildAgentSettings("guest", sessionData, cfg);
         const guestResult = await inviteAgent(
@@ -220,7 +229,6 @@ const PodcastPage: React.FC = () => {
           state: EAgentState.IDLE,
         });
 
-        // Update session with both agent IDs
         const currentSession = usePodcastStore.getState().session;
         if (currentSession) {
           setSession({
@@ -232,35 +240,7 @@ const PodcastPage: React.FC = () => {
 
         setStatus("live");
         showToast("Podcast is live!", "success");
-
-        // 6. Orchestrate conversation start with controlled timing:
-        //    Host greeting ~10s → prompt guest intro → prompt host first question
-
-        // Wait for host greeting TTS to finish (~8s remaining after 2s guest invite delay)
-        await new Promise((resolve) => setTimeout(resolve, 8000));
-
-        try {
-          await api.chat(String(sessionData.guestRtcUid), {
-            messageType: EChatMessageType.TEXT,
-            text: `${cfg.hostAvatar.name} just introduced you on the podcast. Give a warm, enthusiastic introduction of yourself and your passion for ${cfg.topic}. Keep it to 15-20 seconds.`,
-          });
-          console.log("[PodcastPage] Prompted guest to introduce themselves");
-        } catch (err) {
-          console.error("[PodcastPage] Failed to prompt guest introduction:", err);
-        }
-
-        // Wait for guest introduction TTS (~12s)
-        await new Promise((resolve) => setTimeout(resolve, 12000));
-
-        try {
-          await api.chat(String(sessionData.hostRtcUid), {
-            messageType: EChatMessageType.TEXT,
-            text: `Your guest ${cfg.guestAvatar.name} just introduced themselves. Now ask your first interview question about ${cfg.topic}. Keep it conversational and engaging.`,
-          });
-          console.log("[PodcastPage] Sent first question prompt to host");
-        } catch (err) {
-          console.error("[PodcastPage] Failed to kick-start host:", err);
-        }
+        // Guest hears host greeting via audio → VAD triggers guest's response naturally.
       } catch (err) {
         console.error("[PodcastPage] Start error:", err);
         showToast(
