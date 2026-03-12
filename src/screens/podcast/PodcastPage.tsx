@@ -133,14 +133,16 @@ const PodcastPage: React.FC = () => {
               mode: "vad" as const,
               vad_config: {
                 interrupt_duration_ms: 160,
-                speaking_interrupt_duration_ms: 160,
+                // Guest: max 1200ms so it doesn't interrupt host mid-sentence.
+                // Host: moderate — can gently steer if guest goes long.
+                speaking_interrupt_duration_ms: isHost ? 500 : 1200,
                 prefix_padding_ms: 800,
               },
             },
             end_of_speech: {
               mode: "vad" as const,
               vad_config: {
-                silence_duration_ms: isHost ? 1500 : 1500,
+                silence_duration_ms: 1500,
               },
             },
           },

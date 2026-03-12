@@ -79,7 +79,7 @@ const PodcastStudioScreen: React.FC<PodcastStudioScreenProps> = ({
         const api = ConversationalAIAPI.getInstance();
         await api.chat(String(session.hostRtcUid), {
           messageType: EChatMessageType.TEXT,
-          text: `[WRAP UP NOW] Wrap up in 2-3 short sentences. Thank ${config.guestAvatar.name}, mention one takeaway, and say goodbye to the audience. Keep it brief.`,
+          text: `[WRAP UP NOW] We're running out of time. Invite ${config.guestAvatar.name} to share any final thoughts before you close the show.`,
         });
       } catch (chatErr) {
         console.error("[PodcastStudio] Wrap-up chat() error:", chatErr);
@@ -101,26 +101,39 @@ const PodcastStudioScreen: React.FC<PodcastStudioScreenProps> = ({
     }
   }, [session, config, triggerWrapUp, setStatus, onStop]);
 
-  // State-based auto-stop: when host finishes speaking after wrap-up
+  // State-based auto-stop: wrap-up is a 3-step flow:
+  //   1. Host invites guest to give closing remarks (host speaks, then stops)
+  //   2. Guest gives closing remarks (guest speaks, then stops)
+  //   3. Host says final goodbye (host speaks again, then stops) → auto-stop
+  // We track how many times the host has finished speaking after wrap-up.
+  const wrapUpHostTurnsRef = useRef(0);
+
   useEffect(() => {
     if (!wrapUpTriggered) return;
 
-    const state = hostAgent?.state;
-    if (state === EAgentState.SPEAKING) {
+    const hostState = hostAgent?.state;
+    if (hostState === EAgentState.SPEAKING) {
       wrapUpSpokenRef.current = true;
     }
 
-    // After host has spoken, any non-speaking state means closing remarks are done
-    if (wrapUpSpokenRef.current && state && state !== EAgentState.SPEAKING) {
-      const t = setTimeout(() => {
-        if (wrapUpFallbackRef.current) {
-          clearTimeout(wrapUpFallbackRef.current);
-          wrapUpFallbackRef.current = null;
-        }
-        console.log("[PodcastStudio] Host finished wrap-up speech, auto-stopping");
-        onStop();
-      }, 3000);
-      return () => clearTimeout(t);
+    // Host finished a speaking turn during wrap-up
+    if (wrapUpSpokenRef.current && hostState && hostState !== EAgentState.SPEAKING) {
+      wrapUpHostTurnsRef.current += 1;
+      wrapUpSpokenRef.current = false; // reset for next turn
+
+      // Turn 1: host invited guest to close → wait for guest + host goodbye
+      // Turn 2+: host said final goodbye → stop
+      if (wrapUpHostTurnsRef.current >= 2) {
+        const t = setTimeout(() => {
+          if (wrapUpFallbackRef.current) {
+            clearTimeout(wrapUpFallbackRef.current);
+            wrapUpFallbackRef.current = null;
+          }
+          console.log("[PodcastStudio] Host finished final goodbye, auto-stopping");
+          onStop();
+        }, 3000);
+        return () => clearTimeout(t);
+      }
     }
   }, [wrapUpTriggered, hostAgent?.state, onStop]);
 
