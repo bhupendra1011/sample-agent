@@ -45,14 +45,14 @@ const LandingScreen: React.FC = () => {
         token,
         Number(uid),
         channel,
-        "My First Convo AI App",
+        "IOT Conversational AI App",
         userName,
       );
 
       callStart({
         userName,
         uid: String(uid),
-        meetingName: "My First Convo AI App",
+        meetingName: "IOT Conversational AI App",
         channelId: channel,
         isHost: true,
       });
@@ -97,7 +97,7 @@ const LandingScreen: React.FC = () => {
               animationFillMode: "backwards",
             }}
           >
-            Experience
+            IOT
             <br />
             <span className="bg-[linear-gradient(to_right,var(--agora-accent-blue),#33d1ff)] bg-clip-text text-transparent animate-landing-gradient-shimmer inline-block">
               Conversational AI
@@ -110,8 +110,8 @@ const LandingScreen: React.FC = () => {
               animationFillMode: "backwards",
             }}
           >
-            Real-time voice / video calling agents that understand and respond
-            naturally—powered by Agora.
+            Real-time voice and video with an AI agent that controls your IoT
+            devices—powered by Agora.
           </p>
           <Link
             href={AGORA_CONVO_AI_URL}

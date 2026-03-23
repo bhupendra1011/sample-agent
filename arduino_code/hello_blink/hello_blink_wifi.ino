@@ -142,8 +142,8 @@
          // Start WiFi connection
          if (connectWiFi()) {
            currentState = STATE_READY;
-           setGreen();
-           Serial.println("\nState: READY (Green LED)");
+           setRed();
+           Serial.println("\nState: READY (Red LED)");
            Serial.println("Ready to receive MCP commands!");
          } else {
            // Connection failed - go back to OFF
@@ -162,7 +162,7 @@
        break;
      
      case STATE_READY:
-       setGreen();
+       setRed();
        if (buttonPressed) {
          currentState = STATE_DISCONNECTING;
          stateStartTime = millis();
