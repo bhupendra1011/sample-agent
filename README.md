@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="public/favicon.svg" alt="My Agora App" width="80" />
+  <img src="public/favicon.svg" alt="Convo AI Podcast App" width="80" />
 </p>
 
-<h1 align="center">🎙️ My First Convo AI App</h1>
+<h1 align="center">🎙️ Convo AI Podcast App</h1>
 
 <p align="center">
-  <b>A real-time communication app built with Next.js, TypeScript & Agora SDKs</b><br/>
-  Video calls · Voice calls · Real-time messaging · AI Conversational Agent
+  <b>A real-time podcast studio built with Next.js, TypeScript & Agora SDKs</b><br/>
+  Live podcast rooms · Host/Audience chat · AI co-host · Transcripts
 </p>
 
 <p align="center">
@@ -22,38 +22,39 @@
 
 ## 📖 Overview
 
-This app delivers  **playground experience** to try out the latest features on [Conversatioal AI Engine](https://docs.agora.io/en/conversational-ai/overview/product-overview).
-The agent uses configurable LLM, TTS, and ASR providers, supports AI avatars (HeyGen, Akool, Anam), and can call external tools via **MCP (Model Context Protocol)** servers.
+Convo AI Podcast App is a real-time podcast experience built on Agora RTC/RTM and the Conversational AI Engine.
+It supports podcast room setup, live stage controls, audience interaction, transcript streaming, and an AI co-host with configurable LLM/TTS/ASR providers.
 
 All secret keys stay on the server. Next.js API routes generate Agora tokens, inject API keys, and proxy requests to the [Agora Conversational AI v2 API](https://docs.agora.io/en/conversational-ai/overview/product-overview).
 
 ---
 
-https://github.com/user-attachments/assets/8f5fe262-dbfd-41c7-9a23-5fb523e91e68
+Demo: [vimeo:https://vimeo.com/1176174762](https://vimeo.com/1176174762)
 
 ## ✨ Features
 
-| Feature                        | Description                                            |
-| ------------------------------ | ------------------------------------------------------ |
-| 🎥 **Video & Voice Calling**   | HD video/voice calls powered by Agora RTC SDK          |
-| 💬 **Real-time Messaging**     | Instant chat using Agora RTM SDK v2                    |
-| 🤖 **AI Conversational Agent** | Talk to an AI agent with LLM, TTS & ASR support        |
-| 🖼️ **AI Avatars**              | Optional avatar integration (HeyGen, Akool, Anam)      |
-| 🌙 **Dark Mode**               | Full dark mode support with Tailwind                   |
-| 🔌 **MCP Tools**               | Model Context Protocol server for AI-powered tooling   |
-| ⚡ **Modern Stack**            | Next.js 15, React 19, TypeScript, Zustand, React Query |
+| Feature                       | Description                                                          |
+| ----------------------------- | -------------------------------------------------------------------- |
+| 🎙️ **Podcast Studio Flow**    | Create and run podcast sessions with dedicated setup and studio UIs  |
+| 🧑‍💼 **Host Controls**         | Start, extend, wrap-up, and stop podcast sessions in real time       |
+| 👥 **Audience Interaction**   | Live audience chat and RTM messaging during sessions                 |
+| 🤖 **AI Co-host Agent**       | Invite and control AI agent with LLM, TTS, and ASR support          |
+| 📝 **Live Transcripts**       | Real-time transcript panel for podcast conversations                  |
+| 🖼️ **AI Avatars**             | Optional avatar integration (HeyGen, Akool, Anam)                   |
+| 🌙 **Dark Mode + Theming**    | Tailwind-based UI with dark mode and podcast theme configuration     |
 
 ---
 
 ## 🛠️ Tech Stack
 
-| Layer          | Technologies                                                                                                           |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| **Framework**  | Next.js 15 · React 19 · TypeScript 5.8                                                                                 |
-| **Styling**    | TailwindCSS 4 · Dark mode (class strategy)                                                                             |
-| **State**      | Zustand 5 · TanStack React Query                                                                                       |
-| **Agora SDKs** | `agora-rtc-sdk-ng` · `agora-rtm-sdk` v2                                                                               |
-| **AI**         | Conversational AI · LLM (OpenAI/Anthropic/Gemini) · TTS (ElevenLabs/Microsoft/OpenAI) · ASR (Deepgram/Microsoft/Agora) |
+| Layer            | Technologies                                                                                                            |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **Framework**    | Next.js 15 · React 19 · TypeScript 5.8                                                                                 |
+| **Styling**      | TailwindCSS 4 · Dark mode                                                                                              |
+| **State**        | Zustand 5                                                                                                               |
+| **Agora SDKs**   | `agora-rtc-sdk-ng` · `agora-rtm-sdk` v2                                                                                |
+| **AI Pipeline**  | Conversational AI Engine · LLM (OpenAI/Anthropic/Gemini) · TTS (ElevenLabs/Microsoft/OpenAI) · ASR (Deepgram/Microsoft/Agora) |
+| **Server APIs**  | Next.js Route Handlers (`app/api/*`) for tokens, agent lifecycle, podcast lifecycle, and uploads                      |
 
 ---
 
@@ -68,9 +69,9 @@ sequenceDiagram
     participant AI as 🧠 Conversational<br/>AI Engine
     participant LLM as 🤖 LLM Provider
 
-    Note over U,LLM: 🔵 Meeting Flow (no managed service)
+    Note over U,LLM: 🔵 Podcast Session Flow (no managed service)
 
-    U->>C: Enter name, "Start Conversation"
+    U->>C: Create session, "Start Podcast"
     C->>API: GET /api/generate-agora-token
     API->>API: Build RTC/RTM token (agora-token),<br/>generate channel + UID
     API-->>C: token, uid, channel
@@ -163,8 +164,8 @@ cp .env.example .env
 
 Edit `.env` and add your keys. **Minimum to run the app:**
 
-- **Agora (required):** `NEXT_PUBLIC_AGORA_APP_ID`, `AGORA_APP_CERTIFICATE`, `AGORA_CUSTOMER_ID`, `AGORA_CUSTOMER_SECRET` — then you can create/join meetings and use voice/video.
-- **AI agent (optional):** Set `LLM_API_KEY` and one TTS key (e.g. `ELEVENLABS_API_KEY`) to invite the conversational AI agent. Other LLM/TTS/ASR/avatar vars in `.env.example` are optional defaults.
+- **Agora (required):** `NEXT_PUBLIC_AGORA_APP_ID`, `AGORA_APP_CERTIFICATE`, `AGORA_CUSTOMER_ID`, `AGORA_CUSTOMER_SECRET` — then you can create/join podcast sessions and stream audio/video.
+- **AI agent (optional):** Set `LLM_API_KEY` and one TTS key (e.g. `ELEVENLABS_API_KEY`) to invite the AI co-host. Other LLM/TTS/ASR/avatar vars in `.env.example` are optional defaults.
 
 | Variable                     | Where to get it                                                                 |
 | ---------------------------- | ------------------------------------------------------------------------------- |
@@ -201,16 +202,20 @@ Navigate to 👉 `http://localhost:3000`
 
 ```
 my-agora-app/
+├── app/                      # Next.js App Router pages and API routes
+│   ├── podcast/              # Podcast pages (landing, create, studio)
+│   └── api/                  # API routes (agent, podcast, uploads, MCP)
 ├── src/
-│   ├── app/           # Next.js App Router pages & API routes
-│   ├── components/    # React components
-│   │   └── common/    # Reusable UI (Button, Card, Modal, InputField)
-│   ├── hooks/         # Custom React hooks (useAgora)
-│   ├── services/      # Utility services (uiService)
-│   ├── store/         # Zustand stores
-│   └── types/         # TypeScript definitions
-├── public/            # Static assets
-├── .env.example       # Environment variable template
+│   ├── components/           # Shared + podcast UI components
+│   ├── screens/              # Screen-level flows (podcast + call)
+│   ├── hooks/                # Agora, agent, and podcast hooks
+│   ├── store/                # Zustand stores
+│   ├── config/               # Podcast avatars, themes, prompts
+│   ├── services/             # UI and app services
+│   ├── types/                # TypeScript domain types
+│   └── conversational-ai-api/# Conversational AI API client utilities
+├── public/                   # Static assets
+├── .env.example              # Environment variable template
 └── package.json
 ```
 
