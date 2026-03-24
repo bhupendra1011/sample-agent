@@ -1,15 +1,15 @@
 <p align="center">
-  <img src="public/favicon.svg" alt="My Agora App" width="80" />
+  <img src="public/favicon.svg" alt="Voice Controlled Smart Light" width="80" />
 </p>
 
-<h1 align="center">🎙️ My First Convo AI App</h1>
+<h1 align="center">💡 Voice Controlled Smart Light</h1>
 
 <p align="center">
-  <b>A real-time communication app built with Next.js, TypeScript & Agora SDKs</b><br/>
-  Video calls · Voice calls · Real-time messaging · AI Conversational Agent · <b>IoT smart light (this branch)</b>
+  <b>A real-time voice-and-vision IoT demo built with Next.js, TypeScript & Agora SDKs</b><br/>
+  Voice control · Camera verification · MCP tools · ESP8266 smart light
 </p>
 
-> **Branch `feat/main-basic-app-iot`** — Adds an end-to-end **voice + vision + MCP** demo: the Conversational AI agent controls a physical LED/OLED device and can **verify** changes using your camera feed. Product intent and requirements are in [`docs/iot/PRD.md`](docs/iot/PRD.md).
+> **Branch `feat/main-basic-app-iot`** — Adds an end-to-end **voice + vision + MCP** demo: the Conversational AI agent controls a physical LED/OLED device and can **verify** changes using your camera feed.
 
 <p align="center">
   <img src="https://img.shields.io/badge/Next.js-15-black?logo=next.js" alt="Next.js" />
@@ -24,9 +24,9 @@
 
 ## 📖 Overview
 
-This app delivers a **playground** for [Agora Conversational AI](https://docs.agora.io/en/conversational-ai/overview/product-overview): configurable LLM, TTS, and ASR, optional avatars (HeyGen, Akool, Anam), and **MCP (Model Context Protocol)** tool calling.
+This app delivers a **Voice Controlled Smart Light** demo on [Agora Conversational AI](https://docs.agora.io/en/conversational-ai/overview/product-overview): configurable LLM, TTS, and ASR, with **MCP (Model Context Protocol)** tool calling to control real hardware.
 
-**On this branch**, that same stack drives an **IoT smart light** demo (see PRD §1): the agent issues MCP tool calls to a small Python MCP server, which talks to a **NodeMCU ESP8266** over HTTP (LED ring + OLED). The differentiator is **closed-loop verification** — the agent subscribes to your **camera** in the same RTC channel and can confirm the LED state visually (multimodal LLM), not only via `get_light_status`.
+**On this branch**, that same stack drives an **IoT smart light** demo: the agent issues MCP tool calls to a small Python MCP server, which talks to a **NodeMCU ESP8266** over HTTP (LED ring + OLED). The differentiator is **closed-loop verification** — the agent subscribes to your **camera** in the same RTC channel and can confirm the LED state visually (multimodal LLM), not only via `get_light_status`.
 
 Secret keys stay on the server. Next.js API routes generate Agora tokens and proxy Conversational AI API calls.
 
@@ -36,14 +36,11 @@ Secret keys stay on the server. Next.js API routes generate Agora tokens and pro
 
 | What | Where in the repo |
 | ---- | ----------------- |
-| **Product goals, user stories, MCP tool list, success criteria** | [`docs/iot/PRD.md`](docs/iot/PRD.md) |
-| **Wire the MCP server into the app (Agent Settings, vision)** | [`docs/iot/INTEGRATION_GUIDE.md`](docs/iot/INTEGRATION_GUIDE.md) |
-| **ESP8266 firmware, wiring, Arduino setup** | [`docs/iot/IOT_DEVICE_PLAN.md`](docs/iot/IOT_DEVICE_PLAN.md) · [`arduino_code/smart_light/smart_light.ino`](arduino_code/smart_light/smart_light.ino) · [`arduino_code/SETUP.md`](arduino_code/SETUP.md) |
-| **MCP server design (FastAPI, tools, deployment)** | [`docs/iot/MCP_SERVER_PLAN.md`](docs/iot/MCP_SERVER_PLAN.md) |
-| **Agent system prompt & LLM settings** | [`docs/iot/AGENT_PROMPT.md`](docs/iot/AGENT_PROMPT.md) |
-| **End-to-end demo checklist** | [`docs/iot/DEMO_GUIDE.md`](docs/iot/DEMO_GUIDE.md) |
+| **ESP8266 firmware (smart light)** | [`arduino_code/smart_light/smart_light.ino`](arduino_code/smart_light/smart_light.ino) |
+| **Arduino environment setup** | [`arduino_code/SETUP.md`](arduino_code/SETUP.md) |
+| **Editor MCP config (optional)** | [`.mcp.json`](.mcp.json) |
 
-The **web app** already exposes MCP configuration in the Agent Settings sidebar and agent invite flow (see integration guide). The **Python MCP server** (`mcp-iot-light-server/` layout in the plan) is run **alongside** this repo; it is not required for `npm run dev` unless you are doing the full hardware demo.
+The **web app** already exposes MCP configuration in the Agent Settings sidebar and agent invite flow. The **Python MCP server** runs **alongside** this repo; it is not required for `npm run dev` unless you are doing the full hardware demo.
 
 ### IoT architecture (high level)
 
@@ -60,11 +57,11 @@ flowchart TB
   ESP --> LED[NeoPixel ring + OLED]
 ```
 
-**Flows (PRD §2.2):** voice → RTC → agent ASR/LLM/TTS; light control → MCP → device HTTP; verification → user video → agent multimodal LLM.
+**Flows:** voice → RTC → agent ASR/LLM/TTS; light control → MCP → device HTTP; verification → user video → agent multimodal LLM.
 
 ---
 
-https://github.com/user-attachments/assets/8f5fe262-dbfd-41c7-9a23-5fb523e91e68
+vimeo:https://vimeo.com/1176182479
 
 ## ✨ Features
 
@@ -81,7 +78,7 @@ https://github.com/user-attachments/assets/8f5fe262-dbfd-41c7-9a23-5fb523e91e68
 
 ---
 
-## 🛠️ Tech Stack
+## 🛠️ Demo Tech Stack
 
 | Layer          | Technologies                                                                                                           |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------- |
@@ -89,8 +86,8 @@ https://github.com/user-attachments/assets/8f5fe262-dbfd-41c7-9a23-5fb523e91e68
 | **Styling**    | TailwindCSS 4 · Dark mode (class strategy)                                                                             |
 | **State**      | Zustand 5 · TanStack React Query                                                                                       |
 | **Agora SDKs** | `agora-rtc-sdk-ng` · `agora-rtm-sdk` v2                                                                               |
-| **AI**         | Conversational AI · LLM (OpenAI/Anthropic/Gemini) · TTS · ASR — **multimodal LLM recommended for IoT vision**         |
-| **IoT (branch)** | ESP8266 + Arduino firmware in `arduino_code/` · MCP server per `docs/iot/MCP_SERVER_PLAN.md`                          |
+| **AI**         | Conversational AI · LLM (OpenAI/Anthropic/Gemini) · TTS · ASR — **multimodal LLM required for camera verification**    |
+| **IoT (branch)** | ESP8266 + Arduino firmware in `arduino_code/` · Python MCP server (run separately)                                     |
 
 ---
 
@@ -144,7 +141,7 @@ sequenceDiagram
 
 > **How it works:** Tokens are generated server-side by Next.js API routes using the `agora-token` library (no Agora Managed Service). The client fetches `/api/generate-agora-token` for RTC/RTM tokens and channel info, then joins the Agora channel. For the AI agent, API routes generate agent tokens and inject API keys, then call Agora's Conversational AI Engine.
 
-**IoT extension:** With MCP servers configured in Agent Settings, the agent can call tools during the same session; for the smart light demo those tools hit the FastAPI MCP server, which forwards commands to the ESP8266 (see [`docs/iot/INTEGRATION_GUIDE.md`](docs/iot/INTEGRATION_GUIDE.md)).
+**IoT extension:** With MCP servers configured in Agent Settings, the agent can call tools during the same session; for the smart light demo those tools hit the FastAPI MCP server, which forwards commands to the ESP8266.
 
 ---
 
@@ -155,7 +152,7 @@ Before getting started, make sure you have:
 - ✅ **Node.js** v18 or higher
 - ✅ **npm** or **yarn**
 
-**For the full IoT demo (optional):** ESP8266 + components per [`docs/iot/IOT_DEVICE_PLAN.md`](docs/iot/IOT_DEVICE_PLAN.md), **Python 3** for the MCP server, and a **multimodal LLM** API key for camera-based verification ([`docs/iot/INTEGRATION_GUIDE.md`](docs/iot/INTEGRATION_GUIDE.md) §3).
+**For the full IoT demo (optional):** ESP8266 + components, **Python 3** for the MCP server, and a **multimodal LLM** API key for camera-based verification.
 
 ### 🔑 Agora Account Setup
 
@@ -207,7 +204,7 @@ Edit `.env` and add your keys. **Minimum to run the app:**
 
 - **Agora (required):** `NEXT_PUBLIC_AGORA_APP_ID`, `AGORA_APP_CERTIFICATE`, `AGORA_CUSTOMER_ID`, `AGORA_CUSTOMER_SECRET` — then you can create/join meetings and use voice/video.
 - **AI agent (optional):** Set `LLM_API_KEY` and one TTS key (e.g. `ELEVENLABS_API_KEY`) to invite the conversational AI agent. Other LLM/TTS/ASR/avatar vars in `.env.example` are optional defaults.
-- **IoT + vision:** Use a vision-capable model and enable MLLM per [`docs/iot/INTEGRATION_GUIDE.md`](docs/iot/INTEGRATION_GUIDE.md).
+- **IoT + vision:** Use a vision-capable model and enable MLLM in agent settings.
 
 | Variable                     | Where to get it                                                                 |
 | ---------------------------- | ------------------------------------------------------------------------------- |
@@ -229,7 +226,7 @@ Navigate to 👉 `http://localhost:3000`
 
 ### 6️⃣ IoT demo (optional)
 
-Follow [`docs/iot/DEMO_GUIDE.md`](docs/iot/DEMO_GUIDE.md) after flashing [`arduino_code/smart_light/smart_light.ino`](arduino_code/smart_light/smart_light.ino) and running the MCP server described in [`docs/iot/MCP_SERVER_PLAN.md`](docs/iot/MCP_SERVER_PLAN.md).
+Flash [`arduino_code/smart_light/smart_light.ino`](arduino_code/smart_light/smart_light.ino), run your FastAPI MCP server, then connect that endpoint in Agent Settings (LLM tab → MCP Server Configuration).
 
 ---
 
@@ -248,7 +245,6 @@ Follow [`docs/iot/DEMO_GUIDE.md`](docs/iot/DEMO_GUIDE.md) after flashing [`ardui
 
 ```
 my-agora-app/
-├── docs/iot/              # IoT PRD, integration, MCP plan, demo guide
 ├── arduino_code/          # ESP8266 sketches (smart_light, hello_blink, SETUP.md)
 ├── src/
 │   ├── app/               # Next.js App Router pages & API routes
