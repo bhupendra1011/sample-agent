@@ -454,32 +454,12 @@ export async function POST(request: NextRequest) {
     );
     if (enabledMcpServers.length > 0) {
       llmPayload.mcp_servers = enabledMcpServers.map((s) => {
-        // Auto-inject channelName into query params for whiteboard MCP servers
         const mergedQueries = { ...s.queries };
-        if (s.name === "whiteboard" || s.endpoint.includes("/mcp/whiteboard")) {
-          mergedQueries.channelName = channelName;
-        }
-        // Merge query params into endpoint URL, then strip UI-only fields
         const endpoint =
           Object.keys(mergedQueries).length > 0
             ? `${s.endpoint.replace(/\?$/, "")}?${new URLSearchParams(mergedQueries).toString()}`
             : s.endpoint;
-        // Auto-inject auth headers for whiteboard MCP
         const mergedHeaders = { ...s.headers };
-        const isWhiteboardMcp =
-          s.name === "whiteboard" || s.endpoint.includes("/mcp/whiteboard");
-
-        // Custom API key auth for whiteboard MCP
-        const mcpSecret = process.env.WHITEBOARD_MCP_SECRET;
-        if (mcpSecret && isWhiteboardMcp) {
-          mergedHeaders["Authorization"] = `Bearer ${mcpSecret}`;
-        }
-
-        // Vercel Deployment Protection bypass
-        const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-        if (bypassSecret && isWhiteboardMcp) {
-          mergedHeaders["x-vercel-protection-bypass"] = bypassSecret;
-        }
 
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { enabled, queries, endpoint: _ep, headers: _h, ...rest } = s;
