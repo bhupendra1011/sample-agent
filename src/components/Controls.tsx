@@ -18,10 +18,7 @@ import {
 } from "react-icons/md";
 import { useAgora } from "@/hooks/useAgora";
 import { showToast } from "@/services/uiService";
-import {
-  setAgentSettings as persistAgentSettings,
-  getCustomAgentSettings,
-} from "@/services/settingsDb";
+import { getCustomAgentSettings } from "@/services/settingsDb";
 import { inviteAgent, stopAgent, updateAgent } from "@/api/agentApi";
 import { sanitizeCustomJoinPayload } from "@/utils/customPayloadSanitize";
 import Modal from "@/components/common/Modal";
@@ -282,15 +279,6 @@ const Controls: React.FC<ControlsProps> = ({
     async (settings: AgentSettings) => {
       const prevSettings = useAppStore.getState().agentSettings;
       setAgentSettings(settings); // This also updates transcriptionMode
-
-      try {
-        await persistAgentSettings(settings);
-      } catch (err) {
-        console.error(
-          "[Controls] Failed to persist agent settings to IndexedDB:",
-          err,
-        );
-      }
 
       if (isAgentActive && agentId && channelId) {
         const canUpdate = hasUpdatableChanges(prevSettings, settings);

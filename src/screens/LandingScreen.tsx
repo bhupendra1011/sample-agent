@@ -38,21 +38,26 @@ const LandingScreen: React.FC = () => {
               animationFillMode: "backwards",
             }}
           >
-            Experience
+            Build4भारत
             <br />
             <span className="bg-[linear-gradient(to_right,var(--agora-accent-blue),#33d1ff)] bg-clip-text text-transparent animate-landing-gradient-shimmer inline-block">
-              Conversational AI
+              Bharat Voice
+            </span>
+            <span role="img" aria-label="India">
+              🇮🇳
             </span>
           </h1>
           <p
-            className="text-gray-400 text-base sm:text-lg max-w-md mx-auto mb-8 sm:mb-10 animate-fade-in-up"
+            className="text-gray-400 text-base sm:text-lg max-w-lg mx-auto mb-8 sm:mb-10 animate-fade-in-up"
             style={{
               animationDelay: "0.3s",
               animationFillMode: "backwards",
             }}
           >
-            Real-time voice / video calling agents that understand and respond
-            naturally—powered by Agora.
+           Aapka apna AI assistant — jo samjhe Bharat 
+           ko <br/>
+
+Voice AI that speaks Hindi, English, Tamil, Telugu & more
           </p>
           <Link
             href={AGORA_CONVO_AI_URL}
@@ -64,7 +69,7 @@ const LandingScreen: React.FC = () => {
               animationFillMode: "backwards",
             }}
           >
-            Learn more about Agora Conversational AI
+            Powered by Agora Conversational AI
             <svg
               className="w-4 h-4"
               fill="none"
@@ -121,9 +126,7 @@ const LandingScreen: React.FC = () => {
             <span className="relative z-10">Sign in with Google</span>
             </button>
           </div>
-          <p className="text-gray-500 text-xs sm:text-sm text-center max-w-xs">
-            Sign in with Google to create or join meetings.
-          </p>
+        
         </div>
       </main>
     </div>

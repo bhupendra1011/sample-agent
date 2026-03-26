@@ -6,12 +6,7 @@ import { SessionProvider } from "next-auth/react";
 import ToastContainer from "@/components/common/ToastContainer";
 import SessionSync from "@/components/SessionSync";
 import useAppStore from "@/store/useAppStore";
-import {
-  getAgentSettings,
-  setAgentSettings as persistAgentSettings,
-  getVoiceSettings,
-  setVoiceSettings,
-} from "@/services/settingsDb";
+import { getVoiceSettings, setVoiceSettings } from "@/services/settingsDb";
 import { getDefaultSettings } from "@/components/SettingsSidebar";
 
 const queryClient = new QueryClient();
@@ -35,19 +30,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
     const hydrate = async () => {
       try {
-        const [agent, voice] = await Promise.all([
-          getAgentSettings(),
-          getVoiceSettings(),
-        ]);
-        if (agent) {
-          setAgentSettings(agent);
-        } else {
-          // First-time use: initialize with defaults so agent can start
-          // without requiring the user to open settings panel first
-          const defaults = getDefaultSettings();
-          setAgentSettings(defaults);
-          await persistAgentSettings(defaults);
-        }
+        // Always start agent settings from hardcoded app defaults.
+        const defaults = getDefaultSettings();
+        setAgentSettings(defaults);
+        const voice = await getVoiceSettings();
         if (voice?.selectedMicrophoneId != null) {
           setSelectedMicrophoneId(voice.selectedMicrophoneId);
         } else if (

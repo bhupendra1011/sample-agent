@@ -45,7 +45,9 @@ import {
   ANAM_AVATAR_OPTIONS,
   ANAM_DEFAULT_AVATAR_ID,
 } from "@/constants/anamAvatars";
-import ElevenLabsVoicePicker from "@/components/ElevenLabsVoicePicker";
+import ElevenLabsVoicePicker, {
+  ELEVENLABS_ANIKA_VOICE_ID,
+} from "@/components/ElevenLabsVoicePicker";
 
 interface AgentSettingsSidebarProps {
   isOpen: boolean;
@@ -129,7 +131,8 @@ const getDefaultTTSParams = (vendor: TTSVendor): Record<string, unknown> => {
     case "elevenlabs":
       return {
         key: "",
-        voice_id: getEnvVar("ELEVENLABS_VOICE_ID"),
+        voice_id:
+          getEnvVar("ELEVENLABS_VOICE_ID").trim() || ELEVENLABS_ANIKA_VOICE_ID,
         model_id: getEnvVar("ELEVENLABS_MODEL_ID", "eleven_flash_v2_5"),
         sample_rate: parseInt(getEnvVar("ELEVENLABS_SAMPLE_RATE", "24000"), 10),
         speed: 1.0,
@@ -251,12 +254,45 @@ const getDefaultSettings = (): AgentSettings => {
       system_messages: [
         {
           role: "system",
-          content:
-            "You are a helpful AI tutor in a video call. Be concise, friendly, and conversational. Participants may open a shared whiteboard manually, but you do not have tools to draw on it or control it. Explain concepts clearly in speech; if a visual would help, describe it verbally (or use simple ASCII/Markdown in chat if appropriate).",
+          content: `You are "BharatVoice", a fast, friendly voice assistant for India.
+
+PERSONALITY:
+- Warm, polite, efficient
+- Use "aap" (formal) in Hindi, never "tum"
+- Keep responses SHORT — 1-2 sentences max
+- Sound helpful, not robotic
+
+LANGUAGE RULES:
+- Match the user's language automatically
+- If they speak Hindi → respond in Hindi
+- If they speak English → respond in English
+- If they mix (Hinglish) → match their style
+- Supported: Hindi, English, Tamil, Telugu, Marathi, Bengali
+
+BEHAVIOR:
+- Ask max 2 clarifying questions before helping
+- Always confirm key details before action
+- If interrupted, stop immediately and adapt
+- Summarize outcomes in 1 line
+
+VOICE STYLE:
+- Short sentences (easy to speak/hear)
+- No jargon, no long explanations
+- Use natural phrases like "Zaroor!", "Bilkul!", "Got it!", "Sure!"
+
+EXAMPLES:
+User: "Mujhe train ticket book karni hai"
+You: "Zaroor! Kahan se kahan jaana hai?"
+
+User: "Delhi to Mumbai, kal subah"
+You: "Okay, kal subah Delhi se Mumbai. Kitne passengers?"
+
+User: "Two people"
+You: "Got it — 2 passengers, Delhi to Mumbai, tomorrow morning. Confirm karoon?"`,
         },
       ],
       greeting_message:
-        "Hello! I'm your AI assistant. How can I help you today?",
+        "Namaste! I'm BharatVoice 🇮🇳 Aap Hindi, English, Tamil ya kisi bhi bhasha mein baat kar sakte hain. How can I help?",
       failure_message:
         "I'm sorry, I didn't catch that. Could you please repeat?",
       max_history: 10,
@@ -319,8 +355,8 @@ const getDefaultSettings = (): AgentSettings => {
     },
     advanced_features: {
       enable_sal: false,
-      enable_rtm: false,
-      enable_tools: false,
+      enable_rtm: true,
+      enable_tools: true,
     },
     avatar: {
       enable: false,
@@ -722,7 +758,8 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
     } else if (vendor === "elevenlabs") {
       Object.assign(defaultParams, {
         model_id: "eleven_flash_v2_5",
-        voice_id: "",
+        voice_id:
+          getEnvVar("ELEVENLABS_VOICE_ID").trim() || ELEVENLABS_ANIKA_VOICE_ID,
         speed: 1.0,
       });
     } else if (vendor === "openai") {

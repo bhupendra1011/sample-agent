@@ -2,6 +2,9 @@ import React, { useCallback, useRef, useState } from "react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+/** ElevenLabs curated voice "Anika" — default when env `ELEVENLABS_VOICE_ID` is unset. */
+export const ELEVENLABS_ANIKA_VOICE_ID = "90ipbRoKi4CpHXvKVtl0";
+
 interface ElevenLabsVoicePickerProps {
   value: string;
   onChange: (voiceId: string) => void;
@@ -47,7 +50,7 @@ const VOICES: CuratedVoice[] = [
       "https://storage.googleapis.com/eleven-public-prod/premade/voices/pFZP5JQG7iQjIQuC4Bku/89b68b35-b3dd-4348-a84a-a3c13a3c2b30.mp3",
   },
   {
-    voice_id: "90ipbRoKi4CpHXvKVtl0",
+    voice_id: ELEVENLABS_ANIKA_VOICE_ID,
     name: "Anika",
     desc: "Customer Care, Professional",
     gender: "female",
