@@ -10,7 +10,7 @@ const syne = Syne({
 });
 
 export const metadata: Metadata = {
-  title: "My Agora AI App",
+  title: "Bharat Voice",
   description:
     "Real-time video calling with Conversational AI agents, avatars, and collaboration tools — powered by Agora",
   icons: {
