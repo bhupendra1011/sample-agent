@@ -6,6 +6,8 @@
  * 1. ConversationalAIAPI.init({ rtcEngine, rtmEngine, renderMode, enableLog })
  * 2. api.subscribeMessage(channelName) - call before starting agent
  * 3. api.on(EConversationalAIAPIEvents.TRANSCRIPT_UPDATED, (chatHistory) => {...})
+ *    api.on(EConversationalAIAPIEvents.AGENT_ERROR, (agentUid, err) => {...}) — message.error on RTM / stream-message
+ *    (Webhook event type 110 from Agora Notifications is server-side only; enable in Console for backend logs.)
  * 4. api.unsubscribe() - after agent session ends
  * 5. api.destroy() - at end of call
  */
@@ -18,12 +20,23 @@ import {
   ERTMEvents,
   EMessageType,
   EChatMessageType,
+  EModuleType,
   NotFoundError,
 } from "./type";
-import type { IChatMessageText, IChatMessageImage } from "./type";
+import type {
+  IChatMessageText,
+  IChatMessageImage,
+  IMessageError,
+  TModuleError,
+} from "./type";
 
-export { EConversationalAIAPIEvents, EChatMessageType } from "./type";
-export type { IChatMessageText, IChatMessageImage } from "./type";
+export { EConversationalAIAPIEvents, EChatMessageType, EModuleType } from "./type";
+export type {
+  IChatMessageText,
+  IChatMessageImage,
+  IMessageError,
+  TModuleError,
+} from "./type";
 import type {
   ITranscriptHelperItem,
   IUserTranscription,
@@ -534,6 +547,27 @@ export class ConversationalAIAPI extends EventHelper {
         console.log(`[${TAG}] Message interrupted, turnId=${turnId}`);
       }
       this.subRenderController.markInterrupted(turnId);
+    } else if (msgType === EMessageType.MSG_ERROR) {
+      const errMsg = message as unknown as IMessageError;
+      const payload: TModuleError = {
+        type: this.normalizeModuleType(errMsg.module),
+        code: Number(errMsg.code),
+        message: String(errMsg.message ?? ""),
+        timestamp: Number(errMsg.send_ts ?? Date.now()),
+      };
+      console.error(
+        `[${TAG}] message.error (module=${payload.type} code=${payload.code}):`,
+        payload.message,
+        errMsg,
+      );
+      this.emit(
+        EConversationalAIAPIEvents.AGENT_ERROR,
+        this.agentRtcUid,
+        payload,
+      );
+    } else if (this.isAgentErrorPayload(message)) {
+      // Some channels send agent errors as an errors[] blob (similar to webhook 110 payload shape)
+      this.emitAgentErrorsFromPayload(message);
     } else {
       if (this.enableLog) {
         console.log(`[${TAG}] Unknown message type:`, msgType);
@@ -541,6 +575,49 @@ export class ConversationalAIAPI extends EventHelper {
     }
 
     this.emitTranscriptUpdated();
+  }
+
+  private normalizeModuleType(module: unknown): EModuleType {
+    if (
+      typeof module === "string" &&
+      (Object.values(EModuleType) as string[]).includes(module)
+    ) {
+      return module as EModuleType;
+    }
+    return EModuleType.UNKNOWN;
+  }
+
+  /** Detect batched error notifications on RTM (vendor-specific / future shapes). */
+  private isAgentErrorPayload(message: Record<string, unknown>): boolean {
+    const errors = message.errors;
+    return Array.isArray(errors) && errors.length > 0;
+  }
+
+  private emitAgentErrorsFromPayload(message: Record<string, unknown>): void {
+    const errors = message.errors as Array<{
+      module?: string;
+      code?: number;
+      message?: string;
+      turn_id?: number;
+    }>;
+    for (const e of errors) {
+      const payload: TModuleError = {
+        type: this.normalizeModuleType(e?.module),
+        code: Number(e?.code ?? 0),
+        message: String(e?.message ?? "Agent error"),
+        timestamp: Date.now(),
+      };
+      console.error(
+        `[${TAG}] agent errors[] (module=${payload.type} code=${payload.code}):`,
+        payload.message,
+        e,
+      );
+      this.emit(
+        EConversationalAIAPIEvents.AGENT_ERROR,
+        this.agentRtcUid,
+        payload,
+      );
+    }
   }
 
   private emitTranscriptUpdated(): void {

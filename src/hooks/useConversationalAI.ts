@@ -16,8 +16,11 @@ import {
   ConversationalAIAPI,
   EConversationalAIAPIEvents,
   EChatMessageType,
+  EModuleType,
 } from "@/conversational-ai-api";
+import type { TModuleError } from "@/conversational-ai-api";
 import { ETranscriptHelperMode } from "@/conversational-ai-api/type";
+import { showToast } from "@/services/uiService";
 
 interface UseConversationalAIOptions {
   rtcClient: IAgoraRTCClient | null;
@@ -116,8 +119,27 @@ export const useConversationalAI = ({
         }
       };
 
+      // 4. RTM / RTC message.error → visible log + toast (avatar/TTS/LLM failures, etc.)
+      const handleAgentError = (...args: unknown[]) => {
+        const err = args[1] as TModuleError | undefined;
+        if (!err) return;
+        const moduleLabel =
+          err.type === EModuleType.UNKNOWN ? "module" : err.type;
+        console.error("[useConversationalAI] AGENT_ERROR:", {
+          module: moduleLabel,
+          code: err.code,
+          message: err.message,
+          timestamp: err.timestamp,
+        });
+        showToast(
+          `Agent error (${moduleLabel} ${err.code}): ${err.message || "Unknown"}`,
+          "error",
+        );
+      };
+
       api.on(EConversationalAIAPIEvents.TRANSCRIPT_UPDATED, handleTranscriptUpdated);
       api.on(EConversationalAIAPIEvents.AGENT_STATE_CHANGED, handleAgentStateChanged);
+      api.on(EConversationalAIAPIEvents.AGENT_ERROR, handleAgentError);
 
       // 4. Subscribe to channel (before agent speaks / as per docs)
       api.subscribeMessage(channelId);
@@ -130,6 +152,7 @@ export const useConversationalAI = ({
         api.unsubscribe();
         api.off(EConversationalAIAPIEvents.TRANSCRIPT_UPDATED, handleTranscriptUpdated);
         api.off(EConversationalAIAPIEvents.AGENT_STATE_CHANGED, handleAgentStateChanged);
+        api.off(EConversationalAIAPIEvents.AGENT_ERROR, handleAgentError);
         toolkitInitializedRef.current = false;
       };
     } catch (err) {
