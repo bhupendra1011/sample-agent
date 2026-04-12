@@ -94,7 +94,7 @@ const PodcastLandingPage: React.FC = () => {
 
           {/* Subtitle */}
           <p
-            className="mt-5 text-gray-400 text-base sm:text-lg max-w-xl mx-auto animate-fade-in-up"
+            className="mt-5 py-4 sm:py-5 text-gray-400 text-base sm:text-lg max-w-2xl mx-auto text-center leading-relaxed animate-fade-in-up"
             style={{ animationDelay: "0.35s", animationFillMode: "backwards" }}
           >
             Create immersive AI-generated podcast conversations. Two AI agents
@@ -116,15 +116,15 @@ const PodcastLandingPage: React.FC = () => {
             </svg>
           </Link>
 
-          {/* Feature grid */}
+          {/* Feature grid — 2×2, centered */}
           <div
-            className="mt-12 w-full grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in-up"
+            className="mt-12 w-full max-w-2xl mx-auto grid grid-cols-2 gap-3 sm:gap-4 mb-12 sm:mb-14 animate-fade-in-up"
             style={{ animationDelay: "0.55s", animationFillMode: "backwards" }}
           >
             {features.map((feature) => (
               <div
                 key={feature.title}
-                className="p-5 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:border-[var(--agora-accent-blue)]/20 transition-colors group text-left"
+                className="p-4 sm:p-5 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:border-[var(--agora-accent-blue)]/20 transition-colors group text-left"
               >
                 <div className="w-9 h-9 rounded-lg bg-[var(--agora-accent-blue)]/10 flex items-center justify-center mb-3 group-hover:bg-[var(--agora-accent-blue)]/15 transition-colors text-[var(--agora-accent-blue)]">
                   {feature.icon}
@@ -142,7 +142,7 @@ const PodcastLandingPage: React.FC = () => {
 
         {/* Bottom CTA */}
         <div
-          className="mt-12 flex flex-col items-center gap-4 animate-fade-in-up w-full max-w-sm"
+          className="flex flex-col items-center gap-4 animate-fade-in-up w-full max-w-sm"
           style={{ animationDelay: "0.7s", animationFillMode: "backwards" }}
         >
           <div className="relative rounded-xl animate-landing-button-glow w-full">

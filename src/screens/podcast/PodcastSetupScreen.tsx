@@ -4,7 +4,12 @@
 import React, { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import usePodcastStore from "@/store/usePodcastStore";
-import { HOST_AVATARS, GUEST_AVATARS } from "@/config/podcast/avatars";
+import {
+  HOST_AVATARS,
+  GUEST_AVATARS,
+  DEFAULT_HOST_AVATAR,
+  DEFAULT_GUEST_AVATAR,
+} from "@/config/podcast/avatars";
 import {
   PODCAST_THEMES,
   LIGHTING_PRESETS,
@@ -14,34 +19,21 @@ import {
 } from "@/config/podcast/themes";
 import { showToast } from "@/services/uiService";
 import type { PodcastAvatarConfig, PodcastStartResponse } from "@/types/podcast";
-import PoweredByAgora from "@/components/podcast/PoweredByAgora";
+import PodcastAvatarCarousel from "@/components/podcast/PodcastAvatarCarousel";
 
-const DURATION_OPTIONS = [
+const DURATIONS = [
   { label: "3 min", value: 180 },
   { label: "5 min", value: 300 },
   { label: "10 min", value: 600 },
   { label: "15 min", value: 900 },
 ];
 
-const TOPIC_SUGGESTIONS = [
+const TOPICS = [
   "The future of AI and its impact on creative industries",
   "How space exploration will change in the next decade",
   "The science of happiness and what research tells us",
   "Sustainable technology and green innovation",
   "The evolution of music in the digital age",
-];
-
-// Gradient pairs for avatar placeholders
-const HOST_GRADIENTS = [
-  "from-blue-500 to-cyan-400",
-  "from-indigo-500 to-blue-400",
-  "from-violet-500 to-indigo-400",
-];
-const GUEST_GRADIENTS = [
-  "from-rose-500 to-pink-400",
-  "from-amber-500 to-orange-400",
-  "from-emerald-500 to-teal-400",
-  "from-fuchsia-500 to-pink-400",
 ];
 
 interface PodcastSetupScreenProps {
@@ -54,12 +46,8 @@ const PodcastSetupScreen: React.FC<PodcastSetupScreenProps> = ({
   const router = useRouter();
   const [topic, setTopic] = useState("");
   const [duration, setDuration] = useState(300);
-  const [hostAvatar, setHostAvatar] = useState<PodcastAvatarConfig>(
-    HOST_AVATARS[0]
-  );
-  const [guestAvatar, setGuestAvatar] = useState<PodcastAvatarConfig>(
-    GUEST_AVATARS[0]
-  );
+  const [hostAvatar, setHostAvatar] = useState<PodcastAvatarConfig>(DEFAULT_HOST_AVATAR);
+  const [guestAvatar, setGuestAvatar] = useState<PodcastAvatarConfig>(DEFAULT_GUEST_AVATAR);
   const [selectedTheme, setSelectedTheme] = useState(DEFAULT_THEME);
   const [selectedLighting, setSelectedLighting] = useState(DEFAULT_LIGHTING);
   const [avatarEnabled, setAvatarEnabled] = useState(false);
@@ -75,10 +63,8 @@ const PodcastSetupScreen: React.FC<PodcastSetupScreenProps> = ({
       showToast("Please enter a topic (at least 10 characters)", "warning");
       return;
     }
-
     setIsStarting(true);
     setStatus("loading");
-
     try {
       setConfig({
         topic: topic.trim(),
@@ -89,7 +75,6 @@ const PodcastSetupScreen: React.FC<PodcastSetupScreenProps> = ({
         lighting: selectedLighting,
         avatarEnabled,
       });
-
       const response = await fetch("/api/podcast/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -101,446 +86,296 @@ const PodcastSetupScreen: React.FC<PodcastSetupScreenProps> = ({
           themeId: selectedTheme.id,
         }),
       });
-
       if (!response.ok) {
         const err = await response.json();
         throw new Error(err.error || "Failed to start podcast session");
       }
-
       const sessionData = (await response.json()) as PodcastStartResponse;
-
-      setSession({
-        ...sessionData,
-        hostAgentId: null,
-        guestAgentId: null,
-      });
-
-      setTimer({
-        duration,
-        elapsed: 0,
-        remaining: duration,
-        phase: "intro",
-      });
-
+      setSession({ ...sessionData, hostAgentId: null, guestAgentId: null });
+      setTimer({ duration, elapsed: 0, remaining: duration, phase: "intro" });
       await onStartPodcast(sessionData);
     } catch (error) {
       console.error("[PodcastSetup] Start error:", error);
       showToast(
         error instanceof Error ? error.message : "Failed to start podcast",
-        "error"
+        "error",
       );
       setStatus("idle");
     } finally {
       setIsStarting(false);
     }
   }, [
-    topic,
-    duration,
-    hostAvatar,
-    guestAvatar,
-    selectedTheme,
-    selectedLighting,
-    avatarEnabled,
-    setConfig,
-    setStatus,
-    setSession,
-    setTimer,
-    onStartPodcast,
+    topic, duration, hostAvatar, guestAvatar, selectedTheme, selectedLighting,
+    avatarEnabled, setConfig, setStatus, setSession, setTimer, onStartPodcast,
   ]);
 
   const topicValid = topic.trim().length >= 10;
 
   return (
-    <div className="min-h-screen text-gray-100 overflow-hidden bg-gray-950">
-      {/* Create screen: no theme preview, no lighting — simple neutral background only */}
-      <div className="fixed inset-0 pointer-events-none bg-gray-950" aria-hidden />
-      <div className="fixed inset-0 pointer-events-none" aria-hidden>
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_0%,rgba(255,255,255,0.03),transparent_50%)]" />
+    <div className="min-h-dvh overflow-y-auto bg-[#080c14] text-gray-100 antialiased">
+      {/* Ambient glow */}
+      <div className="pointer-events-none fixed inset-0" aria-hidden>
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_35%_at_50%_0%,rgba(0,194,255,0.07),transparent)]" />
       </div>
 
-      <div className="relative max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12 pb-20">
-        {/* Back + Header */}
-        <div className="flex items-center gap-4 mb-8">
+      <div className="relative mx-auto w-full max-w-2xl px-5 pb-8 pt-6 sm:px-6 sm:pt-8">
+        {/* ── Header ── */}
+        <header className="mb-6 flex items-center gap-3">
           <button
             onClick={() => router.push("/podcast")}
-            className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-gray-400 hover:text-white"
-            aria-label="Back to podcast home"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-white/5 hover:text-white"
+            aria-label="Back"
           >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15 19l-7-7 7-7"
-              />
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
           </button>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-white font-syne">
+            <h1 className="font-syne text-xl font-bold tracking-tight text-white sm:text-2xl">
               Create Podcast
             </h1>
-            <p className="text-sm text-gray-500 mt-0.5">
+            <p className="mt-0.5 text-xs tracking-wide text-gray-500">
               Set up your AI-powered conversation
             </p>
           </div>
-        </div>
+        </header>
 
-        <div className="space-y-8">
+        <div className="space-y-5">
           {/* ── Topic ── */}
-          <section className="p-5 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-            <label className="block text-sm font-medium text-gray-300 mb-3">
-              <span className="inline-flex items-center gap-2">
-                <svg
-                  className="w-4 h-4 text-[var(--agora-accent-blue)]"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
-                  />
-                </svg>
-                Podcast Topic
-              </span>
+          <section>
+            <label className="mb-2 flex items-center gap-2 text-[13px] font-semibold text-gray-300">
+              <svg className="h-3.5 w-3.5 text-[var(--agora-accent-blue)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+              </svg>
+              Podcast Topic
             </label>
             <textarea
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              placeholder="What should the AI hosts discuss? Be specific for the best results..."
+              placeholder="What should the AI hosts discuss? Be specific…"
               maxLength={500}
-              rows={3}
-              className="w-full bg-gray-900/60 border border-white/[0.08] rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-[var(--agora-accent-blue)]/50 focus:ring-1 focus:ring-[var(--agora-accent-blue)]/30 resize-none transition-colors text-sm"
+              rows={2}
+              className="w-full resize-none rounded-xl border-0 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder-gray-600 ring-1 ring-inset ring-white/[0.06] transition-all focus:bg-white/[0.06] focus:outline-none focus:ring-[var(--agora-accent-blue)]/30"
             />
-            <div className="flex justify-between items-center mt-2">
-              <span className="text-xs text-gray-600">
-                {topic.length}/500
-                {topic.length > 0 && topic.length < 10 && (
-                  <span className="text-amber-500 ml-2">
-                    Need at least 10 characters
-                  </span>
-                )}
-              </span>
+            <div className="mt-1.5 text-[11px] text-gray-600">
+              {topic.length}/500
+              {topic.length > 0 && topic.length < 10 && (
+                <span className="ml-2 text-amber-500/80">Min 10 chars</span>
+              )}
             </div>
-            {/* Suggestions */}
-            <div className="flex flex-wrap gap-2 mt-3">
-              {TOPIC_SUGGESTIONS.map((s) => (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {TOPICS.map((s) => (
                 <button
                   key={s}
+                  type="button"
                   onClick={() => setTopic(s)}
-                  className="text-xs px-3 py-1.5 rounded-full bg-white/[0.04] hover:bg-[var(--agora-accent-blue)]/10 text-gray-400 hover:text-[var(--agora-accent-blue)] transition-colors border border-white/[0.06] hover:border-[var(--agora-accent-blue)]/20"
+                  className="rounded-full bg-white/[0.04] px-2.5 py-1 text-[11px] text-gray-500 ring-1 ring-inset ring-white/[0.04] transition-colors hover:bg-[var(--agora-accent-blue)]/8 hover:text-[var(--agora-accent-blue)] hover:ring-[var(--agora-accent-blue)]/15"
                 >
-                  {s.length > 45 ? s.slice(0, 42) + "..." : s}
+                  {s.length > 38 ? `${s.slice(0, 36)}…` : s}
                 </button>
               ))}
             </div>
           </section>
 
-          {/* ── Duration ── */}
-          <section className="p-5 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-            <label className="block text-sm font-medium text-gray-300 mb-3">
-              <span className="inline-flex items-center gap-2">
-                <svg
-                  className="w-4 h-4 text-[var(--agora-accent-blue)]"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
+          {/* ── Duration & Avatars toggle — inline row ── */}
+          <div className="flex flex-wrap items-start gap-4">
+            {/* Duration */}
+            <div className="flex-1 min-w-[200px]">
+              <label className="mb-2 flex items-center gap-2 text-[13px] font-semibold text-gray-300">
+                <svg className="h-3.5 w-3.5 text-[var(--agora-accent-blue)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 Duration
-              </span>
-            </label>
-            <div className="grid grid-cols-4 gap-3">
-              {DURATION_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => setDuration(opt.value)}
-                  className={`py-2.5 rounded-lg font-medium text-sm transition-all ${
-                    duration === opt.value
-                      ? "bg-[var(--agora-accent-blue)] text-white shadow-lg shadow-[var(--agora-accent-blue)]/20"
-                      : "bg-white/[0.04] text-gray-400 hover:bg-white/[0.08] hover:text-white border border-white/[0.06]"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
+              </label>
+              <div className="flex gap-1.5">
+                {DURATIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setDuration(opt.value)}
+                    className={`rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all ${
+                      duration === opt.value
+                        ? "bg-[var(--agora-accent-blue)] text-white shadow-md shadow-[var(--agora-accent-blue)]/20"
+                        : "bg-white/[0.04] text-gray-500 ring-1 ring-inset ring-white/[0.06] hover:bg-white/[0.07] hover:text-gray-300"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </section>
 
-          {/* ── Avatar Toggle ── */}
-          <section className="p-5 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <svg
-                  className="w-5 h-5 text-[var(--agora-accent-blue)]"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                  />
-                </svg>
-                <div>
-                  <span className="text-sm font-medium text-gray-200">
-                    Enable Avatars
-                  </span>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Show animated Anam avatars for host &amp; guest
-                  </p>
-                </div>
+            {/* Avatar toggle */}
+            <div className="flex items-center gap-3 pt-7">
+              <div className="text-right">
+                <span className="block text-[13px] font-semibold text-gray-300">Avatars</span>
+                <span className="text-[10px] text-gray-600">Anam faces</span>
               </div>
               <button
                 type="button"
                 role="switch"
                 aria-checked={avatarEnabled}
                 onClick={() => setAvatarEnabled(!avatarEnabled)}
-                className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--agora-accent-blue)] focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950 ${
-                  avatarEnabled
-                    ? "bg-[var(--agora-accent-blue)]"
-                    : "bg-white/10"
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ${
+                  avatarEnabled ? "bg-[var(--agora-accent-blue)]" : "bg-white/[0.08]"
                 }`}
               >
                 <span
-                  className={`pointer-events-none inline-block h-6 w-6 rounded-full bg-white shadow-lg ring-0 transition-transform duration-200 ease-in-out ${
-                    avatarEnabled ? "translate-x-5" : "translate-x-0"
+                  className={`pointer-events-none inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                    avatarEnabled ? "translate-x-[1.25rem]" : "translate-x-0.5"
                   }`}
                 />
               </button>
             </div>
-          </section>
-
-          {/* ── Avatars ── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            {/* Host */}
-            <section className="p-5 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-              <label className="block text-sm font-medium text-gray-300 mb-3">
-                <span className="inline-flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-blue-400" />
-                  Host
-                </span>
-              </label>
-              <div className="grid grid-cols-3 gap-3">
-                {HOST_AVATARS.map((avatar, idx) => (
-                  <button
-                    key={avatar.id}
-                    onClick={() => setHostAvatar(avatar)}
-                    className={`relative p-3 rounded-xl transition-all text-center group ${
-                      hostAvatar.id === avatar.id
-                        ? "bg-[var(--agora-accent-blue)]/10 border-2 border-[var(--agora-accent-blue)]/50 shadow-lg shadow-[var(--agora-accent-blue)]/10"
-                        : "bg-white/[0.03] border-2 border-transparent hover:border-white/10"
-                    }`}
-                  >
-                    <div
-                      className={`w-14 h-14 mx-auto rounded-full bg-gradient-to-br ${HOST_GRADIENTS[idx % HOST_GRADIENTS.length]} flex items-center justify-center text-xl font-bold text-white shadow-lg group-hover:scale-105 transition-transform`}
-                    >
-                      {avatar.name[0]}
-                    </div>
-                    <span className="block mt-2 text-xs font-medium text-white">
-                      {avatar.name}
-                    </span>
-                    {hostAvatar.id === avatar.id && (
-                      <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[var(--agora-accent-blue)]" />
-                    )}
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            {/* Guest */}
-            <section className="p-5 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-              <label className="block text-sm font-medium text-gray-300 mb-3">
-                <span className="inline-flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-rose-400" />
-                  Guest
-                </span>
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                {GUEST_AVATARS.map((avatar, idx) => (
-                  <button
-                    key={avatar.id}
-                    onClick={() => setGuestAvatar(avatar)}
-                    className={`relative p-3 rounded-xl transition-all text-center group ${
-                      guestAvatar.id === avatar.id
-                        ? "bg-[var(--agora-accent-blue)]/10 border-2 border-[var(--agora-accent-blue)]/50 shadow-lg shadow-[var(--agora-accent-blue)]/10"
-                        : "bg-white/[0.03] border-2 border-transparent hover:border-white/10"
-                    }`}
-                  >
-                    <div
-                      className={`w-12 h-12 mx-auto rounded-full bg-gradient-to-br ${GUEST_GRADIENTS[idx % GUEST_GRADIENTS.length]} flex items-center justify-center text-lg font-bold text-white shadow-lg group-hover:scale-105 transition-transform`}
-                    >
-                      {avatar.name[0]}
-                    </div>
-                    <span className="block mt-2 text-xs font-medium text-white">
-                      {avatar.name}
-                    </span>
-                    {guestAvatar.id === avatar.id && (
-                      <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[var(--agora-accent-blue)]" />
-                    )}
-                  </button>
-                ))}
-              </div>
-            </section>
           </div>
 
-          {/* ── Theme & Lighting ── */}
-          <section className="p-5 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-            <label className="block text-sm font-medium text-gray-300 mb-3">
-              <span className="inline-flex items-center gap-2">
-                <svg
-                  className="w-4 h-4 text-[var(--agora-accent-blue)]"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"
-                  />
-                </svg>
-                Visual Theme
+          {/* ── Persona selection ── */}
+          <section>
+            <div className="mb-3 flex items-center gap-2">
+              <span className="text-[13px] font-semibold text-gray-300">Choose Personas</span>
+              <span className="rounded-md bg-[var(--agora-accent-blue)]/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[var(--agora-accent-blue)]">
+                Anam
               </span>
+            </div>
+
+            {/* Host */}
+            <div className="mb-4">
+              <div className="mb-2 flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Host</span>
+              </div>
+              <PodcastAvatarCarousel
+                avatars={HOST_AVATARS}
+                selected={hostAvatar}
+                onSelect={setHostAvatar}
+              />
+            </div>
+
+            {/* Guest */}
+            <div>
+              <div className="mb-2 flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-rose-400" />
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Guest</span>
+              </div>
+              <PodcastAvatarCarousel
+                avatars={GUEST_AVATARS}
+                selected={guestAvatar}
+                onSelect={setGuestAvatar}
+              />
+            </div>
+          </section>
+
+          {/* ── Theme & Lighting ── */}
+          <section>
+            <label className="mb-2 flex items-center gap-2 text-[13px] font-semibold text-gray-300">
+              <svg className="h-3.5 w-3.5 text-[var(--agora-accent-blue)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+              </svg>
+              Visual Theme
             </label>
-            <div className="grid grid-cols-4 gap-3 mb-5">
+            <div className="grid grid-cols-4 gap-2">
               {PODCAST_THEMES.map((theme) => (
                 <button
                   key={theme.id}
+                  type="button"
                   onClick={() => setSelectedTheme(theme)}
-                  className={`relative h-16 rounded-xl overflow-hidden transition-all ${
-                    selectedTheme.id === theme.id ? "ring-2 scale-105 shadow-lg" : "opacity-60 hover:opacity-100"
+                  className={`relative h-14 overflow-hidden rounded-xl transition-all sm:h-16 ${
+                    selectedTheme.id === theme.id
+                      ? "ring-2 ring-[var(--agora-accent-blue)] shadow-lg shadow-[var(--agora-accent-blue)]/10 scale-[1.03]"
+                      : "opacity-50 hover:opacity-90"
                   }`}
-                  style={{
-                    background: theme.cssGradient,
-                    ...(selectedTheme.id === theme.id ? { boxShadow: `0 0 0 2px ${theme.accentColor}` } : {}),
-                  }}
+                  style={{ background: theme.cssGradient }}
                 >
-                  <span className="absolute bottom-1 inset-x-0 text-center text-[10px] font-medium text-white/90 drop-shadow-lg">
+                  <span className="absolute inset-x-0 bottom-1 text-center text-[10px] font-semibold text-white/90 drop-shadow-md">
                     {theme.name}
                   </span>
                 </button>
               ))}
             </div>
 
-            <label className="block text-xs font-medium text-gray-400 mb-2">
-              Ambient lighting
-            </label>
-            <div className="grid grid-cols-4 gap-3">
-              {LIGHTING_PRESETS.map((preset) => {
-                const ambientColor = getAmbientLightColor(selectedTheme.accentColor, preset.id);
-                return (
-                  <button
-                    key={preset.id}
-                    onClick={() => setSelectedLighting(preset)}
-                    className={`py-2 rounded-lg text-xs font-medium transition-all ${
-                      selectedLighting.id === preset.id
-                        ? "text-white"
-                        : "bg-white/[0.04] text-gray-400 hover:bg-white/[0.08] hover:text-white border border-white/[0.06]"
-                    }`}
-                    style={
-                      selectedLighting.id === preset.id
-                        ? { backgroundColor: ambientColor }
-                        : undefined
-                    }
-                  >
-                    {preset.name}
-                  </button>
-                );
-              })}
+            {/* Lighting */}
+            <div className="mt-3">
+              <span className="mb-1.5 block text-[11px] font-medium text-gray-600">
+                Ambient lighting
+              </span>
+              <div className="grid grid-cols-4 gap-1.5">
+                {LIGHTING_PRESETS.map((preset) => {
+                  const color = getAmbientLightColor(selectedTheme.accentColor, preset.id);
+                  const active = selectedLighting.id === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => setSelectedLighting(preset)}
+                      className={`rounded-lg py-1.5 text-[11px] font-semibold transition-all ${
+                        active
+                          ? "text-white shadow-sm"
+                          : "bg-white/[0.03] text-gray-500 ring-1 ring-inset ring-white/[0.05] hover:text-gray-300"
+                      }`}
+                      style={active ? { backgroundColor: color } : undefined}
+                    >
+                      {preset.name}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </section>
 
-          {/* ── Preview summary ── */}
-          <section className="p-5 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-            <div className="flex items-center justify-between text-sm">
-              <div className="flex items-center gap-6">
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`w-8 h-8 rounded-full bg-gradient-to-br ${HOST_GRADIENTS[HOST_AVATARS.indexOf(hostAvatar) % HOST_GRADIENTS.length]} flex items-center justify-center text-xs font-bold text-white`}
-                  >
-                    {hostAvatar.name[0]}
-                  </div>
-                  <span className="text-gray-400">{hostAvatar.name}</span>
+          {/* ── Summary + CTA ── */}
+          <section className="rounded-2xl bg-white/[0.03] p-4 ring-1 ring-inset ring-white/[0.05]">
+            {/* Summary row */}
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex -space-x-2.5">
+                  <img
+                    src={hostAvatar.imageUrl}
+                    alt={hostAvatar.name}
+                    className="h-9 w-9 rounded-full border-2 border-[#080c14] object-cover"
+                  />
+                  <img
+                    src={guestAvatar.imageUrl}
+                    alt={guestAvatar.name}
+                    className="h-9 w-9 rounded-full border-2 border-[#080c14] object-cover"
+                  />
                 </div>
-                <span className="text-gray-600">vs</span>
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`w-8 h-8 rounded-full bg-gradient-to-br ${GUEST_GRADIENTS[GUEST_AVATARS.indexOf(guestAvatar) % GUEST_GRADIENTS.length]} flex items-center justify-center text-xs font-bold text-white`}
-                  >
-                    {guestAvatar.name[0]}
-                  </div>
-                  <span className="text-gray-400">{guestAvatar.name}</span>
+                <div className="text-sm font-medium text-gray-300">
+                  {hostAvatar.name}{" "}
+                  <span className="text-gray-600">vs</span>{" "}
+                  {guestAvatar.name}
                 </div>
               </div>
-              <div className="flex items-center gap-4 text-gray-500 text-xs">
-                <span>{DURATION_OPTIONS.find((d) => d.value === duration)?.label}</span>
+              <div className="flex items-center gap-3 text-xs text-gray-500">
+                <span>{DURATIONS.find((d) => d.value === duration)?.label}</span>
                 <span
-                  className="w-3 h-3 rounded-sm"
+                  className="h-3 w-3 rounded"
                   style={{ background: selectedTheme.accentColor }}
                 />
               </div>
             </div>
-          </section>
 
-          {/* ── Start Button ── */}
-          <div className="relative rounded-xl animate-landing-button-glow">
+            {/* Start button */}
             <button
+              type="button"
               onClick={handleStart}
               disabled={isStarting || !topicValid}
-              className="w-full flex items-center justify-center gap-2 py-4 rounded-xl bg-[var(--agora-accent-blue)] text-white font-semibold text-base shadow-lg hover:opacity-90 hover:scale-[1.01] active:scale-[0.99] transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--agora-accent-blue)] py-3 text-[15px] font-bold text-white shadow-lg shadow-[var(--agora-accent-blue)]/20 transition-all hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-35 disabled:shadow-none disabled:hover:brightness-100"
             >
               {isStarting ? (
-                <span className="flex items-center gap-3">
-                  <svg
-                    className="animate-spin h-5 w-5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
+                <span className="flex items-center gap-2">
+                  <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
-                  Starting Podcast...
+                  Starting…
                 </span>
               ) : (
                 "Start Podcast"
               )}
             </button>
-          </div>
+          </section>
         </div>
       </div>
-
-      {/* Footer: Powered by Agora */}
-      <footer className="fixed bottom-0 left-0 right-0 py-3 px-4 bg-black/30 backdrop-blur-sm border-t border-white/10 flex justify-center">
-        <PoweredByAgora variant="compact" className="text-gray-400" />
-      </footer>
     </div>
   );
 };

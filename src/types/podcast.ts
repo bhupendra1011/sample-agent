@@ -36,6 +36,8 @@ export interface PodcastAvatarConfig {
   anamAvatarId: string;
   role: "host" | "guest";
   defaultVoiceName: string;
+  /** Thumbnail for picker UI (Anam persona gallery) */
+  imageUrl: string;
 }
 
 // --- Session ---
