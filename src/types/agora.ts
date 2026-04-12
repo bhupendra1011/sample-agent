@@ -304,6 +304,10 @@ export interface AvatarAnamParams {
   agora_uid: string;
   agora_token?: string;
   avatar_id: string;
+  /** Hz — Agora docs: 16000, 24000, or 48000. Default 24000. */
+  sample_rate?: 16000 | 24000 | 48000;
+  quality?: "high" | "medium" | "low";
+  video_encoding?: "H264" | "AV1";
 }
 
 export interface AvatarConfig {

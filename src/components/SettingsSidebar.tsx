@@ -12,6 +12,7 @@ import {
   MdRefresh,
   MdBuild,
   MdCode,
+  MdQueryStats,
 } from "react-icons/md";
 import VoiceSettings from "./VoiceSettings";
 import useAppStore from "@/store/useAppStore";
@@ -22,6 +23,7 @@ import type {
   MCPToolInfo,
 } from "@/types/agora";
 import Modal from "@/components/common/Modal";
+import TurnMetricsVisualization from "@/components/TurnMetricsVisualization";
 import type { IMicrophoneAudioTrack } from "agora-rtc-sdk-ng";
 import {
   HEYGEN_AVATAR_GROUPS,
@@ -31,6 +33,12 @@ import {
   ANAM_AVATAR_OPTIONS,
   ANAM_DEFAULT_AVATAR_ID,
 } from "@/constants/anamAvatars";
+import { ELEVENLABS_DEFAULT_VOICE_ID } from "@/constants/elevenlabsDefaults";
+import { queryAgentTurns } from "@/api/agentApi";
+import type {
+  AgentSessionRecord,
+  AgentTurnsResponse,
+} from "@/types/agentTurns";
 
 type SettingsTab = "ai-agent" | "voice" | "mcp-server";
 
@@ -357,7 +365,7 @@ import {
 } from "react-icons/md";
 
 // Section collapse state
-type SectionKey = "llm" | "tts" | "asr" | "avatar" | "advanced";
+type SectionKey = "llm" | "tts" | "asr" | "avatar" | "debug" | "advanced";
 
 // Environment variable helpers (no API keys here; server injects them from server-only env vars)
 const ENV_MAP: Record<string, string | undefined> = {
@@ -431,7 +439,9 @@ const getDefaultTTSParams = (vendor: TTSVendor): Record<string, unknown> => {
     case "elevenlabs":
       return {
         key: "",
-        voice_id: getEnvVar("ELEVENLABS_VOICE_ID"),
+        voice_id:
+          getEnvVar("ELEVENLABS_VOICE_ID").trim() ||
+          ELEVENLABS_DEFAULT_VOICE_ID,
         model_id: getEnvVar("ELEVENLABS_MODEL_ID", "eleven_flash_v2_5"),
         sample_rate: parseInt(getEnvVar("ELEVENLABS_SAMPLE_RATE", "24000"), 10),
         speed: 1.0,
@@ -493,8 +503,8 @@ const getDefaultASRConfig = (vendor: ASRVendor): ASRConfig => {
 
 const AVATAR_PRESETS: Record<AvatarVendor, { label: string; value: string }> = {
   akool: { label: "Akool (Beta)", value: "akool" },
-  heygen: { label: "HeyGen (Beta)", value: "heygen" },
-  anam: { label: "Anam", value: "anam" },
+  heygen: { label: "LiveAvatar (Beta)", value: "heygen" },
+  anam: { label: "Anam (Beta)", value: "anam" },
 };
 
 const getDefaultAvatarParams = (
@@ -525,6 +535,9 @@ const getDefaultAvatarParams = (
         api_key: "",
         agora_uid: "",
         avatar_id: getEnvVar("ANAM_AVATAR_ID") || ANAM_DEFAULT_AVATAR_ID,
+        sample_rate: 24000,
+        quality: "high",
+        video_encoding: "H264",
       };
   }
 };
@@ -542,7 +555,7 @@ export const getDefaultSettings = (): AgentSettingsType => {
         {
           role: "system",
           content:
-            "You are a helpful AI tutor in a video call with access to a shared whiteboard. Be concise, friendly, and conversational. When explaining concepts visually, use the whiteboard tools: call open_whiteboard first, then draw_diagram with Mermaid syntax to create flowcharts, mind maps, or diagrams. Use insert_text for labels. When done explaining, call close_whiteboard to return to the video view. Keep spoken responses short and let the visuals do the heavy lifting. Only use the whiteboard when the user asks for visual explanations or when a diagram would genuinely help understanding.",
+            "You are a helpful AI assistant in a video call. Be concise, friendly, and conversational.",
         },
       ],
       greeting_message:
@@ -560,13 +573,6 @@ export const getDefaultSettings = (): AgentSettingsType => {
           endpoint: "https://mcp-weather-server-5jkm.onrender.com/mcp",
           transport: "http",
           timeout_ms: 10000,
-          enabled: false,
-        },
-        {
-          name: "whiteboard",
-          endpoint: `${typeof window !== "undefined" ? window.location.origin : ""}/api/mcp/whiteboard`,
-          transport: "http",
-          timeout_ms: 15000,
           enabled: false,
         },
       ],
@@ -1884,6 +1890,12 @@ const AgentSettingsSidebarContent: React.FC<{
 }) => {
   const existingSettings = useAppStore((state) => state.agentSettings);
   const setAgentSettings = useAppStore((state) => state.setAgentSettings);
+  const agentId = useAppStore((state) => state.agentId);
+  const agentSessionHistory = useAppStore((state) => state.agentSessionHistory);
+  const removeAgentSessionFromHistory = useAppStore(
+    (state) => state.removeAgentSessionFromHistory,
+  );
+
   const [settings, setSettings] = React.useState<AgentSettingsType>(
     existingSettings || getDefaultSettings(),
   );
@@ -1894,6 +1906,7 @@ const AgentSettingsSidebarContent: React.FC<{
     tts: false,
     asr: false,
     avatar: false,
+    debug: false,
     advanced: false,
   });
   // Turn detection subsection collapse states
@@ -1908,6 +1921,49 @@ const AgentSettingsSidebarContent: React.FC<{
     fillerWords: false,
     features: false,
   });
+  const [turnsData, setTurnsData] = React.useState<AgentTurnsResponse | null>(
+    null,
+  );
+  const [turnsLoading, setTurnsLoading] = React.useState(false);
+  const [turnsError, setTurnsError] = React.useState<string | null>(null);
+  const [showRawTurnsJson, setShowRawTurnsJson] = React.useState(false);
+
+  const handleLoadTurnMetrics = React.useCallback(
+    async (overrideAgentId?: string) => {
+      const id = (overrideAgentId ?? agentId)?.trim();
+      if (!id) {
+        showToast(
+          "Choose a saved agent below or invite the agent for the current session.",
+          "info",
+        );
+        return;
+      }
+      setTurnsLoading(true);
+      setTurnsError(null);
+      try {
+        const data = await queryAgentTurns(id);
+        setTurnsData(data);
+        if (!data.turns?.length) {
+          showToast(
+            "No turns yet — data appears after the session ends (last 7 days).",
+            "info",
+          );
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Failed to load turns";
+        setTurnsError(msg);
+        showToast(msg, "error");
+      } finally {
+        setTurnsLoading(false);
+      }
+    },
+    [agentId],
+  );
+
+  React.useEffect(() => {
+    useAppStore.getState().hydrateAgentSessionHistory();
+  }, []);
+
   const toggleAdvancedSubsection = (key: keyof typeof advancedSubsections) => {
     setAdvancedSubsections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
@@ -1939,9 +1995,23 @@ const AgentSettingsSidebarContent: React.FC<{
         existingSettings.llm?.mcp_servers?.length
           ? existingSettings.llm.mcp_servers
           : defaults.llm.mcp_servers;
+      const baseTts = existingSettings.tts ?? defaults.tts;
+      let ttsOut = baseTts;
+      if (
+        baseTts.vendor === "elevenlabs" &&
+        baseTts.params &&
+        typeof baseTts.params === "object"
+      ) {
+        const p = { ...(baseTts.params as Record<string, unknown>) };
+        if (!String(p.voice_id ?? "").trim()) {
+          p.voice_id = ELEVENLABS_DEFAULT_VOICE_ID;
+        }
+        ttsOut = { ...baseTts, params: p } as AgentSettingsType["tts"];
+      }
       setSettings({
         ...existingSettings,
         llm: { ...existingSettings.llm, mcp_servers: mcpServers },
+        tts: ttsOut,
         filler_words: existingSettings.filler_words ?? defaults.filler_words,
         sal: existingSettings.sal ?? defaults.sal,
       });
@@ -2031,7 +2101,7 @@ const AgentSettingsSidebarContent: React.FC<{
     } else if (vendor === "elevenlabs") {
       Object.assign(defaultParams, {
         model_id: "eleven_flash_v2_5",
-        voice_id: "",
+        voice_id: ELEVENLABS_DEFAULT_VOICE_ID,
         speed: 1.0,
       });
     } else if (vendor === "openai") {
@@ -2468,7 +2538,9 @@ const AgentSettingsSidebarContent: React.FC<{
                 hint="From ElevenLabs voice library"
               >
                 <ElevenLabsVoicePicker
-                  value={getTTSParam("voice_id")}
+                  value={
+                    getTTSParam("voice_id") || ELEVENLABS_DEFAULT_VOICE_ID
+                  }
                   onChange={(id) => setTTSParam("voice_id", id)}
                 />
               </FormField>
@@ -2638,6 +2710,41 @@ const AgentSettingsSidebarContent: React.FC<{
             </div>
           )}
 
+          <div className="mb-4 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+            <a
+              href="https://docs.agora.io/en/conversational-ai/models/avatar/overview"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="[color:var(--agora-accent-blue)] hover:opacity-80 underline underline-offset-2"
+            >
+              Avatar overview
+            </a>
+            <a
+              href="https://docs.agora.io/en/conversational-ai/models/avatar/akool"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="[color:var(--agora-accent-blue)] hover:opacity-80 underline underline-offset-2"
+            >
+              Akool
+            </a>
+            <a
+              href="https://docs.agora.io/en/conversational-ai/models/avatar/heygen"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="[color:var(--agora-accent-blue)] hover:opacity-80 underline underline-offset-2"
+            >
+              LiveAvatar
+            </a>
+            <a
+              href="https://docs.agora.io/en/conversational-ai/models/avatar/anam"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="[color:var(--agora-accent-blue)] hover:opacity-80 underline underline-offset-2"
+            >
+              Anam
+            </a>
+          </div>
+
           <FormField
             label="Vendor"
             required
@@ -2657,10 +2764,10 @@ const AgentSettingsSidebarContent: React.FC<{
             <p className="text-xs text-yellow-800 dark:text-yellow-200">
               <strong>Important:</strong>{" "}
               {selectedAvatarVendor === "akool"
-                ? "Akool requires TTS with 16kHz sample rate (e.g., Microsoft Azure TTS)"
+                ? "Akool requires TTS at 16 kHz sample rate (Agora aligns this when you join)."
                 : selectedAvatarVendor === "anam"
-                  ? "Anam requires TTS with 24kHz sample rate (e.g., ElevenLabs or OpenAI TTS)"
-                  : "HeyGen requires TTS with 24kHz sample rate (e.g., ElevenLabs or OpenAI TTS)"}
+                  ? "Anam requires TTS at 24 kHz (Agora aligns this when you join)."
+                  : "LiveAvatar requires TTS at 24 kHz (Agora aligns this when you join)."}
             </p>
           </div>
 
@@ -2683,7 +2790,7 @@ const AgentSettingsSidebarContent: React.FC<{
                   ? "Leave empty for server key, or enter Akool API key"
                   : selectedAvatarVendor === "anam"
                     ? "Leave empty for server key, or enter Anam API key"
-                    : "Leave empty for server key, or enter HeyGen API key"
+                    : "Leave empty for server key, or enter LiveAvatar API key"
               }
             />
           </FormField>
@@ -2704,21 +2811,52 @@ const AgentSettingsSidebarContent: React.FC<{
           )}
 
           {selectedAvatarVendor === "anam" && (
-            <FormField
-              label="Avatar"
-              required
-              hint="Choose an Anam avatar character"
-              tooltip="Select one of the available Anam stock avatars."
-            >
-              <CustomSelect
-                value={getAvatarParam("avatar_id") || ANAM_DEFAULT_AVATAR_ID}
-                onChange={(v) => setAvatarParam("avatar_id", v)}
-                options={ANAM_AVATAR_OPTIONS.map((opt) => ({
-                  value: opt.value,
-                  label: opt.label,
-                }))}
-              />
-            </FormField>
+            <>
+              <FormField
+                label="Avatar"
+                required
+                hint="Choose an Anam avatar character"
+                tooltip="Select one of the available Anam stock avatars."
+              >
+                <CustomSelect
+                  value={getAvatarParam("avatar_id") || ANAM_DEFAULT_AVATAR_ID}
+                  onChange={(v) => setAvatarParam("avatar_id", v)}
+                  options={ANAM_AVATAR_OPTIONS.map((opt) => ({
+                    value: opt.value,
+                    label: opt.label,
+                  }))}
+                />
+              </FormField>
+              <FormField
+                label="Video quality"
+                hint="Default: high"
+                tooltip="Anam video quality (Agora Conversational AI)."
+              >
+                <CustomSelect
+                  value={getAvatarParam("quality") || "high"}
+                  onChange={(v) => setAvatarParam("quality", v)}
+                  options={[
+                    { value: "low", label: "Low" },
+                    { value: "medium", label: "Medium" },
+                    { value: "high", label: "High" },
+                  ]}
+                />
+              </FormField>
+              <FormField
+                label="Video encoding"
+                hint="Default: H264"
+                tooltip="Anam stream encoding."
+              >
+                <CustomSelect
+                  value={getAvatarParam("video_encoding") || "H264"}
+                  onChange={(v) => setAvatarParam("video_encoding", v)}
+                  options={[
+                    { value: "H264", label: "H264" },
+                    { value: "AV1", label: "AV1" },
+                  ]}
+                />
+              </FormField>
+            </>
           )}
 
           {selectedAvatarVendor === "heygen" && (
@@ -2726,7 +2864,7 @@ const AgentSettingsSidebarContent: React.FC<{
               <FormField
                 label="Quality"
                 required
-                tooltip="Video quality: low (360p), medium (480p), high (720p)"
+                tooltip="LiveAvatar video quality: low (360p), medium (480p), high (720p)"
               >
                 <CustomSelect
                   value={getAvatarParam("quality") || "medium"}
@@ -2742,7 +2880,7 @@ const AgentSettingsSidebarContent: React.FC<{
               <FormField
                 label="Avatar"
                 required
-                hint="Choose a HeyGen avatar character"
+                hint="Choose a LiveAvatar character"
               >
                 <CustomSelect
                   value={
@@ -2794,6 +2932,146 @@ const AgentSettingsSidebarContent: React.FC<{
               />
             </>
           )}
+        </Section>
+
+        <Section
+          title="Conversation turns"
+          icon={<MdQueryStats size={20} />}
+          isOpen={expandedSections.debug}
+          onToggle={() => toggleSection("debug")}
+          badge="Debug"
+        >
+          <div className="mb-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+            <p className="text-sm text-amber-800 dark:text-amber-200">
+              Per-turn metrics are available{" "}
+              <strong>after the agent session ends</strong>. Agora keeps turn
+              history for the <strong>last 7 days</strong>. Empty results during
+              an active call are normal.
+            </p>
+          </div>
+
+          <FormField
+            label="Previous agents"
+            hint="Recorded when you start an agent; times use your browser locale. Load turns after that call has ended."
+          >
+            {agentSessionHistory.length === 0 ? (
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                No saved sessions yet. Invite an agent during a call to record
+                one here.
+              </p>
+            ) : (
+              <ul className="space-y-2 max-h-52 overflow-y-auto">
+                {agentSessionHistory.map((row: AgentSessionRecord) => (
+                  <li
+                    key={row.agentId}
+                    className="flex flex-col gap-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 p-2.5 text-xs"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-mono break-all text-gray-800 dark:text-gray-200">
+                          {row.agentId}
+                        </div>
+                        <div className="text-gray-500 dark:text-gray-400 mt-1">
+                          {new Date(row.joinedAt).toLocaleString(undefined, {
+                            dateStyle: "medium",
+                            timeStyle: "short",
+                          })}
+                          {row.meetingName ? ` · ${row.meetingName}` : ""}
+                          {row.channelId ? ` · ${row.channelId}` : ""}
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1 shrink-0 items-end">
+                        <button
+                          type="button"
+                          disabled={isDisabled || turnsLoading}
+                          onClick={() => void handleLoadTurnMetrics(row.agentId)}
+                          className="px-2.5 py-1 rounded-md text-xs font-medium bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-agora-accent-blue dark:focus:ring-agora-accent-blue"
+                        >
+                          Load turns
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isDisabled}
+                          onClick={() =>
+                            removeAgentSessionFromHistory(row.agentId)
+                          }
+                          className="text-[11px] text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 underline"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </FormField>
+
+          <FormField label="Agent ID" hint="From the current session after you invite the agent.">
+            {agentId ? (
+              <div className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/80 font-mono text-xs break-all text-gray-600 dark:text-gray-400">
+                {agentId}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Invite the agent to enable turn queries.
+              </p>
+            )}
+          </FormField>
+
+          <div className="mt-3 mb-4">
+            <button
+              type="button"
+              disabled={isDisabled || !agentId || turnsLoading}
+              onClick={() => void handleLoadTurnMetrics()}
+              className="w-full px-4 py-2.5 rounded-lg text-sm font-medium bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-agora-accent-blue dark:focus:ring-agora-accent-blue transition-colors"
+            >
+              {turnsLoading
+                ? "Loading…"
+                : "Load turn metrics (current session)"}
+            </button>
+          </div>
+
+          {turnsError && (
+            <p className="mb-3 text-sm text-red-600 dark:text-red-400">
+              {turnsError}
+            </p>
+          )}
+
+          {turnsData && turnsData.turns && turnsData.turns.length > 0 && (
+            <div className="mb-3">
+              <TurnMetricsVisualization turns={turnsData.turns} />
+            </div>
+          )}
+
+          {turnsData && turnsData.turns?.length === 0 && !turnsLoading && (
+            <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
+              No turns returned. Stop the agent and try again, or check that the
+              session is within the last 7 days.
+            </p>
+          )}
+
+          <button
+            type="button"
+            className="mb-2 text-xs [color:var(--agora-accent-blue)] hover:opacity-80 underline underline-offset-2"
+            onClick={() => setShowRawTurnsJson((v) => !v)}
+          >
+            {showRawTurnsJson ? "Hide raw JSON" : "Show raw JSON"}
+          </button>
+          {showRawTurnsJson && turnsData != null && (
+            <pre className="p-3 text-xs font-mono leading-relaxed bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 border border-gray-300 dark:border-gray-700 rounded-lg max-h-48 overflow-auto whitespace-pre-wrap break-all">
+              {JSON.stringify(turnsData, null, 2)}
+            </pre>
+          )}
+
+          <a
+            href="https://docs.agora.io/en/conversational-ai/rest-api/agent/turns"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 inline-block text-xs [color:var(--agora-accent-blue)] hover:opacity-80 underline underline-offset-2"
+          >
+            Query conversation turns — Agora docs
+          </a>
         </Section>
 
         {/* Advanced Section */}

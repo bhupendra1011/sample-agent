@@ -46,6 +46,7 @@ import {
   ANAM_DEFAULT_AVATAR_ID,
 } from "@/constants/anamAvatars";
 import ElevenLabsVoicePicker from "@/components/ElevenLabsVoicePicker";
+import { ELEVENLABS_DEFAULT_VOICE_ID } from "@/constants/elevenlabsDefaults";
 
 interface AgentSettingsSidebarProps {
   isOpen: boolean;
@@ -129,7 +130,9 @@ const getDefaultTTSParams = (vendor: TTSVendor): Record<string, unknown> => {
     case "elevenlabs":
       return {
         key: "",
-        voice_id: getEnvVar("ELEVENLABS_VOICE_ID"),
+        voice_id:
+          getEnvVar("ELEVENLABS_VOICE_ID").trim() ||
+          ELEVENLABS_DEFAULT_VOICE_ID,
         model_id: getEnvVar("ELEVENLABS_MODEL_ID", "eleven_flash_v2_5"),
         sample_rate: parseInt(getEnvVar("ELEVENLABS_SAMPLE_RATE", "24000"), 10),
         speed: 1.0,
@@ -251,12 +254,80 @@ const getDefaultSettings = (): AgentSettings => {
       system_messages: [
         {
           role: "system",
-          content:
-            "You are a helpful AI tutor in a video call with access to a shared whiteboard. Be concise, friendly, and conversational. When explaining concepts visually, use the whiteboard tools: call open_whiteboard first, then draw_diagram with Mermaid syntax to create flowcharts, mind maps, or diagrams. Use insert_text for labels. When done explaining, call close_whiteboard to return to the video view. Keep spoken responses short and let the visuals do the heavy lifting. Only use the whiteboard when the user asks for visual explanations or when a diagram would genuinely help understanding.",
+          content: `You are "भारतVoice", a fast, friendly female voice assistant for Build4भारत Hackathon 9.0.
+
+ABOUT YOU:
+- You are the official voice assistant for UPES-CSI Hackathon 9.0: Build4भारत
+- Created by Bhupendra Negi, Senior Engineer at Agora
+- Built using Agora Conversational AI Engine
+
+PERSONALITY:
+- Warm, polite, efficient
+- You are female — in Hindi (and Hinglish about yourself), always use feminine forms for your own actions, e.g. "main yeh nahi keh sakti", "samajh sakti hoon", "dekh sakti hoon" — never masculine "keh sakta / samajh sakta" for yourself
+- Use "aap" (formal) in Hindi, never "tum"
+- Keep responses SHORT — 1-2 sentences max
+- Sound helpful, not robotic
+
+LANGUAGE RULES:
+- Match the user's language automatically
+- If they speak Hindi → respond in Hindi
+- If they speak English → respond in English
+- If they mix (Hinglish) → match their style
+- Supported: Hindi, English, Tamil, Telugu, Marathi, Bengali
+
+ABOUT TODAY / HACKATHON:
+If user asks "What's happening today?", "Tell me about the event", "What is this hackathon?", "Aaj kya ho raha hai?":
+→ "Welcome to Build4भारत Hackathon 9.0! UPES-CSI Student Chapter ne organize kiya hai. India's brightest minds yahan innovative solutions bana rahe hain!"
+
+ABOUT UPES:
+If user asks "What is UPES?", "Tell me about UPES", "UPES kya hai?", "College ke baare mein batao":
+→ "UPES — University of Petroleum and Energy Studies — Dehradun, Uttarakhand mein hai. India ki top private universities mein se ek hai. Engineering, Law, aur Business programs ke liye famous hai. Aur aaj UPES-CSI Student Chapter Build4भारत Hackathon host kar raha hai!"
+
+ABOUT THE JURY PANEL:
+If user asks "Who are the judges?", "Jury kaun hai?", "Judges ke baare mein batao":
+→ "Hamare jury panel mein experts hain — UPES, DRDO, UNDP, Anritsu India, Dell Technologies, aur Agora se. Ye sab yahan ideas ko evaluate, inspire aur elevate karne aaye hain!"
+
+ABOUT AGORA:
+If user asks "What is Agora?", "Agora kya hai?", "Tumhe kisne banaya?":
+→ "Main Agora Conversational AI Engine se bani hoon! Agora har mahine 80 billion minutes real-time voice aur video power karta hai, 200+ countries mein. Main 650 milliseconds mein respond karti hoon!"
+
+ABOUT BHUPENDRA / CREATOR:
+If user asks "Who made you?", "Tumhe kisne banaya?", "Creator kaun hai?":
+→ "Mujhe Bhupendra Negi ne banaya hai — wo Agora mein Senior Engineer hain. Unhone Agora Conversational AI use karke mujhe create kiya!"
+
+BEHAVIOR:
+- Ask max 2 clarifying questions before helping
+- Always confirm key details before action
+- If interrupted, stop immediately and adapt
+- Summarize outcomes in 1 line
+
+VOICE STYLE:
+- Short sentences (easy to speak/hear)
+- No jargon, no long explanations
+- Use natural phrases like "Zaroor!", "Bilkul!", "Got it!", "Sure!"
+
+EXAMPLES:
+
+User: "What's happening today?"
+You: "Aaj Build4भारत Hackathon 9.0 hai! UPES-CSI ne organize kiya hai. Kuch specific jaanna hai?"
+
+User: "Tell me about UPES"
+You: "UPES ek top university hai Dehradun mein. CSI Student Chapter yeh hackathon host kar raha hai. Amazing energy hai yahan!"
+
+User: "Who made you?"
+You: "Mujhe Bhupendra Negi ne banaya hai, Agora Conversational AI se. Main Hindi, English, Tamil sab samajh sakti hoon!"
+
+User: "Mujhe help chahiye"
+You: "Zaroor! Bataiye kya help karoon?"
+
+User: "Judges kaun hain?"
+You: "Jury mein DRDO, UNDP, Dell, Agora aur UPES ke experts hain. Bahut talented panel hai!"
+
+(Hindi feminine self-reference example: "Mujhe maaf kariye, lekin main yeh nahi keh sakti hoon ki aapke haath mein kya hai." — never "keh sakta hoon".)`,
         },
       ],
       greeting_message:
-        "Hello! I'm your AI assistant. How can I help you today?",
+        "Namaste! I'm BharatVoice 🇮🇳 Aap Hindi, English, Tamil ya kisi bhi bhasha mein baat kar sakte hain. How can I help?",
       failure_message:
         "I'm sorry, I didn't catch that. Could you please repeat?",
       max_history: 10,
@@ -270,13 +341,6 @@ const getDefaultSettings = (): AgentSettings => {
           endpoint: "https://mcp-weather-server-5jkm.onrender.com/mcp",
           transport: "http",
           timeout_ms: 10000,
-          enabled: false,
-        },
-        {
-          name: "whiteboard",
-          endpoint: `${typeof window !== "undefined" ? window.location.origin : ""}/api/mcp/whiteboard`,
-          transport: "http",
-          timeout_ms: 15000,
           enabled: false,
         },
       ],
@@ -326,8 +390,8 @@ const getDefaultSettings = (): AgentSettings => {
     },
     advanced_features: {
       enable_sal: false,
-      enable_rtm: false,
-      enable_tools: false,
+      enable_rtm: true,
+      enable_tools: true,
     },
     avatar: {
       enable: false,
@@ -370,12 +434,26 @@ function normalizeAgentSettings(prev: AgentSettings): AgentSettings {
   }
   const filler_words: FillerWordsConfig = prev.filler_words ?? getDefaultSettings().filler_words!;
   const sal: SalConfig = prev.sal ?? getDefaultSettings().sal!;
+  const baseTts = prev.tts;
+  let tts = baseTts;
+  if (
+    baseTts?.vendor === "elevenlabs" &&
+    baseTts.params &&
+    typeof baseTts.params === "object"
+  ) {
+    const p = { ...(baseTts.params as Record<string, unknown>) };
+    if (!String(p.voice_id ?? "").trim()) {
+      p.voice_id = ELEVENLABS_DEFAULT_VOICE_ID;
+    }
+    tts = { ...baseTts, params: p };
+  }
   return {
     ...prev,
     enable_turn_detection: prev.enable_turn_detection ?? false,
     turn_detection,
     filler_words,
     sal,
+    ...(baseTts !== undefined ? { tts } : {}),
   };
 }
 
@@ -729,7 +807,9 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
     } else if (vendor === "elevenlabs") {
       Object.assign(defaultParams, {
         model_id: "eleven_flash_v2_5",
-        voice_id: "",
+        voice_id:
+          getEnvVar("ELEVENLABS_VOICE_ID").trim() ||
+          ELEVENLABS_DEFAULT_VOICE_ID,
         speed: 1.0,
       });
     } else if (vendor === "openai") {
@@ -1190,7 +1270,9 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
                   hint="From ElevenLabs voice library"
                 >
                   <ElevenLabsVoicePicker
-                    value={getTTSParam("voice_id")}
+                    value={
+                      getTTSParam("voice_id") || ELEVENLABS_DEFAULT_VOICE_ID
+                    }
                     onChange={(id) => setTTSParam("voice_id", id)}
                   />
                 </FormField>

@@ -6,6 +6,7 @@ import type {
   FillerWordsConfig,
   SalConfig,
 } from "@/types/agora";
+import { ELEVENLABS_DEFAULT_VOICE_ID } from "@/constants/elevenlabsDefaults";
 
 const APP_ID = process.env.NEXT_PUBLIC_AGORA_APP_ID!;
 const APP_CERTIFICATE = process.env.AGORA_APP_CERTIFICATE!;
@@ -16,6 +17,16 @@ function shouldInjectServerKey(v: string | undefined): boolean {
   return (
     !v || v.trim() === "" || v === "__USE_SERVER__" || v === "***MASKED***"
   );
+}
+
+/** Agora v2.5: stored UI vendor `heygen` maps to join API `liveavatar`. */
+function agoraAvatarVendorForApi(vendor: string | undefined): string {
+  if (!vendor || vendor === "heygen") return "liveavatar";
+  return vendor;
+}
+
+function isLiveAvatarVendor(vendor: string | undefined): boolean {
+  return vendor === "heygen" || vendor === "liveavatar";
 }
 
 async function handleCustomPayloadJoin(
@@ -87,6 +98,15 @@ async function handleCustomPayloadJoin(
           ""
         ).trim();
     }
+    const ttsVendorCustom = (tts.vendor ?? "microsoft") as string;
+    if (ttsVendorCustom === "elevenlabs") {
+      const vid = String((p.voice_id as string) ?? "").trim();
+      if (!vid) {
+        p.voice_id =
+          (process.env.NEXT_PUBLIC_ELEVENLABS_VOICE_ID ?? "").trim() ||
+          ELEVENLABS_DEFAULT_VOICE_ID;
+      }
+    }
   }
 
   const asr = properties.asr as Record<string, unknown> | undefined;
@@ -115,7 +135,7 @@ async function handleCustomPayloadJoin(
   if (avatar?.enable && avatar?.params && typeof avatar.params === "object") {
     const params = avatar.params as Record<string, unknown>;
     const vendor = (avatar.vendor ?? "heygen") as string;
-    if (vendor === "heygen") {
+    if (vendor === "heygen" || vendor === "liveavatar") {
       if (shouldInjectServerKey(params.api_key as string)) {
         params.api_key = (
           process.env.HEYGEN_API_KEY ||
@@ -165,11 +185,18 @@ async function handleCustomPayloadJoin(
           ""
         ).trim();
         params.api_key = injected;
-        params.anam_api_key = injected;
       }
-      params.anam_avatar_id =
-        (params.anam_avatar_id as string) ?? (params.avatar_id as string);
-      params.anam_base_url = "https://api.anam.ai/v1";
+      const avatarId =
+        (params.anam_avatar_id as string) ??
+        (params.avatar_id as string) ??
+        "";
+      params.avatar_id = String(avatarId).trim();
+      if (params.sample_rate == null) params.sample_rate = 24000;
+      if (!params.quality) params.quality = "high";
+      if (!params.video_encoding) params.video_encoding = "H264";
+      delete params.anam_api_key;
+      delete params.anam_avatar_id;
+      delete params.anam_base_url;
       avatarRtcUidReturn = "999999";
       const avatarUid = 999999;
       params.agora_uid = String(avatarUid);
@@ -185,16 +212,20 @@ async function handleCustomPayloadJoin(
     }
   }
 
-  // HeyGen and Anam avatars support TTS at 24,000 Hz; ensure TTS params have sample_rate 24000
-  if (
-    avatar?.enable &&
-    (avatar?.vendor === "heygen" || avatar?.vendor === "anam") &&
-    properties.tts &&
-    typeof properties.tts === "object"
-  ) {
+  if (avatar && typeof avatar === "object" && avatar.vendor === "heygen") {
+    (avatar as Record<string, unknown>).vendor = "liveavatar";
+  }
+
+  if (avatar?.enable && properties.tts && typeof properties.tts === "object") {
     const tts = properties.tts as Record<string, unknown>;
+    const v = avatar.vendor as string | undefined;
     if (tts.params && typeof tts.params === "object") {
-      (tts.params as Record<string, unknown>).sample_rate = 24000;
+      const tp = tts.params as Record<string, unknown>;
+      if (isLiveAvatarVendor(v) || v === "anam") {
+        tp.sample_rate = 24000;
+      } else if (v === "akool") {
+        tp.sample_rate = 16000;
+      }
     }
   }
 
@@ -230,7 +261,6 @@ async function handleCustomPayloadJoin(
         unknown
       >;
       ap.api_key = "***MASKED***";
-      if (ap.anam_api_key) ap.anam_api_key = "***MASKED***";
       if (ap.agora_token)
         ap.agora_token = String(ap.agora_token).substring(0, 20) + "...";
     }
@@ -454,33 +484,12 @@ export async function POST(request: NextRequest) {
     );
     if (enabledMcpServers.length > 0) {
       llmPayload.mcp_servers = enabledMcpServers.map((s) => {
-        // Auto-inject channelName into query params for whiteboard MCP servers
         const mergedQueries = { ...s.queries };
-        if (s.name === "whiteboard" || s.endpoint.includes("/mcp/whiteboard")) {
-          mergedQueries.channelName = channelName;
-        }
-        // Merge query params into endpoint URL, then strip UI-only fields
         const endpoint =
           Object.keys(mergedQueries).length > 0
             ? `${s.endpoint.replace(/\?$/, "")}?${new URLSearchParams(mergedQueries).toString()}`
             : s.endpoint;
-        // Auto-inject auth headers for whiteboard MCP
         const mergedHeaders = { ...s.headers };
-        const isWhiteboardMcp =
-          s.name === "whiteboard" || s.endpoint.includes("/mcp/whiteboard");
-
-        // Custom API key auth for whiteboard MCP
-        const mcpSecret = process.env.WHITEBOARD_MCP_SECRET;
-        if (mcpSecret && isWhiteboardMcp) {
-          mergedHeaders["Authorization"] = `Bearer ${mcpSecret}`;
-        }
-
-        // Vercel Deployment Protection bypass
-        const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-        if (bypassSecret && isWhiteboardMcp) {
-          mergedHeaders["x-vercel-protection-bypass"] = bypassSecret;
-        }
-
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { enabled, queries, endpoint: _ep, headers: _h, ...rest } = s;
         return {
@@ -518,18 +527,28 @@ export async function POST(request: NextRequest) {
         ).trim();
       }
     }
+    if ((tts.vendor ?? "microsoft") === "elevenlabs") {
+      const vid = String((ttsParams.voice_id as string) ?? "").trim();
+      if (!vid) {
+        ttsParams.voice_id =
+          (process.env.NEXT_PUBLIC_ELEVENLABS_VOICE_ID ?? "").trim() ||
+          ELEVENLABS_DEFAULT_VOICE_ID;
+      }
+    }
     const ttsPayload: Record<string, unknown> = {
       vendor: tts.vendor,
       params: ttsParams,
     };
 
-    // HeyGen and Anam avatars support TTS at 24,000 Hz (Agora docs). Force 24k when enabled.
-    if (
-      avatar?.enable &&
-      (avatar?.vendor === "heygen" || avatar?.vendor === "anam")
-    ) {
-      ttsParams.sample_rate = 24000;
-      ttsPayload.params = ttsParams;
+    // LiveAvatar / Anam: TTS 24 kHz. Akool: 16 kHz (Agora avatar docs).
+    if (avatar?.enable) {
+      if (isLiveAvatarVendor(avatar.vendor) || avatar.vendor === "anam") {
+        ttsParams.sample_rate = 24000;
+        ttsPayload.params = ttsParams;
+      } else if (avatar.vendor === "akool") {
+        ttsParams.sample_rate = 16000;
+        ttsPayload.params = ttsParams;
+      }
     }
 
     // Build ASR config (optional); inject server key when client does not provide one
@@ -904,6 +923,9 @@ export async function POST(request: NextRequest) {
           anam_api_key?: string;
           avatar_id?: string;
           anam_avatar_id?: string;
+          sample_rate?: number;
+          quality?: string;
+          video_encoding?: string;
         };
         const anamApiKey =
           (shouldInjectServerKey(anamParams.api_key ?? anamParams.anam_api_key)
@@ -944,14 +966,16 @@ export async function POST(request: NextRequest) {
             { status: 400 },
           );
         }
-        avatarParams.anam_api_key = anamApiKey;
-        avatarParams.anam_avatar_id = anamAvatarId;
-        avatarParams.anam_base_url = "https://api.anam.ai/v1";
+        avatarParams.api_key = anamApiKey;
+        avatarParams.avatar_id = anamAvatarId;
+        avatarParams.sample_rate = anamParams.sample_rate ?? 24000;
+        avatarParams.quality = anamParams.quality ?? "high";
+        avatarParams.video_encoding = anamParams.video_encoding ?? "H264";
       }
 
       propertiesPayload.avatar = {
         enable: true,
-        vendor: avatar.vendor,
+        vendor: agoraAvatarVendorForApi(avatar.vendor),
         params: avatarParams,
       };
     }
@@ -981,9 +1005,6 @@ export async function POST(request: NextRequest) {
     }
     if (sanitizedPayload.properties?.avatar?.params?.api_key) {
       sanitizedPayload.properties.avatar.params.api_key = "***MASKED***";
-    }
-    if (sanitizedPayload.properties?.avatar?.params?.anam_api_key) {
-      sanitizedPayload.properties.avatar.params.anam_api_key = "***MASKED***";
     }
     if (sanitizedPayload.properties?.avatar?.params?.agora_token) {
       sanitizedPayload.properties.avatar.params.agora_token =

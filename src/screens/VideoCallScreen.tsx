@@ -25,7 +25,6 @@ import {
 } from "react-icons/md";
 import { useTour } from "@/hooks/useTour";
 import { TourOverlay } from "@/components/FeatureTour";
-import useWhiteboardCommands from "@/hooks/useWhiteboardCommands";
 
 const SESSION_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
@@ -178,9 +177,6 @@ const VideoCallScreen: React.FC = () => {
 
   const tour = useTour();
 
-  // Poll for AI whiteboard commands when both whiteboard and agent are active
-  useWhiteboardCommands();
-
   // Initialize conversational AI hook for transcript handling
   const { sendChatMessage } = useConversationalAI({
     rtcClient,
@@ -221,15 +217,25 @@ const VideoCallScreen: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-300">
-      {/* Top Bar */}
-      <div className="flex items-center bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white p-4 text-lg shadow-md transition-colors duration-300">
-        <span
-          data-tour="tour-meeting-name"
-          className="font-bold text-xl font-syne"
-        >
-          Meeting: {meetingName || channelId}
-        </span>
-        <div className="flex items-center gap-3 ml-auto">
+      {/* Top Bar: meeting left, hackathon label centered, actions right */}
+      <div className="grid grid-cols-3 items-center gap-3 bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white p-4 text-lg shadow-md transition-colors duration-300">
+        <div className="min-w-0 flex justify-start">
+          <span
+            data-tour="tour-meeting-name"
+            className="font-bold text-xl font-syne truncate"
+          >
+            Meeting: {meetingName || channelId}
+          </span>
+        </div>
+        <div className="min-w-0 flex justify-center text-center px-2">
+          <span
+            className="font-semibold text-base sm:text-lg text-[var(--agora-accent-blue)] truncate max-w-full"
+            title="Build4भारत Hackathon 9.0"
+          >
+            Conversational Agent
+          </span>
+        </div>
+        <div className="flex items-center gap-3 justify-end min-w-0">
           {/* Transmission Badge - shown when agent is active */}
           {isAgentActive && (
             <span

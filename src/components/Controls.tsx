@@ -232,6 +232,12 @@ const Controls: React.FC<ControlsProps> = ({
         result.agentRtcUid || "0",
         result.avatarRtcUid,
       );
+      useAppStore.getState().appendAgentSession({
+        agentId: result.agentId,
+        joinedAt: Date.now(),
+        channelId: channelId || undefined,
+        meetingName: meetingName || undefined,
+      });
       const mode = options?.useCustomPayload
         ? (
             options.customJoinPayload?.properties?.advanced_features as
@@ -253,7 +259,15 @@ const Controls: React.FC<ControlsProps> = ({
       );
       setAgentLoading(false);
     }
-  }, [localUID, channelId, localUsername, agentSettings, setAgentLoading, setAgentActive]);
+  }, [
+    localUID,
+    channelId,
+    meetingName,
+    localUsername,
+    agentSettings,
+    setAgentLoading,
+    setAgentActive,
+  ]);
 
   const handleStopAgent = useCallback(async () => {
     if (!agentId) return;
@@ -338,12 +352,12 @@ const Controls: React.FC<ControlsProps> = ({
         {/* Left: version link */}
         <div className="flex-1 flex items-center">
           <a
-            href="https://docs.agora.io/en/conversational-ai/overview/release-notes#v24"
+            href="https://docs.agora.io/en/conversational-ai/overview/release-notes#v25"
             target="_blank"
             rel="noopener noreferrer"
             className="text-xs [color:var(--agora-accent-blue)] hover:opacity-80 transition-opacity underline underline-offset-2"
           >
-            Convo Engine v2.4
+            Convo Engine v2.5
           </a>
         </div>
 

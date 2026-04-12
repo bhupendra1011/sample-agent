@@ -7,6 +7,12 @@ import type {
   AgentQueryStatus,
   ITranscriptHelperItem,
 } from "@/types/agora";
+import type { AgentSessionRecord } from "@/types/agentTurns";
+import {
+  loadAgentSessionHistory,
+  saveAgentSessionHistory,
+  MAX_AGENT_SESSION_RECORDS,
+} from "@/utils/agentSessionHistoryStorage";
 import { EAgentState, ETranscriptRenderMode } from "@/types/agora";
 import type { ILocalAudioTrack, ILocalVideoTrack, IRemoteVideoTrack } from "agora-rtc-sdk-ng";
 
@@ -100,6 +106,11 @@ interface AppState {
   transcriptionMode: "rtc" | "rtm";
   transcriptRenderMode: ETranscriptRenderMode;
   setAgentActive: (agentId: string, agentRtcUid?: string, avatarRtcUid?: string) => void;
+  /** Past agent joins (persisted); use for turns API after sessions end. */
+  agentSessionHistory: AgentSessionRecord[];
+  appendAgentSession: (entry: AgentSessionRecord) => void;
+  removeAgentSessionFromHistory: (agentId: string) => void;
+  hydrateAgentSessionHistory: () => void;
   setAgentLoading: (loading: boolean) => void;
   setAgentUpdating: (updating: boolean) => void;
   clearAgent: () => void;
@@ -213,6 +224,7 @@ const useAppStore = create<AppState>((set, get) => ({
 
   // Agent initial state
   agentId: null,
+  agentSessionHistory: [] as AgentSessionRecord[],
   isAgentActive: false,
   isAgentLoading: false,
   isAgentUpdating: false,
@@ -240,6 +252,31 @@ const useAppStore = create<AppState>((set, get) => ({
       isAgentActive: true,
       isAgentLoading: false,
     }),
+  appendAgentSession: (entry) =>
+    set((state) => {
+      const base =
+        state.agentSessionHistory.length > 0
+          ? state.agentSessionHistory
+          : typeof window !== "undefined"
+            ? loadAgentSessionHistory()
+            : [];
+      const next = [
+        entry,
+        ...base.filter((e) => e.agentId !== entry.agentId),
+      ].slice(0, MAX_AGENT_SESSION_RECORDS);
+      saveAgentSessionHistory(next);
+      return { agentSessionHistory: next };
+    }),
+  removeAgentSessionFromHistory: (agentId) =>
+    set((state) => {
+      const next = state.agentSessionHistory.filter(
+        (e) => e.agentId !== agentId,
+      );
+      saveAgentSessionHistory(next);
+      return { agentSessionHistory: next };
+    }),
+  hydrateAgentSessionHistory: () =>
+    set({ agentSessionHistory: loadAgentSessionHistory() }),
   setAgentLoading: (loading) => set({ isAgentLoading: loading }),
   setAgentUpdating: (updating) => set({ isAgentUpdating: updating }),
   clearAgent: () =>

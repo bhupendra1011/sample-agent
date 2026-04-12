@@ -1,5 +1,6 @@
 // src/api/agentApi.ts
 import type { AgentSettings, AgentQueryStatus } from "@/types/agora";
+import type { AgentTurnsResponse } from "@/types/agentTurns";
 
 export interface CustomJoinPayload {
   name: string;
@@ -95,6 +96,29 @@ export async function queryAgent(
   }
 
   return response.json();
+}
+
+/**
+ * Per-turn latency and lifecycle metrics (after session ends; last 7 days).
+ * See https://docs.agora.io/en/conversational-ai/rest-api/agent/turns
+ */
+export async function queryAgentTurns(
+  agentId: string,
+): Promise<AgentTurnsResponse> {
+  const response = await fetch(
+    `/api/agent/turns?agentId=${encodeURIComponent(agentId)}`,
+  );
+
+  if (!response.ok) {
+    const errorData = (await response.json().catch(() => ({}))) as {
+      error?: string;
+      hint?: string;
+    };
+    const msg = [errorData.error, errorData.hint].filter(Boolean).join(" ");
+    throw new Error(msg || "Failed to query conversation turns");
+  }
+
+  return response.json() as Promise<AgentTurnsResponse>;
 }
 
 /**

@@ -84,5 +84,20 @@ export function sanitizeCustomJoinPayload(
     if (sanitized !== undefined) allowedProps[key] = sanitized;
   }
 
+  stripV25DeprecatedJoinFields(allowedProps);
+
   return { name, properties: allowedProps };
+}
+
+/** v2.5 removed these fields from Start agent; strip if present in custom JSON. */
+function stripV25DeprecatedJoinFields(p: Record<string, unknown>): void {
+  delete p.silence_timeout;
+  const llm = p.llm;
+  if (llm && typeof llm === "object" && llm !== null) {
+    delete (llm as Record<string, unknown>).silence_message;
+  }
+  const adv = p.advanced_features;
+  if (adv && typeof adv === "object" && adv !== null) {
+    delete (adv as Record<string, unknown>).enable_aivad;
+  }
 }
