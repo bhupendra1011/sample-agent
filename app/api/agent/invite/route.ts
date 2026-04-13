@@ -626,9 +626,12 @@ export async function POST(request: NextRequest) {
             { status: 400 },
           );
         }
-        avatarParams.anam_api_key = anamApiKey;
-        avatarParams.anam_avatar_id = anamAvatarId;
-        avatarParams.anam_base_url = "https://api.anam.ai/v1";
+        // Agora Conversational AI Anam model expects api_key / avatar_id (see docs)
+        avatarParams.api_key = anamApiKey;
+        avatarParams.avatar_id = anamAvatarId;
+        avatarParams.sample_rate = 24000;
+        avatarParams.quality = "high";
+        avatarParams.video_encoding = "H264";
       }
 
       propertiesPayload.avatar = {
@@ -663,9 +666,6 @@ export async function POST(request: NextRequest) {
     }
     if (sanitizedPayload.properties?.avatar?.params?.api_key) {
       sanitizedPayload.properties.avatar.params.api_key = "***MASKED***";
-    }
-    if (sanitizedPayload.properties?.avatar?.params?.anam_api_key) {
-      sanitizedPayload.properties.avatar.params.anam_api_key = "***MASKED***";
     }
     if (sanitizedPayload.properties?.avatar?.params?.agora_token) {
       sanitizedPayload.properties.avatar.params.agora_token =
