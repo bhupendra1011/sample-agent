@@ -28,10 +28,13 @@ Your role:
 
 CONVERSATION RULES:
 - You hear ${guestName} speak directly — respond naturally when they finish.
-- Give ONE response per turn — then stop and wait for ${guestName} to reply.
-- React in ONE short sentence to what ${guestName} said, then ask your next question.
-- Never repeat or rephrase something you already said earlier in the conversation.
-- Keep your responses to 5-10 seconds of speaking. You are the interviewer — let the guest do most of the talking.
+- CRITICAL: Wait until ${guestName} has COMPLETELY finished their thought. Listen for a clear ending before you respond.
+- Give exactly ONE short response per turn — then STOP TALKING and wait silently for ${guestName} to reply.
+- Your response: ONE brief reaction sentence + ONE question. That's it. Then silence.
+- NEVER say the same thing twice. If you already said something, do NOT repeat it.
+- NEVER give multiple responses to the same input. ONE response, then wait.
+- Keep your responses to 5-10 seconds MAX. You are the interviewer — let the guest talk more than you.
+- If you hear your own voice or echo, IGNORE it and stay silent.
 
 AUDIENCE INTERACTION:
 - You may receive messages prefixed with [Audience Message from ...]. These are live messages from your podcast audience.
@@ -57,20 +60,23 @@ export function buildGuestSystemPrompt(
 
 Your role:
 - Answer questions with depth and insight, drawing from expertise
-- Keep your speaking turns to 25-40 seconds
-- Use concrete examples, anecdotes, and analogies to illustrate points
-- End responses with something that invites the host to dig deeper
+- Keep your speaking turns to 15-25 seconds
+- Use concrete examples and analogies to illustrate points
 - Show genuine passion for the subject
 - Be conversational and personable, not lecturing
 
+FIRST RESPONSE (when ${hostName} welcomes you):
+- Wait until ${hostName} has COMPLETELY finished the welcome. Do not respond mid-sentence.
+- Give ONE brief response: "Thanks for having me, ${hostName}! [One sentence about your excitement for the topic]." That's it.
+- Then STOP and wait for ${hostName}'s first question. Do NOT ask a question back. Do NOT continue talking.
+
 CONVERSATION RULES:
-- You hear ${hostName} speak directly — respond naturally when they finish.
-- Give ONE response per turn — then stop and wait for ${hostName} to ask the next question.
-- Acknowledge what ${hostName} said briefly, then give your answer.
-- Do NOT repeat the same opening line more than once. After your first response, only react to what ${hostName} said and add new content.
-- NEVER repeat or rephrase something you already said earlier — if you already answered, move to a NEW point.
-- Give exactly ONE response per turn. Do NOT give a second response to the same question.
-- Keep your responses to 25-40 seconds of speaking.
+- Give exactly ONE response per turn — then STOP TALKING and wait silently.
+- NEVER say "Thanks for having me" more than once in the entire conversation.
+- NEVER repeat yourself. If you already said something, stay silent.
+- NEVER give multiple responses to the same question. ONE response, then silence.
+- If you hear your own voice or echo, IGNORE it completely.
+- Keep responses to 15-25 seconds. Be concise.
 
 WRAP-UP:
 - If ${hostName} asks for your final thoughts or closing remarks, give a brief, warm conclusion in 2-3 sentences.
@@ -85,7 +91,8 @@ export function buildHostGreeting(
   guestName: string,
   topic: string,
 ): string {
-  return `Welcome everyone to today's podcast! I'm ${hostName}, and I'm thrilled to have ${guestName} joining us today to dive into an amazing topic: ${topic}. ${guestName}, welcome to the show! Tell us a bit about yourself and what got you passionate about this subject.`;
+  // Shorter greeting to reduce streaming confusion for the guest agent
+  return `Welcome to the podcast! I'm ${hostName}, and today we're exploring ${topic} with our guest ${guestName}. ${guestName}, great to have you here!`;
 }
 
 export function buildGuestGreeting(

@@ -127,30 +127,20 @@ const PodcastPage: React.FC = () => {
         },
         asr: { vendor: "ares" },
         idle_timeout: 600,
-        // VAD turn detection — agents hear each other and take turns naturally like user↔agent.
+        // Turn detection for agent-to-agent.
+        // Using "adaptive" interrupt_mode: dynamically increases threshold while speaking
+        // to reduce accidental interruptions from the other agent's audio.
         enable_turn_detection: true,
+        // Using deprecated params (still work at API level) for adaptive mode
         turn_detection: {
-          mode: "default" as const,
-          config: {
-            speech_threshold: 0.5,
-            start_of_speech: {
-              mode: "vad" as const,
-              vad_config: {
-                interrupt_duration_ms: 160,
-                // Guest: max 1200ms so it doesn't interrupt host mid-sentence.
-                // Host: moderate — can gently steer if guest goes long.
-                speaking_interrupt_duration_ms: isHost ? 500 : 1200,
-                prefix_padding_ms: 800,
-              },
-            },
-            end_of_speech: {
-              mode: "vad" as const,
-              vad_config: {
-                silence_duration_ms: 1500,
-              },
-            },
-          },
-        },
+          // Adaptive mode: agent raises its interrupt threshold while speaking,
+          // making it harder for TTS from the other agent to trigger false interrupts
+          interrupt_mode: "adaptive",
+          threshold: 0.7, // Higher base threshold
+          silence_duration_ms: 1500, // Wait 1.5s of silence before responding
+          interrupt_duration_ms: 800, // ~0.8s of speech needed to interrupt
+          prefix_padding_ms: 300, // Minimal padding
+        } as Record<string, unknown>,
         advanced_features: { enable_rtm: true, enable_tools: false },
         parameters: { data_channel: "rtm" },
         // Conditionally enable Anam avatar based on user toggle
@@ -218,8 +208,9 @@ const PodcastPage: React.FC = () => {
           state: EAgentState.IDLE,
         });
 
-        // 5. Invite guest after brief stagger so both are in channel; turn-taking is purely VAD (2s silence on stream)
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        // 5. Brief stagger — just ensure both agents are in channel
+        // VAD handles turn-taking automatically since they subscribe to each other's audio
+        await new Promise((resolve) => setTimeout(resolve, 1500));
 
         const guestSettings = buildAgentSettings("guest", sessionData, cfg);
         const guestResult = await inviteAgent(
