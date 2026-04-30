@@ -35,10 +35,43 @@ function formatTimestamp(ts: number): string {
   return new Date(ts * 1000).toLocaleTimeString();
 }
 
+/** Live agent signal derived from EAgentState (v2.6 clearer signals). */
+type LiveSignal = "listening" | "thinking" | "speaking" | "idle";
+
+const LIVE_SIGNAL_STYLES: Record<
+  LiveSignal,
+  { dot: string; text: string; label: string }
+> = {
+  listening: {
+    dot: "bg-green-500 animate-pulse",
+    text: "text-green-700 dark:text-green-300",
+    label: "Listening",
+  },
+  thinking: {
+    dot: "bg-amber-500 animate-pulse",
+    text: "text-amber-700 dark:text-amber-300",
+    label: "Thinking",
+  },
+  speaking: {
+    dot: "bg-blue-500 animate-pulse",
+    text: "text-blue-700 dark:text-blue-300",
+    label: "Speaking",
+  },
+  idle: {
+    dot: "bg-gray-300 dark:bg-gray-600",
+    text: "text-gray-500 dark:text-gray-400",
+    label: "Idle",
+  },
+};
+
 const AgentStatusBadge: React.FC = () => {
   const agentId = useAppStore((state) => state.agentId);
   const agentQueryStatus = useAppStore((state) => state.agentQueryStatus);
   const setAgentQueryStatus = useAppStore((state) => state.setAgentQueryStatus);
+  const agentListening = useAppStore((state) => state.agentListening);
+  const agentThinking = useAppStore((state) => state.agentThinking);
+  const agentSpeaking = useAppStore((state) => state.agentSpeaking);
+  const isAgentActive = useAppStore((state) => state.isAgentActive);
 
   const [expanded, setExpanded] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -100,27 +133,42 @@ const AgentStatusBadge: React.FC = () => {
   const status = agentQueryStatus?.status ?? "STARTING";
   const colors = STATUS_COLORS[status] ?? STATUS_COLORS.IDLE;
 
+  const liveSignal: LiveSignal = agentSpeaking
+    ? "speaking"
+    : agentThinking
+    ? "thinking"
+    : agentListening
+    ? "listening"
+    : "idle";
+  const showLiveSignal = isAgentActive && status === "RUNNING";
+  const liveStyle = LIVE_SIGNAL_STYLES[liveSignal];
+
   return (
     <div ref={badgeRef} className="relative">
-      {/* Collapsed badge */}
-      <button
-        onClick={() => setExpanded((prev) => !prev)}
-        className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-gray-100 dark:bg-gray-700/60 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200 text-xs"
-        title="Click for agent status details"
-      >
-        <span className={`w-2 h-2 rounded-full shrink-0 ${colors.dot}`} />
-        <span className="text-gray-600 dark:text-gray-300 whitespace-nowrap">
-          Agent Status:
-        </span>
-        <span className={`font-semibold whitespace-nowrap ${colors.text}`}>
-          {status}
-        </span>
-        {expanded ? (
-          <MdExpandLess className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
-        ) : (
-          <MdExpandMore className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
-        )}
-      </button>
+      <div className="flex items-center gap-1.5">
+        {/* Collapsed operational status badge.
+            Live "listening / thinking / speaking" signal lives on the
+            AgentTile (and inside this badge's expanded popover) to avoid
+            duplicating the same indicator twice in the bottom bar. */}
+        <button
+          onClick={() => setExpanded((prev) => !prev)}
+          className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-gray-100 dark:bg-gray-700/60 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200 text-xs"
+          title="Click for agent status details"
+        >
+          <span className={`w-2 h-2 rounded-full shrink-0 ${colors.dot}`} />
+          <span className="text-gray-600 dark:text-gray-300 whitespace-nowrap">
+            Agent Status:
+          </span>
+          <span className={`font-semibold whitespace-nowrap ${colors.text}`}>
+            {status}
+          </span>
+          {expanded ? (
+            <MdExpandLess className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
+          ) : (
+            <MdExpandMore className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
+          )}
+        </button>
+      </div>
 
       {/* Expanded popover */}
       {expanded && (
@@ -147,6 +195,20 @@ const AgentStatusBadge: React.FC = () => {
               <span className="text-gray-500 dark:text-gray-400">Status</span>
               <span className={`font-semibold ${colors.text}`}>{status}</span>
             </div>
+
+            {showLiveSignal && (
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500 dark:text-gray-400">
+                  Live signal
+                </span>
+                <span
+                  className={`inline-flex items-center gap-1 font-semibold ${liveStyle.text}`}
+                >
+                  <span className={`w-2 h-2 rounded-full ${liveStyle.dot}`} />
+                  {liveStyle.label}
+                </span>
+              </div>
+            )}
 
             <div className="flex justify-between">
               <span className="text-gray-500 dark:text-gray-400">Agent ID</span>

@@ -352,12 +352,12 @@ const Controls: React.FC<ControlsProps> = ({
         {/* Left: version link */}
         <div className="flex-1 flex items-center">
           <a
-            href="https://docs.agora.io/en/conversational-ai/overview/release-notes#v25"
+            href="https://docs.agora.io/en/conversational-ai/overview/release-notes#v26"
             target="_blank"
             rel="noopener noreferrer"
             className="text-xs [color:var(--agora-accent-blue)] hover:opacity-80 transition-opacity underline underline-offset-2"
           >
-            Convo Engine v2.5
+            Convo Engine v2.6
           </a>
         </div>
 

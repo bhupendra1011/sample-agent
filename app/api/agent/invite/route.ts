@@ -5,6 +5,7 @@ import type {
   TurnDetectionConfig,
   FillerWordsConfig,
   SalConfig,
+  MllmConfig,
 } from "@/types/agora";
 import { ELEVENLABS_DEFAULT_VOICE_ID } from "@/constants/elevenlabsDefaults";
 
@@ -89,6 +90,13 @@ async function handleCustomPayloadJoin(
         p.key = (
           process.env.OPENAI_TTS_KEY ||
           process.env.NEXT_PUBLIC_OPENAI_TTS_KEY ||
+          ""
+        ).trim();
+      else if (vendor === "deepgram")
+        p.key = (
+          process.env.DEEPGRAM_TTS_KEY ||
+          process.env.DEEPGRAM_API_KEY ||
+          process.env.NEXT_PUBLIC_DEEPGRAM_API_KEY ||
           ""
         ).trim();
       else
@@ -456,6 +464,10 @@ export async function POST(request: NextRequest) {
       llmPayload.greeting_message = llm.greeting_message;
     }
 
+    if (llm.greeting_configs?.mode) {
+      llmPayload.greeting_configs = { mode: llm.greeting_configs.mode };
+    }
+
     if (llm.failure_message) {
       llmPayload.failure_message = llm.failure_message;
     }
@@ -477,6 +489,12 @@ export async function POST(request: NextRequest) {
     const rtmExplicitlyDisabled = advanced_features?.enable_rtm === false;
     llmPayload.input_modalities =
       rtmExplicitlyDisabled ? ["text"] : (llm.input_modalities ?? ["text", "image"]);
+
+    // v2.x output_modalities: when omitted server defaults to ["text"].
+    // Include only when caller explicitly set it (so we don't override defaults).
+    if (llm.output_modalities && llm.output_modalities.length > 0) {
+      llmPayload.output_modalities = llm.output_modalities;
+    }
 
     // Build MCP servers for LLM (tool invocation) — only include enabled servers
     const enabledMcpServers = (llm.mcp_servers ?? []).filter(
@@ -517,6 +535,13 @@ export async function POST(request: NextRequest) {
         ttsParams.key = (
           process.env.OPENAI_TTS_KEY ||
           process.env.NEXT_PUBLIC_OPENAI_TTS_KEY ||
+          ""
+        ).trim();
+      } else if (vendor === "deepgram") {
+        ttsParams.key = (
+          process.env.DEEPGRAM_TTS_KEY ||
+          process.env.DEEPGRAM_API_KEY ||
+          process.env.NEXT_PUBLIC_DEEPGRAM_API_KEY ||
           ""
         ).trim();
       } else {
@@ -602,6 +627,61 @@ export async function POST(request: NextRequest) {
     // Add optional ASR config
     if (asrPayload && Object.keys(asrPayload).length > 0) {
       propertiesPayload.asr = asrPayload;
+    }
+
+    // Add MLLM config (v2.6 cleaner turn handling under mllm.turn_detection).
+    // Only include when advanced_features.enable_mllm is true and the user has
+    // configured mllm fields. We inject the server-side key for the
+    // selected MLLM style when the client sent an empty/sentinel value.
+    const mllm = (agentSettings as { mllm?: MllmConfig }).mllm;
+    if (advanced_features?.enable_mllm && mllm) {
+      const mllmStyle = mllm.style ?? "openai";
+      const mllmApiKey = shouldInjectServerKey(mllm.api_key)
+        ? (mllmStyle === "gemini"
+            ? process.env.GEMINI_API_KEY ||
+              process.env.NEXT_PUBLIC_GEMINI_API_KEY ||
+              ""
+            : process.env.OPENAI_API_KEY ||
+              process.env.NEXT_PUBLIC_OPENAI_API_KEY ||
+              ""
+          ).trim()
+        : (mllm.api_key ?? "").trim();
+
+      const mllmPayload: Record<string, unknown> = { style: mllmStyle };
+      if (mllm.url) mllmPayload.url = mllm.url;
+      if (mllmApiKey) mllmPayload.api_key = mllmApiKey;
+      if (mllm.headers) mllmPayload.headers = mllm.headers;
+      if (mllm.params && Object.keys(mllm.params).length > 0) {
+        mllmPayload.params = mllm.params;
+      }
+      if (mllm.system_messages && mllm.system_messages.length > 0) {
+        mllmPayload.system_messages = mllm.system_messages;
+      }
+      if (mllm.greeting_message) {
+        mllmPayload.greeting_message = mllm.greeting_message;
+      }
+      if (mllm.failure_message) {
+        mllmPayload.failure_message = mllm.failure_message;
+      }
+      if (mllm.max_history != null) {
+        mllmPayload.max_history = mllm.max_history;
+      }
+      if (mllm.input_modalities && mllm.input_modalities.length > 0) {
+        mllmPayload.input_modalities = mllm.input_modalities;
+      }
+      if (mllm.output_modalities && mllm.output_modalities.length > 0) {
+        mllmPayload.output_modalities = mllm.output_modalities;
+      }
+      // v2.6: vendor-specific turn detection
+      if (mllm.turn_detection) {
+        const td = mllm.turn_detection;
+        const provider = td.provider ?? mllmStyle;
+        const tdPayload: Record<string, unknown> = { provider };
+        if (provider === "openai" && td.openai) tdPayload.openai = td.openai;
+        if (provider === "gemini" && td.gemini) tdPayload.gemini = td.gemini;
+        mllmPayload.turn_detection = tdPayload;
+      }
+      propertiesPayload.mllm = mllmPayload;
     }
 
     // Add turn detection (Agora v2 config format)
@@ -999,6 +1079,9 @@ export async function POST(request: NextRequest) {
     }
     if (sanitizedPayload.properties?.llm?.api_key) {
       sanitizedPayload.properties.llm.api_key = "***MASKED***";
+    }
+    if (sanitizedPayload.properties?.mllm?.api_key) {
+      sanitizedPayload.properties.mllm.api_key = "***MASKED***";
     }
     if (sanitizedPayload.properties?.tts?.params?.key) {
       sanitizedPayload.properties.tts.params.key = "***MASKED***";

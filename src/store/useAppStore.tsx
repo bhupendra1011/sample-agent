@@ -6,6 +6,7 @@ import type {
   AgentSettings,
   AgentQueryStatus,
   ITranscriptHelperItem,
+  ThinkOptions,
 } from "@/types/agora";
 import type { AgentSessionRecord } from "@/types/agentTurns";
 import {
@@ -32,6 +33,27 @@ export interface Toast {
   id: string;
   message: string;
   type: ToastType;
+}
+
+/**
+ * Local log of custom instructions sent via /think (v2.6).
+ * Rendered in TranscriptSidePanel as outbound bubbles.
+ */
+export interface InstructionLogEntry {
+  id: string;
+  text: string;
+  options: Pick<
+    ThinkOptions,
+    | "on_listening_action"
+    | "on_thinking_action"
+    | "on_speaking_action"
+    | "interruptable"
+    | "metadata"
+    | "label"
+  >;
+  status: "pending" | "sent" | "error";
+  errorMessage?: string;
+  _time: number;
 }
 
 interface AppState {
@@ -95,6 +117,10 @@ interface AppState {
   isAgentUpdating: boolean;
   agentSettings: AgentSettings | null;
   agentState: EAgentState;
+  /** Derived live signals from agentState (v2.6 clearer signals). */
+  agentListening: boolean;
+  agentThinking: boolean;
+  agentSpeaking: boolean;
   agentRtcUid: string | null;
   /** When avatar is enabled, the avatar joins with this RTC UID (e.g. 999999). Used to show avatar video in the agent tile. */
   agentAvatarRtcUid: string | null;
@@ -116,6 +142,15 @@ interface AppState {
   clearAgent: () => void;
   setAgentSettings: (settings: AgentSettings) => void;
   setAgentState: (state: EAgentState) => void;
+
+  /** v2.6: log of custom /think instructions sent from the UI. */
+  instructionLog: InstructionLogEntry[];
+  addInstructionLogEntry: (entry: InstructionLogEntry) => void;
+  updateInstructionLogEntry: (
+    id: string,
+    patch: Partial<InstructionLogEntry>,
+  ) => void;
+  clearInstructionLog: () => void;
   setTranscriptItems: (items: ITranscriptHelperItem[]) => void;
   setCurrentInProgressMessage: (message: ITranscriptHelperItem | null) => void;
   setTranscriptionMode: (mode: "rtc" | "rtm") => void;
@@ -230,6 +265,9 @@ const useAppStore = create<AppState>((set, get) => ({
   isAgentUpdating: false,
   agentSettings: null,
   agentState: EAgentState.IDLE,
+  agentListening: false,
+  agentThinking: false,
+  agentSpeaking: false,
   agentRtcUid: null,
   agentAvatarRtcUid: null,
   transcriptItems: [],
@@ -286,11 +324,15 @@ const useAppStore = create<AppState>((set, get) => ({
       isAgentLoading: false,
       isAgentUpdating: false,
       agentState: EAgentState.IDLE,
+      agentListening: false,
+      agentThinking: false,
+      agentSpeaking: false,
       agentRtcUid: null,
       agentAvatarRtcUid: null,
       transcriptItems: [],
       currentInProgressMessage: null,
       userSentMessages: [],
+      instructionLog: [],
       transcriptionMode: "rtm",
       agentQueryStatus: null,
     }),
@@ -299,7 +341,27 @@ const useAppStore = create<AppState>((set, get) => ({
     const mode = settings?.advanced_features?.enable_rtm === false ? "rtc" : "rtm";
     set({ agentSettings: settings, transcriptionMode: mode });
   },
-  setAgentState: (state) => set({ agentState: state }),
+  setAgentState: (state) =>
+    set({
+      agentState: state,
+      agentListening: state === EAgentState.LISTENING,
+      agentThinking: state === EAgentState.THINKING,
+      agentSpeaking: state === EAgentState.SPEAKING,
+    }),
+
+  // --- v2.6 instruction log ---
+  instructionLog: [] as InstructionLogEntry[],
+  addInstructionLogEntry: (entry) =>
+    set((state) => ({
+      instructionLog: [...state.instructionLog, entry],
+    })),
+  updateInstructionLogEntry: (id, patch) =>
+    set((state) => ({
+      instructionLog: state.instructionLog.map((e) =>
+        e.id === id ? { ...e, ...patch } : e,
+      ),
+    })),
+  clearInstructionLog: () => set({ instructionLog: [] }),
   setTranscriptItems: (items) => set({ transcriptItems: items }),
   setCurrentInProgressMessage: (message) =>
     set({ currentInProgressMessage: message }),
@@ -415,10 +477,14 @@ const useAppStore = create<AppState>((set, get) => ({
       isAgentLoading: false,
       isAgentUpdating: false,
       agentState: EAgentState.IDLE,
+      agentListening: false,
+      agentThinking: false,
+      agentSpeaking: false,
       agentRtcUid: null,
       agentAvatarRtcUid: null,
       transcriptItems: [],
       userSentMessages: [],
+      instructionLog: [],
       transcriptionMode: "rtm",
       agentQueryStatus: null,
     }),

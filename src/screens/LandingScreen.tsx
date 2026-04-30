@@ -6,6 +6,8 @@ import { signIn } from "next-auth/react";
 
 const AGORA_CONVO_AI_URL =
   "https://www.agora.io/en/products/conversational-ai-engine/";
+const AGORA_CONVO_AI_RELEASE_NOTES_URL =
+  "https://docs.agora.io/en/conversational-ai/overview/release-notes#v26";
 
 const LandingScreen: React.FC = () => {
   const handleSignInWithGoogle = useCallback(() => {
@@ -67,6 +69,41 @@ const LandingScreen: React.FC = () => {
             Learn more about Agora Conversational AI
             <svg
               className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+              />
+            </svg>
+          </Link>
+
+          <Link
+            href={AGORA_CONVO_AI_RELEASE_NOTES_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="View Agora Conversational AI v2.6 release notes"
+            className="group mt-6 inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/5 backdrop-blur-sm text-xs sm:text-[13px] text-gray-300 hover:text-white hover:border-[var(--agora-accent-blue)]/40 hover:bg-[var(--agora-accent-blue)]/10 transition-all duration-200 animate-fade-in-up"
+            style={{
+              animationDelay: "0.6s",
+              animationFillMode: "backwards",
+            }}
+          >
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="absolute inline-flex h-full w-full rounded-full bg-[var(--agora-accent-blue)] opacity-75 animate-ping" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--agora-accent-blue)]" />
+            </span>
+            <span>
+              Powered by Agora Conversational AI{" "}
+              <span className="font-semibold text-white">v2.6</span>
+            </span>
+            <svg
+              className="w-3 h-3 opacity-60 group-hover:opacity-100 transition-opacity"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"

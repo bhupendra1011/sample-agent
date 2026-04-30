@@ -48,6 +48,15 @@ export interface MCPToolInfo {
   description?: string;
 }
 
+/**
+ * Greeting broadcast configuration (v2.2+).
+ * - `single_every`: Greeting plays every time a new user joins an empty channel.
+ * - `single_first`: Greeting plays only the first time a user joins.
+ */
+export interface LLMGreetingConfigs {
+  mode?: "single_every" | "single_first";
+}
+
 export interface LLMConfig {
   /** LLM API endpoint URL (required) */
   url: string;
@@ -59,6 +68,8 @@ export interface LLMConfig {
   system_messages?: Array<{ role: string; content: string }>;
   /** Initial greeting when agent starts */
   greeting_message?: string;
+  /** Greeting broadcast mode (v2.2+). When omitted, server defaults to single_every. */
+  greeting_configs?: LLMGreetingConfigs;
   /** Fallback message on failure */
   failure_message?: string;
   /** Number of conversation history messages (1-1024, default 32) */
@@ -76,6 +87,13 @@ export interface LLMConfig {
   mcp_servers?: MCPServerConfig[];
   /** LLM input modalities: text only or text + image (default when omitted: ["text", "image"]) */
   input_modalities?: ("text" | "image")[];
+  /**
+   * LLM output modalities (v2.x). When omitted, server defaults to ["text"].
+   * - `["text"]`: TTS module converts text to speech.
+   * - `["audio"]`: Voice published directly (LLM produces speech).
+   * - `["text","audio"]`: Both — caller handles processing.
+   */
+  output_modalities?: ("text" | "audio")[];
   /** Template variables for dynamic content */
   template_variables?: Record<string, unknown>;
 }
@@ -89,7 +107,8 @@ export type TTSVendor =
   | "openai"
   | "fish_audio"
   | "google"
-  | "polly";
+  | "polly"
+  | "deepgram";
 
 export interface TTSMicrosoftParams {
   key: string;
@@ -120,6 +139,22 @@ export interface TTSOpenAIParams {
   speed?: number;
 }
 
+/**
+ * Deepgram TTS params (v2.6+ — see release notes).
+ * Adds streaming-friendly TTS via Deepgram's Aura family of models.
+ */
+export interface TTSDeepgramParams {
+  key: string;
+  /** Optional override of Deepgram TTS endpoint base URL */
+  url?: string;
+  /** Voice/model identifier (e.g. "aura-asteria-en", "aura-luna-en") */
+  model?: string;
+  /** Output sample rate; align with avatar/voice pipeline if used */
+  sample_rate?: number;
+  /** Encoding format (e.g. "linear16", "mulaw") */
+  encoding?: string;
+}
+
 export interface TTSConfig {
   /** TTS vendor (required) */
   vendor: TTSVendor;
@@ -128,6 +163,7 @@ export interface TTSConfig {
     | TTSMicrosoftParams
     | TTSElevenLabsParams
     | TTSOpenAIParams
+    | TTSDeepgramParams
     | Record<string, unknown>;
 }
 
@@ -279,6 +315,91 @@ export interface AgentParametersConfig {
   data_channel?: "rtc" | "rtm";
 }
 
+// --- MLLM (Multimodal LLM, voice-to-voice) ---
+/** MLLM provider style. v2.6 introduces vendor-specific MLLM turn detection. */
+export type MllmStyle = "openai" | "gemini";
+
+/** Vendor-specific MLLM turn detection (v2.6 cleaner refactor). */
+export interface MllmTurnDetection {
+  /**
+   * Provider for MLLM turn detection.
+   * - `openai`: OpenAI Realtime server VAD / semantic VAD config.
+   * - `gemini`: Google Gemini Live activity-detection config.
+   */
+  provider?: "openai" | "gemini";
+  /** OpenAI Realtime server_vad / semantic_vad config (passed through verbatim). */
+  openai?: Record<string, unknown>;
+  /** Google Gemini Live realtime_input_config / activity_detection config (passed through verbatim). */
+  gemini?: Record<string, unknown>;
+}
+
+/** MLLM (voice-to-voice) configuration. */
+export interface MllmConfig {
+  /** MLLM provider style (openai for OpenAI Realtime; gemini for Gemini Live). */
+  style?: MllmStyle;
+  /** API endpoint URL */
+  url?: string;
+  /** API key for authentication */
+  api_key?: string;
+  /** Custom headers as JSON string */
+  headers?: string;
+  /** Provider-specific parameters (model, voice, temperature, etc.) */
+  params?: Record<string, unknown>;
+  /** System messages for context */
+  system_messages?: Array<{ role: string; content: string }>;
+  /** Greeting message */
+  greeting_message?: string;
+  /** Failure message */
+  failure_message?: string;
+  /** Conversation history depth */
+  max_history?: number;
+  /**
+   * MLLM turn detection — refactored in v2.6 for clearer vendor-specific control
+   * across OpenAI Realtime and Google Gemini Live.
+   */
+  turn_detection?: MllmTurnDetection;
+  /** Allowed input modalities */
+  input_modalities?: ("text" | "image" | "audio")[];
+  /** Allowed output modalities */
+  output_modalities?: ("text" | "audio")[];
+}
+
+// --- /think endpoint (v2.6) ---
+/** Action to take when the agent is in a given state. */
+export type ThinkActionInjectIgnore = "inject" | "ignore";
+export type ThinkActionInterruptIgnore = "interrupt" | "ignore";
+
+/**
+ * Options for sending a custom instruction to a running agent.
+ * POST /v2/projects/{appid}/agents/{agentId}/think
+ *
+ * The instruction is injected into the agent's pipeline as user input
+ * and processed using the standard turn logic.
+ */
+export interface ThinkOptions {
+  /** The custom instruction text to inject (required). */
+  text: string;
+  /** Action when agent is listening. Default: "inject". */
+  on_listening_action?: ThinkActionInjectIgnore;
+  /** Action when agent is thinking. Default: "interrupt". */
+  on_thinking_action?: ThinkActionInterruptIgnore;
+  /** Action when agent is speaking. Default: "ignore". */
+  on_speaking_action?: ThinkActionInterruptIgnore;
+  /** Whether user speech can interrupt the injected instruction. Default: true. */
+  interruptable?: boolean;
+  /** Custom metadata; passes through verbatim. */
+  metadata?: Record<string, unknown>;
+  /** UI-only: human-readable label captured in the local instruction log. */
+  label?: string;
+}
+
+/** Response from /think endpoint. */
+export interface ThinkResponse {
+  agent_id: string;
+  channel: string;
+  start_ts: number;
+}
+
 // --- Avatar Vendors ---
 export type AvatarVendor = "akool" | "heygen" | "anam";
 
@@ -412,6 +533,10 @@ export interface AgentSettings {
 
   // LLM Configuration (required)
   llm: LLMConfig;
+
+  // MLLM Configuration (optional; used when advanced_features.enable_mllm = true).
+  // v2.6 cleaner turn handling lives under mllm.turn_detection.
+  mllm?: MllmConfig;
 
   // TTS Configuration (required)
   tts: TTSConfig;
@@ -600,6 +725,26 @@ export const TTS_PRESETS: Record<
     label: "Amazon Polly (Beta)",
     value: "polly",
     requiresApiKey: true,
+  },
+  deepgram: {
+    label: "Deepgram (v2.6)",
+    value: "deepgram",
+    requiresApiKey: true,
+    defaultModel: "aura-asteria-en",
+    models: [
+      "aura-asteria-en",
+      "aura-luna-en",
+      "aura-stella-en",
+      "aura-athena-en",
+      "aura-hera-en",
+      "aura-orion-en",
+      "aura-arcas-en",
+      "aura-perseus-en",
+      "aura-angus-en",
+      "aura-orpheus-en",
+      "aura-helios-en",
+      "aura-zeus-en",
+    ],
   },
 };
 
