@@ -1,6 +1,7 @@
 // src/constants/heygenAvatars.ts
-// Curated list of public HeyGen avatar IDs grouped by category.
-// Label is shown in the dropdown; value is the avatar_id sent to HeyGen.
+// Curated public LiveAvatar IDs (UUIDs) from GET https://api.liveavatar.com/v1/avatars/public
+// Agora join maps UI vendor "heygen" → liveavatar; avatar_id must be these UUIDs.
+// Label is shown in the dropdown; value is avatar_id sent to the agent API.
 
 export interface HeyGenAvatarOption {
   label: string;
@@ -12,88 +13,60 @@ export interface HeyGenAvatarGroup {
   options: HeyGenAvatarOption[];
 }
 
-/** Public character avatars — one look per character for variety */
-const CHARACTER_AVATARS: HeyGenAvatarGroup = {
-  group: "Characters",
+/** Public LiveAvatar avatars — distinct roles (API type is VIDEO for all). */
+const LIVEAVATAR_PUBLIC: HeyGenAvatarGroup = {
+  group: "LiveAvatar (public)",
   options: [
-    { label: "Thaddeus – Professional", value: "Thaddeus_ProfessionalLook_public" },
-    { label: "Rika – Professional", value: "Rika_ProfessionalLook_public" },
-    { label: "Pedro – Blue Shirt", value: "Pedro_Blue_Shirt_public" },
-    { label: "Marianne – Red Suit", value: "Marianne_Red_Suit_public" },
-    { label: "Katya – Pink Suit", value: "Katya_Pink_Suit_public" },
-    { label: "Graham – Casual", value: "Graham_CasualLook_public" },
-    { label: "Anthony – White Suit", value: "Anthony_White_Suit_public" },
-    { label: "Alessandra – Grey Sweater", value: "Alessandra_Grey_Sweater_public" },
-    { label: "Anastasia – Professional", value: "Anastasia_ProfessionalLook_public" },
-    { label: "Amina – Blue Suit", value: "Amina_Blue_Suit_public" },
+    {
+      label: "Santa — Fireplace (character)",
+      value: "1c690fe7-23e0-49f9-bfba-14344450285b",
+    },
+    {
+      label: "Ann — Therapist",
+      value: "513fd1b7-7ef9-466d-9af2-344e51eeb833",
+    },
+    {
+      label: "Dexter — Lawyer",
+      value: "0930fd59-c8ad-434d-ad53-b391a1768720",
+    },
+    {
+      label: "June — HR",
+      value: "65f9e3c9-d48b-4118-b73a-4ae2e3cbb8f0",
+    },
+    {
+      label: "Bryan — Tech expert",
+      value: "64b526e4-741c-43b6-a918-4e40f3261c7a",
+    },
+    {
+      label: "Silas — HR",
+      value: "9650a758-1085-4d49-8bf3-f347565ec229",
+    },
+    {
+      label: "Ann — Doctor (standing)",
+      value: "567e8371-f69f-49ec-9f2d-054083431165",
+    },
+    {
+      label: "Shawn — Therapist",
+      value: "7b888024-f8c9-4205-95e1-78ce01497bda",
+    },
+    {
+      label: "Silas — Customer support",
+      value: "dc2935cf-5863-4f08-943b-c7478aea59fb",
+    },
+    {
+      label: "Judy — Teacher (sitting)",
+      value: "c72a9099-84b9-4d5d-98f4-a19ba131e654",
+    },
   ],
 };
 
-/** Specialty / role-based avatars */
-const SPECIALTY_AVATARS: HeyGenAvatarGroup[] = [
-  {
-    group: "Doctors",
-    options: [
-      { label: "Ann – Doctor (Standing)", value: "Ann_Doctor_Standing2_public" },
-      { label: "Dexter – Doctor (Standing)", value: "Dexter_Doctor_Standing2_public" },
-      { label: "Judy – Doctor (Sitting)", value: "Judy_Doctor_Sitting2_public" },
-    ],
-  },
-  {
-    group: "Fitness",
-    options: [
-      { label: "Bryan – Fitness Coach", value: "Bryan_FitnessCoach_public" },
-      { label: "Elenora – Fitness Coach", value: "Elenora_FitnessCoach_public" },
-    ],
-  },
-  {
-    group: "Lawyers",
-    options: [
-      { label: "Dexter – Lawyer", value: "Dexter_Lawyer_Sitting_public" },
-      { label: "Judy – Lawyer", value: "Judy_Lawyer_Sitting2_public" },
-    ],
-  },
-  {
-    group: "Teachers",
-    options: [
-      { label: "Judy – Teacher (Standing)", value: "Judy_Teacher_Standing_public" },
-      { label: "Judy – Teacher (Sitting)", value: "Judy_Teacher_Sitting_public" },
-    ],
-  },
-  {
-    group: "HR / Support",
-    options: [
-      { label: "June – HR", value: "June_HR_public" },
-      { label: "Silas – HR", value: "SilasHR_public" },
-      { label: "Silas – Customer Support", value: "Silas_CustomerSupport_public" },
-    ],
-  },
-  {
-    group: "Tech",
-    options: [
-      { label: "Bryan – IT", value: "Bryan_IT_Sitting_public" },
-      { label: "Elenora – IT", value: "Elenora_IT_Sitting_public" },
-    ],
-  },
-  {
-    group: "Therapist",
-    options: [
-      { label: "Ann – Therapist", value: "Ann_Therapist_public" },
-      { label: "Shawn – Therapist", value: "Shawn_Therapist_public" },
-    ],
-  },
-];
-
 /** All avatar groups in display order */
-export const HEYGEN_AVATAR_GROUPS: HeyGenAvatarGroup[] = [
-  CHARACTER_AVATARS,
-  ...SPECIALTY_AVATARS,
-];
+export const HEYGEN_AVATAR_GROUPS: HeyGenAvatarGroup[] = [LIVEAVATAR_PUBLIC];
 
 /** Flat list of all avatars (useful for lookups) */
 export const HEYGEN_ALL_AVATARS: HeyGenAvatarOption[] = HEYGEN_AVATAR_GROUPS.flatMap(
-  (g) => g.options
+  (g) => g.options,
 );
 
-/** Default avatar ID (Shawn – Therapist) */
-export const HEYGEN_DEFAULT_AVATAR_ID = "Shawn_Therapist_public";
+/** Default: Silas — HR (public UUID) */
+export const HEYGEN_DEFAULT_AVATAR_ID = "9650a758-1085-4d49-8bf3-f347565ec229";

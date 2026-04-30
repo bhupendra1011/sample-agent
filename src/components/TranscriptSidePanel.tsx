@@ -1,10 +1,24 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { MdClose, MdSend, MdImage, MdTextFields, MdViewHeadline } from "react-icons/md";
+import {
+  MdClose,
+  MdSend,
+  MdImage,
+  MdTextFields,
+  MdViewHeadline,
+  MdTune,
+  MdAutoAwesome,
+  MdInfoOutline,
+} from "react-icons/md";
 import useAppStore from "@/store/useAppStore";
-import type { ITranscriptHelperItem } from "@/types/agora";
+import type {
+  ITranscriptHelperItem,
+  ThinkActionInjectIgnore,
+  ThinkActionInterruptIgnore,
+} from "@/types/agora";
 import { ETurnStatus, ETranscriptRenderMode } from "@/types/agora";
+import { sendAgentInstruction } from "@/api/agentApi";
 
 interface TranscriptSidePanelProps {
   isOpen: boolean;
@@ -32,10 +46,37 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
   );
   const agentRtcUid = useAppStore((state) => state.agentRtcUid);
   const localUID = useAppStore((state) => state.localUID);
+  const agentId = useAppStore((state) => state.agentId);
+  const isAgentActive = useAppStore((state) => state.isAgentActive);
+  const instructionLog = useAppStore((state) => state.instructionLog);
+  const addInstructionLogEntry = useAppStore(
+    (state) => state.addInstructionLogEntry,
+  );
+  const updateInstructionLogEntry = useAppStore(
+    (state) => state.updateInstructionLogEntry,
+  );
+  const addToast = useAppStore((state) => state.addToast);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [messageText, setMessageText] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+
+  // v2.6: Chat | Instruct mode for the input footer
+  const [inputMode, setInputMode] = useState<"chat" | "instruct">("chat");
+  const [instructionText, setInstructionText] = useState("");
+  const [showInstructAdvanced, setShowInstructAdvanced] = useState(false);
+  // v2.6 default = "silent steering": directive shapes the next agent turn
+  // without echoing into the transcript. Switch on_listening to "inject" only
+  // when you explicitly want the directive to appear as a user turn and
+  // trigger an immediate agent reply.
+  const [onListening, setOnListening] =
+    useState<ThinkActionInjectIgnore>("ignore");
+  const [onThinking, setOnThinking] =
+    useState<ThinkActionInterruptIgnore>("ignore");
+  const [onSpeaking, setOnSpeaking] =
+    useState<ThinkActionInterruptIgnore>("ignore");
+  const [interruptable, setInterruptable] = useState(true);
+  const [isSendingInstruction, setIsSendingInstruction] = useState(false);
   const prevMessageLengthRef = useRef(0);
   const prevInProgressTextRef = useRef("");
 
@@ -80,6 +121,54 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
     }
   };
 
+  const handleSendInstruction = useCallback(async () => {
+    const text = instructionText.trim();
+    if (!text || !agentId || !isAgentActive) return;
+
+    const id = `instr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const options = {
+      on_listening_action: onListening,
+      on_thinking_action: onThinking,
+      on_speaking_action: onSpeaking,
+      interruptable,
+    } as const;
+
+    addInstructionLogEntry({
+      id,
+      text,
+      options,
+      status: "pending",
+      _time: Date.now(),
+    });
+    setInstructionText("");
+    setIsSendingInstruction(true);
+    try {
+      await sendAgentInstruction(agentId, { text, ...options });
+      updateInstructionLogEntry(id, { status: "sent" });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to send instruction";
+      updateInstructionLogEntry(id, {
+        status: "error",
+        errorMessage: message,
+      });
+      addToast(message, "error");
+    } finally {
+      setIsSendingInstruction(false);
+    }
+  }, [
+    instructionText,
+    agentId,
+    isAgentActive,
+    onListening,
+    onThinking,
+    onSpeaking,
+    interruptable,
+    addInstructionLogEntry,
+    updateInstructionLogEntry,
+    addToast,
+  ]);
+
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && file.type.startsWith("image/")) {
@@ -120,20 +209,54 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
   // Dedupe: when user types, we add to userSentMessages and Agora may echo as transcript—show only one.
   type DisplayItem =
     | { type: "transcript"; item: ITranscriptHelperItem }
-    | { type: "userMessage"; text?: string; imageUrl?: string; _time: number };
+    | { type: "userMessage"; text?: string; imageUrl?: string; _time: number }
+    | {
+        type: "instruction";
+        id: string;
+        text: string;
+        status: "pending" | "sent" | "error";
+        errorMessage?: string;
+        _time: number;
+      };
   const DEDUPE_MS = 15000; // same "You" text within 15s = treat as same message
+  // v2.6: when on_listening_action="inject" is used, Agora's /think echoes
+  // the directive back as a synthetic user turn (uid not matching ours), which
+  // would otherwise render as "User unknown". Suppress any user-tagged turn
+  // whose text exactly matches an instruction we sent in the last 30s, on the
+  // user's own RTC uid OR an unknown one. The purple Instruction bubble + the
+  // agent's reply are sufficient.
+  const INSTRUCTION_ECHO_WINDOW_MS = 30_000;
+  const recentInstructionTexts = instructionLog
+    .filter(
+      (entry) =>
+        entry.status !== "error" &&
+        Date.now() - entry._time < INSTRUCTION_ECHO_WINDOW_MS,
+    )
+    .map((entry) => entry.text.trim());
+
+  const isInstructionEcho = (item: ITranscriptHelperItem): boolean => {
+    if (item.uid === String(agentRtcUid)) return false; // never strip agent turns
+    const text = (item.text ?? "").trim();
+    if (!text) return false;
+    return recentInstructionTexts.some(
+      (instructionText) => instructionText === text,
+    );
+  };
+
   const localTranscriptItems = transcriptItems.filter(
     (item) => item.uid === String(localUID)
   );
   const agentOrOtherTranscriptItems = transcriptItems.filter(
-    (item) => item.uid !== String(localUID)
+    (item) => item.uid !== String(localUID) && !isInstructionEcho(item)
   );
   const userSentSet = new Set(
     userSentMessages.map((m) => `${(m._time / DEDUPE_MS) | 0}-${(m.text ?? "").trim()}`)
   );
   const localTranscriptDisplay = localTranscriptItems.filter((item) => {
     const key = `${(item._time / DEDUPE_MS) | 0}-${(item.text ?? "").trim()}`;
-    return !userSentSet.has(key);
+    if (userSentSet.has(key)) return false;
+    if (isInstructionEcho(item)) return false;
+    return true;
   });
   const displayItems: DisplayItem[] = [
     ...agentOrOtherTranscriptItems.map((item) => ({ type: "transcript" as const, item })),
@@ -143,6 +266,14 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
       text: msg.text,
       imageUrl: msg.imageUrl,
       _time: msg._time,
+    })),
+    ...instructionLog.map((entry) => ({
+      type: "instruction" as const,
+      id: entry.id,
+      text: entry.text,
+      status: entry.status,
+      errorMessage: entry.errorMessage,
+      _time: entry._time,
     })),
   ].sort((a, b) => {
     const timeA = a.type === "transcript" ? a.item._time : a._time;
@@ -266,6 +397,52 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
             <>
               {/* Render completed messages and user-sent images */}
               {displayItems.map((entry, index) => {
+                if (entry.type === "instruction") {
+                  const tone =
+                    entry.status === "error"
+                      ? "bg-red-500 dark:bg-red-600 text-white"
+                      : entry.status === "pending"
+                      ? "bg-purple-400 dark:bg-purple-700 text-white opacity-80"
+                      : "bg-purple-500 dark:bg-purple-600 text-white";
+                  return (
+                    <div
+                      key={`instr-${entry.id}-${index}`}
+                      className="flex justify-end"
+                    >
+                      <div
+                        className={`max-w-[80%] rounded-lg overflow-hidden px-4 py-2 ${tone}`}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <MdAutoAwesome size={14} className="opacity-90" />
+                          <span className="text-xs font-medium opacity-90">
+                            Instruction
+                          </span>
+                          <span className="text-xs opacity-60">
+                            {formatTime(entry._time)}
+                          </span>
+                          {entry.status === "pending" && (
+                            <span className="text-[10px] uppercase tracking-wide opacity-80">
+                              Sending...
+                            </span>
+                          )}
+                          {entry.status === "error" && (
+                            <span className="text-[10px] uppercase tracking-wide opacity-90">
+                              Failed
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm whitespace-pre-wrap break-words">
+                          {entry.text}
+                        </p>
+                        {entry.status === "error" && entry.errorMessage && (
+                          <p className="mt-1 text-xs italic opacity-90">
+                            {entry.errorMessage}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
                 if (entry.type === "userMessage") {
                   return (
                     <div
@@ -383,11 +560,160 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
           )}
         </div>
 
-        {/* RTM Mode: Message Input */}
-        {canSendMessages && (
-          <div className={`${embedded ? "px-4" : "px-6"} py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900`}>
+        {/* Footer: Chat (RTM) or Instruct (/think) */}
+        {(canSendMessages || (isAgentActive && agentId)) && (
+          <div
+            className={`${embedded ? "px-4" : "px-6"} py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900`}
+          >
+            {/* Mode toggle: only when both modes are available */}
+            {canSendMessages && isAgentActive && agentId && (
+              <div className="flex items-center justify-between mb-3">
+                <div className="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 p-0.5 bg-gray-50 dark:bg-gray-800">
+                  <button
+                    onClick={() => setInputMode("chat")}
+                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                      inputMode === "chat"
+                        ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm"
+                        : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                    }`}
+                  >
+                    Chat
+                  </button>
+                  <button
+                    onClick={() => setInputMode("instruct")}
+                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1 ${
+                      inputMode === "instruct"
+                        ? "bg-white dark:bg-gray-900 text-purple-600 dark:text-purple-300 shadow-sm"
+                        : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                    }`}
+                    title="Send a custom instruction to the agent (v2.6 /think)"
+                  >
+                    <MdAutoAwesome size={14} />
+                    Instruct
+                  </button>
+                </div>
+                {inputMode === "instruct" && (
+                  <button
+                    onClick={() => setShowInstructAdvanced((v) => !v)}
+                    className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors ${
+                      showInstructAdvanced
+                        ? "bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300"
+                        : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    }`}
+                  >
+                    <MdTune size={14} />
+                    {showInstructAdvanced ? "Hide options" : "Options"}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Instruct-only header when chat is unavailable (RTC mode) */}
+            {!canSendMessages && isAgentActive && agentId && (
+              <div className="flex items-center justify-between mb-3">
+                <div className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-300">
+                  <MdAutoAwesome size={14} />
+                  Instruct (v2.6)
+                </div>
+                <button
+                  onClick={() => setShowInstructAdvanced((v) => !v)}
+                  className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors ${
+                    showInstructAdvanced
+                      ? "bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300"
+                      : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  }`}
+                >
+                  <MdTune size={14} />
+                  {showInstructAdvanced ? "Hide options" : "Options"}
+                </button>
+              </div>
+            )}
+
+            {/* Advanced instruction options */}
+            {(inputMode === "instruct" || !canSendMessages) &&
+              showInstructAdvanced && (
+                <div className="mb-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/70 border border-gray-200 dark:border-gray-700 space-y-2 text-xs">
+                  <div className="grid grid-cols-3 gap-2">
+                    <label className="flex flex-col gap-1">
+                      <span className="text-gray-600 dark:text-gray-400">
+                        On listening
+                      </span>
+                      <select
+                        value={onListening}
+                        onChange={(e) =>
+                          setOnListening(
+                            e.target.value as ThinkActionInjectIgnore,
+                          )
+                        }
+                        className="px-2 py-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                      >
+                        <option value="inject">inject</option>
+                        <option value="ignore">ignore</option>
+                      </select>
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-gray-600 dark:text-gray-400">
+                        On thinking
+                      </span>
+                      <select
+                        value={onThinking}
+                        onChange={(e) =>
+                          setOnThinking(
+                            e.target.value as ThinkActionInterruptIgnore,
+                          )
+                        }
+                        className="px-2 py-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                      >
+                        <option value="interrupt">interrupt</option>
+                        <option value="ignore">ignore</option>
+                      </select>
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-gray-600 dark:text-gray-400">
+                        On speaking
+                      </span>
+                      <select
+                        value={onSpeaking}
+                        onChange={(e) =>
+                          setOnSpeaking(
+                            e.target.value as ThinkActionInterruptIgnore,
+                          )
+                        }
+                        className="px-2 py-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white"
+                      >
+                        <option value="interrupt">interrupt</option>
+                        <option value="ignore">ignore</option>
+                      </select>
+                    </label>
+                  </div>
+                  <label className="flex items-center gap-2 mt-1">
+                    <input
+                      type="checkbox"
+                      checked={interruptable}
+                      onChange={(e) => setInterruptable(e.target.checked)}
+                      className="accent-purple-500"
+                    />
+                    <span className="text-gray-700 dark:text-gray-300">
+                      Allow user speech to interrupt this instruction
+                    </span>
+                  </label>
+                  {onListening === "inject" && (
+                    <div className="flex items-start gap-2 p-2 rounded-md bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 text-amber-800 dark:text-amber-300">
+                      <MdInfoOutline size={14} className="mt-[2px] shrink-0" />
+                      <span>
+                        <strong>inject</strong> adds the directive as a user
+                        turn, so it will appear in the transcript (as
+                        &quot;User&quot;) and trigger an immediate agent reply.
+                        Pick <strong>ignore</strong> for silent steering that
+                        only shapes the agent&apos;s next turn.
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
             <div className="space-y-3">
-              {imageFile && (
+              {imageFile && inputMode === "chat" && canSendMessages && (
                 <div className="flex items-center gap-2 p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
                   <MdImage size={20} className="text-gray-500" />
                   <span className="text-sm text-gray-700 dark:text-gray-300 flex-1 truncate">
@@ -401,37 +727,73 @@ const TranscriptSidePanel: React.FC<TranscriptSidePanelProps> = ({
                   </button>
                 </div>
               )}
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={messageText}
-                  onChange={(e) => setMessageText(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSendMessage();
-                    }
-                  }}
-                  placeholder="Type a message..."
-                  className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                />
-                <label className="flex items-center justify-center w-10 h-10 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg cursor-pointer transition-colors">
+
+              {inputMode === "chat" && canSendMessages ? (
+                <div className="flex gap-2">
                   <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageSelect}
-                    className="hidden"
+                    type="text"
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendMessage();
+                      }
+                    }}
+                    placeholder="Type a message..."
+                    className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                   />
-                  <MdImage className="text-gray-600 dark:text-gray-300" size={20} />
-                </label>
-                <button
-                  onClick={handleSendMessage}
-                  disabled={!messageText.trim() && !imageFile}
-                  className="px-4 py-2 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  <MdSend size={18} />
-                </button>
-              </div>
+                  <label className="flex items-center justify-center w-10 h-10 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg cursor-pointer transition-colors">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageSelect}
+                      className="hidden"
+                    />
+                    <MdImage
+                      className="text-gray-600 dark:text-gray-300"
+                      size={20}
+                    />
+                  </label>
+                  <button
+                    onClick={handleSendMessage}
+                    disabled={!messageText.trim() && !imageFile}
+                    className="px-4 py-2 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    <MdSend size={18} />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={instructionText}
+                    onChange={(e) => setInstructionText(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendInstruction();
+                      }
+                    }}
+                    placeholder='e.g. "Be more concise" or "User clicked Buy now"'
+                    disabled={!isAgentActive || !agentId}
+                    className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-purple-300 dark:border-purple-700 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 disabled:opacity-50"
+                  />
+                  <button
+                    onClick={handleSendInstruction}
+                    disabled={
+                      !instructionText.trim() ||
+                      !isAgentActive ||
+                      !agentId ||
+                      isSendingInstruction
+                    }
+                    className="px-4 py-2 bg-purple-500 hover:bg-purple-600 dark:bg-purple-600 dark:hover:bg-purple-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    title="Send instruction (v2.6 /think)"
+                  >
+                    <MdAutoAwesome size={18} />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}

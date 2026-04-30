@@ -5,7 +5,9 @@ import type {
   TurnDetectionConfig,
   FillerWordsConfig,
   SalConfig,
+  MllmConfig,
 } from "@/types/agora";
+import { ELEVENLABS_DEFAULT_VOICE_ID } from "@/constants/elevenlabsDefaults";
 
 const APP_ID = process.env.NEXT_PUBLIC_AGORA_APP_ID!;
 const APP_CERTIFICATE = process.env.AGORA_APP_CERTIFICATE!;
@@ -16,6 +18,16 @@ function shouldInjectServerKey(v: string | undefined): boolean {
   return (
     !v || v.trim() === "" || v === "__USE_SERVER__" || v === "***MASKED***"
   );
+}
+
+/** Agora v2.5: stored UI vendor `heygen` maps to join API `liveavatar`. */
+function agoraAvatarVendorForApi(vendor: string | undefined): string {
+  if (!vendor || vendor === "heygen") return "liveavatar";
+  return vendor;
+}
+
+function isLiveAvatarVendor(vendor: string | undefined): boolean {
+  return vendor === "heygen" || vendor === "liveavatar";
 }
 
 async function handleCustomPayloadJoin(
@@ -80,12 +92,28 @@ async function handleCustomPayloadJoin(
           process.env.NEXT_PUBLIC_OPENAI_TTS_KEY ||
           ""
         ).trim();
+      else if (vendor === "deepgram")
+        p.key = (
+          process.env.DEEPGRAM_TTS_KEY ||
+          process.env.DEEPGRAM_API_KEY ||
+          process.env.NEXT_PUBLIC_DEEPGRAM_API_KEY ||
+          ""
+        ).trim();
       else
         p.key = (
           process.env.MICROSOFT_TTS_KEY ||
           process.env.NEXT_PUBLIC_MICROSOFT_TTS_KEY ||
           ""
         ).trim();
+    }
+    const ttsVendorCustom = (tts.vendor ?? "microsoft") as string;
+    if (ttsVendorCustom === "elevenlabs") {
+      const vid = String((p.voice_id as string) ?? "").trim();
+      if (!vid) {
+        p.voice_id =
+          (process.env.NEXT_PUBLIC_ELEVENLABS_VOICE_ID ?? "").trim() ||
+          ELEVENLABS_DEFAULT_VOICE_ID;
+      }
     }
   }
 
@@ -115,7 +143,7 @@ async function handleCustomPayloadJoin(
   if (avatar?.enable && avatar?.params && typeof avatar.params === "object") {
     const params = avatar.params as Record<string, unknown>;
     const vendor = (avatar.vendor ?? "heygen") as string;
-    if (vendor === "heygen") {
+    if (vendor === "heygen" || vendor === "liveavatar") {
       if (shouldInjectServerKey(params.api_key as string)) {
         params.api_key = (
           process.env.HEYGEN_API_KEY ||
@@ -165,11 +193,18 @@ async function handleCustomPayloadJoin(
           ""
         ).trim();
         params.api_key = injected;
-        params.anam_api_key = injected;
       }
-      params.anam_avatar_id =
-        (params.anam_avatar_id as string) ?? (params.avatar_id as string);
-      params.anam_base_url = "https://api.anam.ai/v1";
+      const avatarId =
+        (params.anam_avatar_id as string) ??
+        (params.avatar_id as string) ??
+        "";
+      params.avatar_id = String(avatarId).trim();
+      if (params.sample_rate == null) params.sample_rate = 24000;
+      if (!params.quality) params.quality = "high";
+      if (!params.video_encoding) params.video_encoding = "H264";
+      delete params.anam_api_key;
+      delete params.anam_avatar_id;
+      delete params.anam_base_url;
       avatarRtcUidReturn = "999999";
       const avatarUid = 999999;
       params.agora_uid = String(avatarUid);
@@ -185,16 +220,20 @@ async function handleCustomPayloadJoin(
     }
   }
 
-  // HeyGen and Anam avatars support TTS at 24,000 Hz; ensure TTS params have sample_rate 24000
-  if (
-    avatar?.enable &&
-    (avatar?.vendor === "heygen" || avatar?.vendor === "anam") &&
-    properties.tts &&
-    typeof properties.tts === "object"
-  ) {
+  if (avatar && typeof avatar === "object" && avatar.vendor === "heygen") {
+    (avatar as Record<string, unknown>).vendor = "liveavatar";
+  }
+
+  if (avatar?.enable && properties.tts && typeof properties.tts === "object") {
     const tts = properties.tts as Record<string, unknown>;
+    const v = avatar.vendor as string | undefined;
     if (tts.params && typeof tts.params === "object") {
-      (tts.params as Record<string, unknown>).sample_rate = 24000;
+      const tp = tts.params as Record<string, unknown>;
+      if (isLiveAvatarVendor(v) || v === "anam") {
+        tp.sample_rate = 24000;
+      } else if (v === "akool") {
+        tp.sample_rate = 16000;
+      }
     }
   }
 
@@ -230,7 +269,6 @@ async function handleCustomPayloadJoin(
         unknown
       >;
       ap.api_key = "***MASKED***";
-      if (ap.anam_api_key) ap.anam_api_key = "***MASKED***";
       if (ap.agora_token)
         ap.agora_token = String(ap.agora_token).substring(0, 20) + "...";
     }
@@ -426,6 +464,10 @@ export async function POST(request: NextRequest) {
       llmPayload.greeting_message = llm.greeting_message;
     }
 
+    if (llm.greeting_configs?.mode) {
+      llmPayload.greeting_configs = { mode: llm.greeting_configs.mode };
+    }
+
     if (llm.failure_message) {
       llmPayload.failure_message = llm.failure_message;
     }
@@ -448,6 +490,12 @@ export async function POST(request: NextRequest) {
     llmPayload.input_modalities =
       rtmExplicitlyDisabled ? ["text"] : (llm.input_modalities ?? ["text", "image"]);
 
+    // v2.x output_modalities: when omitted server defaults to ["text"].
+    // Include only when caller explicitly set it (so we don't override defaults).
+    if (llm.output_modalities && llm.output_modalities.length > 0) {
+      llmPayload.output_modalities = llm.output_modalities;
+    }
+
     // Build MCP servers for LLM (tool invocation) — only include enabled servers
     const enabledMcpServers = (llm.mcp_servers ?? []).filter(
       (s) => s.enabled !== false,
@@ -460,7 +508,6 @@ export async function POST(request: NextRequest) {
             ? `${s.endpoint.replace(/\?$/, "")}?${new URLSearchParams(mergedQueries).toString()}`
             : s.endpoint;
         const mergedHeaders = { ...s.headers };
-
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { enabled, queries, endpoint: _ep, headers: _h, ...rest } = s;
         return {
@@ -490,6 +537,13 @@ export async function POST(request: NextRequest) {
           process.env.NEXT_PUBLIC_OPENAI_TTS_KEY ||
           ""
         ).trim();
+      } else if (vendor === "deepgram") {
+        ttsParams.key = (
+          process.env.DEEPGRAM_TTS_KEY ||
+          process.env.DEEPGRAM_API_KEY ||
+          process.env.NEXT_PUBLIC_DEEPGRAM_API_KEY ||
+          ""
+        ).trim();
       } else {
         ttsParams.key = (
           process.env.MICROSOFT_TTS_KEY ||
@@ -498,18 +552,28 @@ export async function POST(request: NextRequest) {
         ).trim();
       }
     }
+    if ((tts.vendor ?? "microsoft") === "elevenlabs") {
+      const vid = String((ttsParams.voice_id as string) ?? "").trim();
+      if (!vid) {
+        ttsParams.voice_id =
+          (process.env.NEXT_PUBLIC_ELEVENLABS_VOICE_ID ?? "").trim() ||
+          ELEVENLABS_DEFAULT_VOICE_ID;
+      }
+    }
     const ttsPayload: Record<string, unknown> = {
       vendor: tts.vendor,
       params: ttsParams,
     };
 
-    // HeyGen and Anam avatars support TTS at 24,000 Hz (Agora docs). Force 24k when enabled.
-    if (
-      avatar?.enable &&
-      (avatar?.vendor === "heygen" || avatar?.vendor === "anam")
-    ) {
-      ttsParams.sample_rate = 24000;
-      ttsPayload.params = ttsParams;
+    // LiveAvatar / Anam: TTS 24 kHz. Akool: 16 kHz (Agora avatar docs).
+    if (avatar?.enable) {
+      if (isLiveAvatarVendor(avatar.vendor) || avatar.vendor === "anam") {
+        ttsParams.sample_rate = 24000;
+        ttsPayload.params = ttsParams;
+      } else if (avatar.vendor === "akool") {
+        ttsParams.sample_rate = 16000;
+        ttsPayload.params = ttsParams;
+      }
     }
 
     // Build ASR config (optional); inject server key when client does not provide one
@@ -563,6 +627,61 @@ export async function POST(request: NextRequest) {
     // Add optional ASR config
     if (asrPayload && Object.keys(asrPayload).length > 0) {
       propertiesPayload.asr = asrPayload;
+    }
+
+    // Add MLLM config (v2.6 cleaner turn handling under mllm.turn_detection).
+    // Only include when advanced_features.enable_mllm is true and the user has
+    // configured mllm fields. We inject the server-side key for the
+    // selected MLLM style when the client sent an empty/sentinel value.
+    const mllm = (agentSettings as { mllm?: MllmConfig }).mllm;
+    if (advanced_features?.enable_mllm && mllm) {
+      const mllmStyle = mllm.style ?? "openai";
+      const mllmApiKey = shouldInjectServerKey(mllm.api_key)
+        ? (mllmStyle === "gemini"
+            ? process.env.GEMINI_API_KEY ||
+              process.env.NEXT_PUBLIC_GEMINI_API_KEY ||
+              ""
+            : process.env.OPENAI_API_KEY ||
+              process.env.NEXT_PUBLIC_OPENAI_API_KEY ||
+              ""
+          ).trim()
+        : (mllm.api_key ?? "").trim();
+
+      const mllmPayload: Record<string, unknown> = { style: mllmStyle };
+      if (mllm.url) mllmPayload.url = mllm.url;
+      if (mllmApiKey) mllmPayload.api_key = mllmApiKey;
+      if (mllm.headers) mllmPayload.headers = mllm.headers;
+      if (mllm.params && Object.keys(mllm.params).length > 0) {
+        mllmPayload.params = mllm.params;
+      }
+      if (mllm.system_messages && mllm.system_messages.length > 0) {
+        mllmPayload.system_messages = mllm.system_messages;
+      }
+      if (mllm.greeting_message) {
+        mllmPayload.greeting_message = mllm.greeting_message;
+      }
+      if (mllm.failure_message) {
+        mllmPayload.failure_message = mllm.failure_message;
+      }
+      if (mllm.max_history != null) {
+        mllmPayload.max_history = mllm.max_history;
+      }
+      if (mllm.input_modalities && mllm.input_modalities.length > 0) {
+        mllmPayload.input_modalities = mllm.input_modalities;
+      }
+      if (mllm.output_modalities && mllm.output_modalities.length > 0) {
+        mllmPayload.output_modalities = mllm.output_modalities;
+      }
+      // v2.6: vendor-specific turn detection
+      if (mllm.turn_detection) {
+        const td = mllm.turn_detection;
+        const provider = td.provider ?? mllmStyle;
+        const tdPayload: Record<string, unknown> = { provider };
+        if (provider === "openai" && td.openai) tdPayload.openai = td.openai;
+        if (provider === "gemini" && td.gemini) tdPayload.gemini = td.gemini;
+        mllmPayload.turn_detection = tdPayload;
+      }
+      propertiesPayload.mllm = mllmPayload;
     }
 
     // Add turn detection (Agora v2 config format)
@@ -884,6 +1003,9 @@ export async function POST(request: NextRequest) {
           anam_api_key?: string;
           avatar_id?: string;
           anam_avatar_id?: string;
+          sample_rate?: number;
+          quality?: string;
+          video_encoding?: string;
         };
         const anamApiKey =
           (shouldInjectServerKey(anamParams.api_key ?? anamParams.anam_api_key)
@@ -924,14 +1046,16 @@ export async function POST(request: NextRequest) {
             { status: 400 },
           );
         }
-        avatarParams.anam_api_key = anamApiKey;
-        avatarParams.anam_avatar_id = anamAvatarId;
-        avatarParams.anam_base_url = "https://api.anam.ai/v1";
+        avatarParams.api_key = anamApiKey;
+        avatarParams.avatar_id = anamAvatarId;
+        avatarParams.sample_rate = anamParams.sample_rate ?? 24000;
+        avatarParams.quality = anamParams.quality ?? "high";
+        avatarParams.video_encoding = anamParams.video_encoding ?? "H264";
       }
 
       propertiesPayload.avatar = {
         enable: true,
-        vendor: avatar.vendor,
+        vendor: agoraAvatarVendorForApi(avatar.vendor),
         params: avatarParams,
       };
     }
@@ -956,14 +1080,14 @@ export async function POST(request: NextRequest) {
     if (sanitizedPayload.properties?.llm?.api_key) {
       sanitizedPayload.properties.llm.api_key = "***MASKED***";
     }
+    if (sanitizedPayload.properties?.mllm?.api_key) {
+      sanitizedPayload.properties.mllm.api_key = "***MASKED***";
+    }
     if (sanitizedPayload.properties?.tts?.params?.key) {
       sanitizedPayload.properties.tts.params.key = "***MASKED***";
     }
     if (sanitizedPayload.properties?.avatar?.params?.api_key) {
       sanitizedPayload.properties.avatar.params.api_key = "***MASKED***";
-    }
-    if (sanitizedPayload.properties?.avatar?.params?.anam_api_key) {
-      sanitizedPayload.properties.avatar.params.anam_api_key = "***MASKED***";
     }
     if (sanitizedPayload.properties?.avatar?.params?.agora_token) {
       sanitizedPayload.properties.avatar.params.agora_token =

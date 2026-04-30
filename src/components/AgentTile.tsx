@@ -115,6 +115,24 @@ const AgentTile: React.FC<AgentTileProps> = ({
 
   const hasVideo = Boolean(videoTrack);
 
+  // v2.6: small live state pill — only shown when an avatar video occupies
+  // the tile, because in that mode the bottom state label/animation is
+  // hidden and we still want a glanceable signal. In the bot-icon view the
+  // bottom label + animation already covers it, so we skip the pill there
+  // to avoid duplicating the same indicator.
+  const showLivePill =
+    isRtm &&
+    hasVideo &&
+    (agentState === EAgentState.LISTENING ||
+      agentState === EAgentState.THINKING ||
+      agentState === EAgentState.SPEAKING);
+  const livePillClass =
+    agentState === EAgentState.SPEAKING
+      ? "bg-blue-500/90 text-white"
+      : agentState === EAgentState.THINKING
+      ? "bg-amber-500/90 text-white"
+      : "bg-green-500/90 text-white";
+
   return (
     <div
       id={`agent-${agentUid}`}
@@ -130,6 +148,18 @@ const AgentTile: React.FC<AgentTileProps> = ({
       )}
       {/* Subtle dark overlay for vintage / less bright */}
       <div className="absolute inset-0 rounded-lg bg-gradient-to-t from-black/25 via-transparent to-black/5 pointer-events-none" aria-hidden />
+
+      {/* v2.6 live state pill overlay (top-right) */}
+      {showLivePill && (
+        <div
+          className={`absolute top-2 right-2 z-10 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium shadow ${livePillClass}`}
+          aria-live="polite"
+          title="Live agent state (v2.6 clearer signals)"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-white/90 animate-pulse" />
+          {getStateLabel()}
+        </div>
+      )}
       {/* Agent Avatar/Icon - shown when no video or as overlay */}
       <div className="relative flex flex-col items-center justify-center flex-1 p-4 z-[1]">
         {!hasVideo && (

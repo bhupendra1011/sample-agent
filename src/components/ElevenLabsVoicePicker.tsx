@@ -1,4 +1,5 @@
 import React, { useCallback, useRef, useState } from "react";
+import { ELEVENLABS_DEFAULT_VOICE_ID } from "@/constants/elevenlabsDefaults";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -19,9 +20,18 @@ interface CuratedVoice {
   preview_url: string;
 }
 
-// ─── 5 Curated Voices (3 female, 2 male) ────────────────────────────────────
+// ─── Curated voices (Jessica first = app default) ───────────────────────────
 
 const VOICES: CuratedVoice[] = [
+  {
+    voice_id: ELEVENLABS_DEFAULT_VOICE_ID,
+    name: "Jessica",
+    desc: "Playful, Bright, Warm",
+    gender: "female",
+    accent: "American",
+    preview_url:
+      "https://storage.googleapis.com/eleven-public-prod/premade/voices/cgSgspJ2msm6clMCkdW9/56a97bf8-b69b-448f-846c-c3a11683d45a.mp3",
+  },
   {
     voice_id: "EXAVITQu4vr4xnSDxMaL",
     name: "Sarah",
@@ -30,15 +40,6 @@ const VOICES: CuratedVoice[] = [
     accent: "American",
     preview_url:
       "https://storage.googleapis.com/eleven-public-prod/premade/voices/EXAVITQu4vr4xnSDxMaL/01a3e33c-6e99-4ee7-8543-ff2216a32186.mp3",
-  },
-  {
-    voice_id: "cgSgspJ2msm6clMCkdW9",
-    name: "Jessica",
-    desc: "Playful, Bright, Warm",
-    gender: "female",
-    accent: "American",
-    preview_url:
-      "https://storage.googleapis.com/eleven-public-prod/premade/voices/cgSgspJ2msm6clMCkdW9/56a97bf8-b69b-448f-846c-c3a11683d45a.mp3",
   },
   {
     voice_id: "pFZP5JQG7iQjIQuC4Bku",

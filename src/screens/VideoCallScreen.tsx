@@ -232,7 +232,7 @@ const VideoCallScreen: React.FC = () => {
             className="font-semibold text-base sm:text-lg text-[var(--agora-accent-blue)] truncate max-w-full"
             title="Build4भारत Hackathon 9.0"
           >
-            Build4भारत Hackathon 9.0
+            Conversational Agent
           </span>
         </div>
         <div className="flex items-center gap-3 justify-end min-w-0">

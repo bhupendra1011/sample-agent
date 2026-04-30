@@ -1,5 +1,11 @@
 // src/api/agentApi.ts
-import type { AgentSettings, AgentQueryStatus } from "@/types/agora";
+import type {
+  AgentSettings,
+  AgentQueryStatus,
+  ThinkOptions,
+  ThinkResponse,
+} from "@/types/agora";
+import type { AgentTurnsResponse } from "@/types/agentTurns";
 
 export interface CustomJoinPayload {
   name: string;
@@ -95,6 +101,62 @@ export async function queryAgent(
   }
 
   return response.json();
+}
+
+/**
+ * Per-turn latency and lifecycle metrics (after session ends; last 7 days).
+ * See https://docs.agora.io/en/conversational-ai/rest-api/agent/turns
+ */
+export async function queryAgentTurns(
+  agentId: string,
+): Promise<AgentTurnsResponse> {
+  const response = await fetch(
+    `/api/agent/turns?agentId=${encodeURIComponent(agentId)}`,
+  );
+
+  if (!response.ok) {
+    const errorData = (await response.json().catch(() => ({}))) as {
+      error?: string;
+      hint?: string;
+    };
+    const msg = [errorData.error, errorData.hint].filter(Boolean).join(" ");
+    throw new Error(msg || "Failed to query conversation turns");
+  }
+
+  return response.json() as Promise<AgentTurnsResponse>;
+}
+
+/**
+ * Sends a custom text instruction to a running agent (v2.6).
+ * Uses POST /v2/projects/{appid}/agents/{agentId}/think.
+ *
+ * Defaults match the Agora docs:
+ *   on_listening_action: "inject"
+ *   on_thinking_action: "interrupt"
+ *   on_speaking_action: "ignore"
+ *   interruptable: true
+ *
+ * See: https://docs.agora.io/en/conversational-ai/rest-api/agent/think
+ */
+export async function sendAgentInstruction(
+  agentId: string,
+  options: ThinkOptions,
+): Promise<ThinkResponse> {
+  const response = await fetch("/api/agent/think", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ agentId, options }),
+  });
+
+  if (!response.ok) {
+    const errorData = (await response.json().catch(() => ({}))) as {
+      error?: string;
+      details?: unknown;
+    };
+    throw new Error(errorData.error || "Failed to send agent instruction");
+  }
+
+  return response.json() as Promise<ThinkResponse>;
 }
 
 /**

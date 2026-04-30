@@ -45,9 +45,8 @@ import {
   ANAM_AVATAR_OPTIONS,
   ANAM_DEFAULT_AVATAR_ID,
 } from "@/constants/anamAvatars";
-import ElevenLabsVoicePicker, {
-  ELEVENLABS_ANIKA_VOICE_ID,
-} from "@/components/ElevenLabsVoicePicker";
+import ElevenLabsVoicePicker from "@/components/ElevenLabsVoicePicker";
+import { ELEVENLABS_DEFAULT_VOICE_ID } from "@/constants/elevenlabsDefaults";
 
 interface AgentSettingsSidebarProps {
   isOpen: boolean;
@@ -109,7 +108,8 @@ const getDefaultTTSVendor = (): TTSVendor => {
   if (
     vendor === "elevenlabs" ||
     vendor === "openai" ||
-    vendor === "microsoft"
+    vendor === "microsoft" ||
+    vendor === "deepgram"
   ) {
     return vendor;
   }
@@ -132,7 +132,8 @@ const getDefaultTTSParams = (vendor: TTSVendor): Record<string, unknown> => {
       return {
         key: "",
         voice_id:
-          getEnvVar("ELEVENLABS_VOICE_ID").trim() || ELEVENLABS_ANIKA_VOICE_ID,
+          getEnvVar("ELEVENLABS_VOICE_ID").trim() ||
+          ELEVENLABS_DEFAULT_VOICE_ID,
         model_id: getEnvVar("ELEVENLABS_MODEL_ID", "eleven_flash_v2_5"),
         sample_rate: parseInt(getEnvVar("ELEVENLABS_SAMPLE_RATE", "24000"), 10),
         speed: 1.0,
@@ -143,6 +144,14 @@ const getDefaultTTSParams = (vendor: TTSVendor): Record<string, unknown> => {
         model: getEnvVar("OPENAI_TTS_MODEL", "tts-1"),
         voice: getEnvVar("OPENAI_TTS_VOICE", "alloy"),
         speed: 1.0,
+      };
+    case "deepgram":
+      // v2.6: Deepgram TTS (Aura family). Server injects DEEPGRAM_TTS_KEY.
+      return {
+        key: "",
+        model: "aura-asteria-en",
+        sample_rate: 24000,
+        encoding: "linear16",
       };
     case "microsoft":
     default:
@@ -434,12 +443,26 @@ function normalizeAgentSettings(prev: AgentSettings): AgentSettings {
   }
   const filler_words: FillerWordsConfig = prev.filler_words ?? getDefaultSettings().filler_words!;
   const sal: SalConfig = prev.sal ?? getDefaultSettings().sal!;
+  const baseTts = prev.tts;
+  let tts = baseTts;
+  if (
+    baseTts?.vendor === "elevenlabs" &&
+    baseTts.params &&
+    typeof baseTts.params === "object"
+  ) {
+    const p = { ...(baseTts.params as Record<string, unknown>) };
+    if (!String(p.voice_id ?? "").trim()) {
+      p.voice_id = ELEVENLABS_DEFAULT_VOICE_ID;
+    }
+    tts = { ...baseTts, params: p };
+  }
   return {
     ...prev,
     enable_turn_detection: prev.enable_turn_detection ?? false,
     turn_detection,
     filler_words,
     sal,
+    ...(baseTts !== undefined ? { tts } : {}),
   };
 }
 
@@ -794,7 +817,8 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
       Object.assign(defaultParams, {
         model_id: "eleven_flash_v2_5",
         voice_id:
-          getEnvVar("ELEVENLABS_VOICE_ID").trim() || ELEVENLABS_ANIKA_VOICE_ID,
+          getEnvVar("ELEVENLABS_VOICE_ID").trim() ||
+          ELEVENLABS_DEFAULT_VOICE_ID,
         speed: 1.0,
       });
     } else if (vendor === "openai") {
@@ -1097,6 +1121,27 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
             </FormField>
 
             <FormField
+              label="Greeting Mode"
+              hint="single_every: replay on every new user join. single_first: only the first time."
+              tooltip="LLM greeting broadcast mode (v2.2+). Server defaults to single_every when omitted."
+            >
+              <CustomSelect
+                value={settings.llm.greeting_configs?.mode ?? "single_every"}
+                onChange={(v) =>
+                  updateLLM({
+                    greeting_configs: {
+                      mode: v as "single_every" | "single_first",
+                    },
+                  })
+                }
+                options={[
+                  { value: "single_every", label: "single_every (default)" },
+                  { value: "single_first", label: "single_first" },
+                ]}
+              />
+            </FormField>
+
+            <FormField
               label="Failure Message"
               hint="Fallback when there's an error"
               tooltip="Fallback when the LLM call fails."
@@ -1167,7 +1212,7 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
             <FormField
               label="API Key"
               required
-              hint="Leave empty to use server key (ELEVENLABS_API_KEY / MICROSOFT_TTS_KEY / OPENAI_TTS_KEY)"
+              hint="Leave empty to use server key (ELEVENLABS_API_KEY / MICROSOFT_TTS_KEY / OPENAI_TTS_KEY / DEEPGRAM_TTS_KEY)"
             >
               <Input
                 type="password"
@@ -1255,7 +1300,9 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
                   hint="From ElevenLabs voice library"
                 >
                   <ElevenLabsVoicePicker
-                    value={getTTSParam("voice_id")}
+                    value={
+                      getTTSParam("voice_id") || ELEVENLABS_DEFAULT_VOICE_ID
+                    }
                     onChange={(id) => setTTSParam("voice_id", id)}
                   />
                 </FormField>
@@ -1303,6 +1350,64 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
                     value={getTTSParam("voice")}
                     onChange={(v) => setTTSParam("voice", v)}
                     options={(TTS_PRESETS.openai.voices ?? []).map((voice) => ({ value: voice, label: voice }))}
+                  />
+                </FormField>
+              </>
+            )}
+
+            {/* Deepgram TTS specific fields (v2.6) */}
+            {selectedTTSVendor === "deepgram" && (
+              <>
+                <FormField
+                  label="Voice / Model"
+                  required
+                  hint="Deepgram Aura family (e.g. aura-asteria-en)"
+                >
+                  <CustomSelect
+                    value={getTTSParam("model") || "aura-asteria-en"}
+                    onChange={(v) => setTTSParam("model", v)}
+                    options={(TTS_PRESETS.deepgram.models ?? []).map(
+                      (model) => ({ value: model, label: model }),
+                    )}
+                  />
+                </FormField>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    label="Sample rate"
+                    hint="Hz (use 24000 with avatars; 16000 for Akool)"
+                  >
+                    <Input
+                      type="number"
+                      min={8000}
+                      step={1000}
+                      value={getTTSParam("sample_rate") || "24000"}
+                      onChange={(e) =>
+                        setTTSParam(
+                          "sample_rate",
+                          parseInt(e.target.value, 10) || 24000,
+                        )
+                      }
+                    />
+                  </FormField>
+                  <FormField label="Encoding" hint="linear16 / mulaw">
+                    <CustomSelect
+                      value={getTTSParam("encoding") || "linear16"}
+                      onChange={(v) => setTTSParam("encoding", v)}
+                      options={[
+                        { value: "linear16", label: "linear16" },
+                        { value: "mulaw", label: "mulaw" },
+                      ]}
+                    />
+                  </FormField>
+                </div>
+                <FormField
+                  label="Endpoint URL"
+                  hint="Optional override of Deepgram TTS base URL"
+                >
+                  <Input
+                    value={getTTSParam("url") || ""}
+                    onChange={(e) => setTTSParam("url", e.target.value)}
+                    placeholder="(default Deepgram endpoint)"
                   />
                 </FormField>
               </>
@@ -1680,10 +1785,12 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
                 />
               </FormField>
 
-              {/* config.start_of_speech - Collapsible */}
+              {/* config.start_of_speech - Collapsible.
+                  Relabeled as "Interruption mode" to surface v2.6's unified
+                  interruption control (speech VAD / keywords / disabled). */}
               <CollapsibleSubSection
-                title="Start of speech"
-                description="When the user is considered to have started speaking"
+                title="Interruption mode (start of speech)"
+                description="Unified interruption (v2.6): speech-based, keyword-triggered, or disabled."
                 isOpen={turnDetectionSubsections.startOfSpeech}
                 onToggle={() => toggleTurnDetectionSubsection("startOfSpeech")}
               >
@@ -2353,6 +2460,117 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({
                 }
                 hint="Function calling support."
               />
+              <Toggle
+                label="Enable MLLM (voice-to-voice)"
+                checked={settings.advanced_features?.enable_mllm ?? false}
+                onChange={(checked) =>
+                  setSettings({
+                    ...settings,
+                    advanced_features: {
+                      ...settings.advanced_features,
+                      enable_mllm: checked,
+                    },
+                    mllm: settings.mllm ?? {
+                      style: "openai",
+                      api_key: "",
+                      params: {},
+                      turn_detection: { provider: "openai" },
+                    },
+                  })
+                }
+                hint="OpenAI Realtime / Gemini Live voice-to-voice. v2.6: vendor-specific turn detection under mllm.turn_detection."
+              />
+              {(settings.advanced_features?.enable_mllm ?? false) && (
+                <div className="mt-3 pl-0 space-y-3">
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    MLLM configuration
+                  </h4>
+                  <FormField
+                    label="Provider"
+                    hint="openai = OpenAI Realtime; gemini = Google Gemini Live"
+                  >
+                    <CustomSelect
+                      value={settings.mllm?.style ?? "openai"}
+                      onChange={(v) => {
+                        const style = v as "openai" | "gemini";
+                        setSettings({
+                          ...settings,
+                          mllm: {
+                            ...settings.mllm,
+                            style,
+                            turn_detection: {
+                              ...settings.mllm?.turn_detection,
+                              provider: style,
+                            },
+                          },
+                        });
+                      }}
+                      options={[
+                        { value: "openai", label: "OpenAI Realtime" },
+                        { value: "gemini", label: "Google Gemini Live" },
+                      ]}
+                    />
+                  </FormField>
+                  <FormField
+                    label="API Key"
+                    hint="Leave empty to use server key (OPENAI_API_KEY / GEMINI_API_KEY)"
+                  >
+                    <Input
+                      type="password"
+                      value={maskKeyForDisplay(settings.mllm?.api_key)}
+                      onChange={(e) =>
+                        keyChange(e.target.value, settings.mllm?.api_key, (k) =>
+                          setSettings({
+                            ...settings,
+                            mllm: { ...settings.mllm, api_key: k },
+                          }),
+                        )
+                      }
+                      placeholder="Leave empty for server key"
+                    />
+                  </FormField>
+                  <FormField
+                    label="Endpoint URL"
+                    hint="Optional override (provider default if blank)"
+                  >
+                    <Input
+                      value={settings.mllm?.url ?? ""}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          mllm: { ...settings.mllm, url: e.target.value },
+                        })
+                      }
+                      placeholder="https://api.openai.com/v1/realtime"
+                    />
+                  </FormField>
+                  <FormField
+                    label="Greeting message"
+                    hint="What the MLLM voice says first"
+                  >
+                    <Input
+                      value={settings.mllm?.greeting_message ?? ""}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          mllm: {
+                            ...settings.mllm,
+                            greeting_message: e.target.value,
+                          },
+                        })
+                      }
+                      placeholder="Hello! How can I help you?"
+                    />
+                  </FormField>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    v2.6: vendor-specific turn detection (OpenAI Realtime
+                    server_vad/semantic_vad, Gemini Live activity detection)
+                    will be sent under <code>mllm.turn_detection</code> when
+                    populated. Set provider above; details can be tuned via the
+                    join payload editor.
+                  </p>
+                </div>
+              )}
             </CollapsibleSubSection>
           </Section>
         </div>
